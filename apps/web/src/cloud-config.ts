@@ -32,7 +32,7 @@ export const CLOUD: CloudProject = {
   url: "https://ronancqtbbqmsiatxmfn.supabase.co",
   publishableKey: "sb_publishable_IS6I8qzIGjmWzWUSXW5IhA_TFLO1A5M",
   googleClientId: "542220598161-qcg2d23ci9hpj3vr2nm3lnl2tji43qj1.apps.googleusercontent.com",
-  googleReturn: "https://nbparagliding.nz/nzosa/",
+  googleReturn: "https://nbparagliding.nz/osabooks/",
 };
 
 /**
