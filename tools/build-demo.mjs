@@ -95,7 +95,7 @@ This directory contains the production build for the online demo hosted at:
 https://nbparagliding.nz/nzosa_demo/
 
 That is **not** the same place as the app itself, which lives at
-https://nbparagliding.nz/nzosa/ and is deployed separately. Unpacking this
+https://nbparagliding.nz/osabooks/ and is deployed separately. Unpacking this
 over \`nzosa/\` would replace the app with the demo, banner and seed data and
 all.
 
