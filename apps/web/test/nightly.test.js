@@ -1,0 +1,174 @@
+import assert from "node:assert/strict";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import test from "node:test";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { build } from "esbuild";
+
+/**
+ * The morning run is the page's own code, bundled to run with no page. These
+ * build it the way apps/web/nightly.js does and run it on invented books, so
+ * a change that reaches for the page from code the morning uses -- document,
+ * a window, a save -- fails here rather than at six in the morning.
+ */
+const root = join(dirname(fileURLToPath(import.meta.url)), "..");
+const out = mkdtempSync(join(tmpdir(), "nzosa-nightly-"));
+const bundle = join(out, "nightly-run.mjs");
+await build({
+  entryPoints: [join(root, "src", "nightly-run.ts")],
+  bundle: true,
+  platform: "node",
+  format: "esm",
+  target: ["node20"],
+  define: { __NZOSA_EDITION__: '"nz"' },
+  outfile: bundle,
+  logLevel: "silent",
+});
+test.after(() => rmSync(out, { recursive: true, force: true }));
+
+let fresh = 0;
+/** A fresh copy each time: the run keeps its state in the module. */
+async function run(input) {
+  fresh += 1;
+  const { morningRun } = await import(`${pathToFileURL(bundle).href}?n=${fresh}`);
+  return morningRun(input);
+}
+
+const chart = [
+  { code: "200", name: "Sales", type: "Revenue", taxCode: "15% GST on Income", description: "" },
+  { code: "429", name: "General Expenses", type: "Overhead", taxCode: "15% GST on Expenses", description: "" },
+  { code: "449", name: "Motor Vehicle Expenses", type: "Overhead", taxCode: "15% GST on Expenses", description: "" },
+  { code: "489", name: "Telephone & Internet", type: "Overhead", taxCode: "15% GST on Expenses", description: "" },
+];
+
+function line(id, date, amount, otherParty) {
+  return {
+    id, date, amount, currency: "NZD", account: "12-3456-7890123-00", serial: "", trn: "",
+    particulars: "", code: "", reference: "", otherParty, origin: "", type: "", batch: "",
+    otherPartyAccount: "", occurrence: 1,
+  };
+}
+
+function parts(transactions) {
+  return {
+    decisions: { version: 1, data: { chart } },
+    transactions: { version: 1, data: transactions },
+    rules: { version: 1, data: {} },
+  };
+}
+
+test("fuel and a phone plan are suggested from the list of known businesses, with no AI", async () => {
+  const result = await run({
+    parts: parts([
+      line("a1", "2026-05-02", -6150, "Z RIMU"),
+      line("a2", "2026-05-03", -4500, "SPARK NZ"),
+      line("a3", "2026-05-04", -1200, "KOWHAI CAFE"),
+    ]),
+    maxLines: 200,
+  });
+  const byId = new Map(result.suggestions.map((s) => [s.id, s.code]));
+  assert.match(byId.get("a1") ?? "", /449/);
+  assert.match(byId.get("a2") ?? "", /489/);
+  assert.equal(byId.has("a3"), false, "an unknown cafe is left for the AI or a person");
+  assert.equal(result.added, 0);
+});
+
+test("the feed's new lines are seen as waiting, the AI asked about them, and nothing written", async () => {
+  let asked = "";
+  const result = await run({
+    parts: parts([line("a1", "2026-05-02", -6150, "Z RIMU")]),
+    feed: {
+      links: { acc_totara: "12-3456-7890123-00" },
+      fetch: async () => [
+        { _id: "trans_1", _account: "acc_totara", date: "2026-05-06T00:00:00Z", description: "TOTARA TRADING", amount: -88 },
+        { _id: "trans_2", _account: "acc_other", date: "2026-05-06T00:00:00Z", description: "NOT OURS", amount: -5 },
+      ],
+    },
+    ask: async (prompt) => {
+      asked = prompt;
+      const id = /"id": "([^"]+)"/.exec(prompt.slice(prompt.indexOf("Transactions to code")))?.[1];
+      return { text: JSON.stringify([{ id, code: "429", confidence: 0.7, because: "supplies" }]) };
+    },
+    maxLines: 200,
+  });
+  assert.equal(result.added, 1, "the linked account's line, not the other");
+  assert.equal(result.items.length, 2, "the inbox keeps what the bank gave, as it gave it");
+  assert.ok(asked.includes("TOTARA TRADING"));
+  assert.ok(!asked.includes('"payee": "Z RIMU"'), "a line the list answered is not paid for again");
+  assert.ok(result.suggestions.some((s) => /429/.test(s.code) && s.because === "supplies"));
+});
+
+test("at most the lines allowed are asked about", async () => {
+  const many = Array.from({ length: 30 }, (_, i) =>
+    line(`m${i}`, `2026-06-${String((i % 28) + 1).padStart(2, "0")}`, -(1000 + i), `KOWHAI SUPPLIER ${i}`),
+  );
+  let asking = 0;
+  await run({
+    parts: parts(many),
+    ask: async (_prompt, count) => {
+      asking += count;
+      return { text: "[]" };
+    },
+    maxLines: 12,
+  });
+  assert.equal(asking, 12);
+});
+
+test("lines the model could not answer are left alone the next morning, and not paid for again", async () => {
+  const many = Array.from({ length: 6 }, (_, i) => line(`u${i}`, `2026-06-0${i + 1}`, -(2000 + i), `KOWHAI SUPPLIER ${i}`));
+  const seen = [];
+  const ask = async (prompt, count) => {
+    seen.push(count);
+    return { text: "[]" };
+  };
+  const first = await run({ parts: parts(many), ask, maxLines: 100, now: new Date("2026-10-01T00:00:00Z") });
+  assert.equal(Object.keys(first.unsure.ids).length, 6, "all six asked and none answered");
+  const asked = seen.reduce((a, b) => a + b, 0);
+  assert.equal(asked, 6);
+
+  seen.length = 0;
+  const second = await run({ parts: parts(many), ask, maxLines: 100, unsure: first.unsure, now: new Date("2026-10-02T00:00:00Z") });
+  assert.equal(seen.length, 0, "nothing asked: they were tried yesterday");
+  assert.equal(Object.keys(second.unsure.ids).length, 6);
+
+  const later = await run({ parts: parts(many), ask, maxLines: 100, unsure: first.unsure, now: new Date("2026-10-16T00:00:00Z") });
+  assert.equal(seen.reduce((a, b) => a + b, 0), 6, "asked again after 14 days");
+  assert.equal(later.unsure.ids.u0, "2026-10-16T00:00:00.000Z");
+});
+
+test("a change to the chart lets the unanswered lines be asked again", async () => {
+  const many = [line("c1", "2026-06-01", -2000, "KOWHAI SUPPLIER ONE")];
+  const ask = async () => ({ text: "[]" });
+  const first = await run({ parts: parts(many), ask, maxLines: 100, now: new Date("2026-10-01T00:00:00Z") });
+  let count = 0;
+  const changed = parts(many);
+  changed.decisions.data.chart = [...chart, { code: "493", name: "Travel", type: "Overhead", taxCode: "15% GST on Expenses", description: "" }];
+  await run({ parts: changed, ask: async (_p, n) => ((count += n), { text: "[]" }), maxLines: 100, unsure: first.unsure, now: new Date("2026-10-02T00:00:00Z") });
+  assert.equal(count, 1, "the chart is different, so the line is worth asking again");
+});
+
+test("an error is not remembered as a line the model could not answer", async () => {
+  const many = [line("e1", "2026-06-01", -2000, "KOWHAI SUPPLIER ONE")];
+  const r = await run({ parts: parts(many), ask: async () => ({ error: "no allowance left today" }), maxLines: 100, now: new Date("2026-10-01T00:00:00Z") });
+  assert.deepEqual(r.unsure.ids, {});
+});
+
+test("the inbox keeps only what the books do not already hold, and a refused ask is not counted as asked", async () => {
+  const held = { ...line("a1", "2026-05-02", -6150, "Z RIMU"), extras: { akahuId: "trans_old" }, source: { importer: "akahu", file: "feed", line: 1 } };
+  const result = await run({
+    parts: parts([held]),
+    feed: {
+      links: { acc_totara: "12-3456-7890123-00" },
+      fetch: async () => [
+        { _id: "trans_old", _account: "acc_totara", date: "2026-05-02T00:00:00Z", description: "Z RIMU", amount: -61.5 },
+        { _id: "trans_new", _account: "acc_totara", date: "2026-05-06T00:00:00Z", description: "TOTARA TRADING", amount: -88 },
+      ],
+    },
+    ask: async () => ({ error: "no allowance left today" }),
+    maxLines: 100,
+  });
+  assert.deepEqual(result.items.map((i) => i._id), ["trans_new"]);
+  assert.match(result.said, /0 lines asked of the AI|0 line asked of the AI|no allowance left today/);
+  assert.ok(!/100 lines asked/.test(result.said));
+});

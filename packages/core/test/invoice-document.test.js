@@ -1,0 +1,197 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { cleanDocumentLink, cleanLogo, emailForContact, invoiceDocument, invoiceEmail } from "../dist/index.js";
+
+const line = (over) => ({
+  description: "Tandem flight", accountCode: "200", taxType: "15% GST on Income",
+  net: 20000, tax: 3000, gross: 23000, ...over,
+});
+
+const invoice = (over) => ({
+  number: "INV-1042", kind: "sales", contact: "Kea Cafe Group", reference: "PO 88",
+  issued: "2026-05-01", due: "2026-05-31", total: 23000, tax: 3000, paid: 0,
+  outstanding: 23000, currency: "NZD", status: "AUTHORISED", lines: [line()], ...over,
+});
+
+const supplier = {
+  name: "Kereru Gliders Ltd",
+  address: "12 Sample Street\nNelson 7010",
+  gstNumber: "123-456-789",
+  payTo: "02-1100-0022001-000",
+};
+
+test("the document carries what a customer needs to pay it", () => {
+  const html = invoiceDocument(invoice(), supplier);
+  for (const wanted of [
+    "Kereru Gliders Ltd", "12 Sample Street", "GST 123-456-789",
+    "Kea Cafe Group", "INV-1042", "01/05/2026", "31/05/2026", "PO 88",
+    "Tandem flight", "02-1100-0022001-000", "230.00", "30.00", "200.00",
+  ]) {
+    assert.ok(html.includes(wanted), `missing ${wanted}`);
+  }
+});
+
+test("a supplier with no GST number issues an invoice, not a tax invoice", () => {
+  // Calling it a tax invoice when no GST was charged says the customer can
+  // claim something they cannot.
+  const html = invoiceDocument(
+    invoice({ tax: 0, total: 20000, outstanding: 20000, lines: [line({ tax: 0, gross: 20000 })] }),
+    { name: "Sole Trader" },
+  );
+  assert.ok(html.includes("<h1>Invoice</h1>"), "should be a plain invoice");
+  assert.equal(html.includes("Tax invoice"), false);
+  assert.equal(html.includes("GST 1"), false);
+});
+
+test("a part-paid invoice shows what is still owed", () => {
+  const html = invoiceDocument(
+    invoice({ paid: 10000, outstanding: 13000 }),
+    supplier,
+  );
+  assert.ok(html.includes("Already paid"));
+  assert.ok(html.includes("Amount due"));
+  assert.ok(html.includes("-100.00"), "the payment should read as a deduction");
+  assert.ok(html.includes("130.00"));
+});
+
+test("lines that do not come to the invoice total are flagged, not corrected", () => {
+  // An imported invoice says what the other system said. Quietly recomputing
+  // would send the customer a different figure from the one in the books.
+  const html = invoiceDocument(invoice({ total: 25000, outstanding: 25000 }), supplier);
+  assert.match(html, /lines come to 230.00 and the invoice total is recorded as 250.00/);
+  assert.ok(html.includes("250.00"), "the recorded total is what is billed");
+});
+
+test("nothing a customer typed can become markup", () => {
+  const nasty = '<script>alert(1)</script> & "quoted"';
+  const html = invoiceDocument(
+    invoice({ contact: nasty, lines: [line({ description: nasty })] }),
+    { ...supplier, name: nasty },
+  );
+  assert.equal(html.includes("<script>"), false);
+  assert.ok(html.includes("&lt;script&gt;"));
+  assert.ok(html.includes("&amp;"));
+});
+
+test("an address keeps the lines it was written on", () => {
+  const html = invoiceDocument(invoice(), supplier);
+  assert.ok(html.includes("12 Sample Street<br>Nelson 7010"));
+});
+
+test("no due date means no due line", () => {
+  const html = invoiceDocument(invoice({ due: null }), supplier);
+  assert.equal(html.includes("Due</span>"), false);
+});
+
+test("it is one file, with its styles inside it", () => {
+  const html = invoiceDocument(invoice(), supplier);
+  assert.equal(/<link|<img|src=/.test(html), false, "nothing to fetch from elsewhere");
+  assert.ok(html.startsWith("<!doctype html>"));
+});
+
+test("the email names the invoice, what is owing and how to pay", () => {
+  const { subject, body } = invoiceEmail(invoice({ paid: 5000, outstanding: 18000 }), supplier);
+  assert.equal(subject, "Tax invoice INV-1042 from Kereru Gliders Ltd");
+  for (const wanted of ["INV-1042", "180.00", "31/05/2026", "PO 88", "02-1100-0022001-000", "Kereru Gliders Ltd"]) {
+    assert.ok(body.includes(wanted), `missing ${wanted}`);
+  }
+  assert.ok(!body.includes("230.00"));
+});
+
+test("the email is addressed to the customer's saved address, and only a real one", () => {
+  assert.equal(invoiceEmail(invoice({ email: " accounts@kea.example " }), supplier).to, "accounts@kea.example");
+  assert.equal(invoiceEmail(invoice({ email: "not an address" }), supplier).to, "");
+  assert.equal(invoiceEmail(invoice(), supplier).to, "");
+});
+
+test("a customer's address is remembered by name, newest first", () => {
+  const books = [
+    invoice({ number: "A", issued: "2026-01-01", email: "old@kea.example" }),
+    invoice({ number: "B", issued: "2026-03-01", contact: " kea  cafe group", email: "new@kea.example" }),
+    invoice({ number: "C", issued: "2026-04-01" }),
+    invoice({ number: "D", issued: "2026-05-01", contact: "Other", email: "other@x.example" }),
+    invoice({ number: "E", issued: "2026-06-01", kind: "purchase", email: "bill@kea.example" }),
+  ];
+  assert.equal(emailForContact(books, "Kea Cafe Group"), "new@kea.example");
+  assert.equal(emailForContact(books, "Nobody"), null);
+  assert.equal(emailForContact(books, ""), null);
+});
+
+test("an unregistered supplier's email says invoice, not tax invoice", () => {
+  const { subject } = invoiceEmail(invoice({ tax: 0 }), { name: "Sole Trader" });
+  assert.equal(subject, "Invoice INV-1042 from Sole Trader");
+});
+
+const PIXEL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+
+test("a logo is a small raster image data URI and nothing else", () => {
+  assert.equal(cleanLogo(PIXEL), PIXEL);
+  assert.equal(cleanLogo("data:image/svg+xml;base64,PHN2Zz48L3N2Zz4="), null);
+  assert.equal(cleanLogo("https://example.com/logo.png"), null);
+  assert.equal(cleanLogo('data:image/png;base64,AAAA"><script>'), null);
+  const big = "data:image/png;base64," + "A".repeat(1_400_000);
+  assert.equal(cleanLogo(big), null);
+});
+
+test("the document shows the logo, and drops one that is not safe", () => {
+  assert.ok(invoiceDocument(invoice(), { ...supplier, logo: PIXEL }).includes('<img class="logo"'));
+  assert.ok(!invoiceDocument(invoice(), { ...supplier, logo: "javascript:alert(1)" }).includes("<img"));
+});
+
+test("a document link must be an http(s) address", () => {
+  assert.equal(cleanDocumentLink(" https://drive.google.com/file/d/abc/view "), "https://drive.google.com/file/d/abc/view");
+  assert.equal(cleanDocumentLink("javascript:alert(1)"), null);
+  assert.equal(cleanDocumentLink("not a link"), null);
+  assert.equal(cleanDocumentLink(undefined), null);
+});
+
+test("an Australian tax invoice shows the supplier's ABN", () => {
+  const html = invoiceDocument(invoice(), { ...supplier, gstNumber: "51 824 753 556" }, { taxIdLabel: "ABN", lang: "en-AU" });
+  assert.ok(html.includes("ABN 51 824 753 556"));
+  assert.ok(!html.includes("GST 51 824"));
+  assert.ok(html.includes("Tax invoice"));
+  assert.ok(html.includes('lang="en-AU"'));
+});
+
+test("the invoice's own message is at its foot and in its email; none adds nothing", async () => {
+  const { invoiceDocument, invoiceEmail } = await import("../dist/index.js");
+  const inv = {
+    number: "INV-9", kind: "sales", contact: "A", reference: "", issued: "2026-10-26", due: null, total: 1150, tax: 150, paid: 0, outstanding: 1150,
+    currency: "NZD", status: "", lines: [{ description: "x", accountCode: "200", taxType: "15% GST on Income", net: 1000, tax: 150, gross: 1150 }],
+    message: "Thank you!\nPay within 20 days.",
+  };
+  const supplier = { name: "Kea" };
+  assert.ok(invoiceDocument(inv, supplier).includes("Pay within 20 days."));
+  assert.ok(invoiceEmail(inv, supplier).body.includes("Pay within 20 days."));
+  assert.ok(!invoiceDocument({ ...inv, message: "" }, supplier).includes('class="note"'));
+  // A note given for this one document wins over the invoice's own.
+  assert.ok(invoiceDocument(inv, supplier, { note: "Other words" }).includes("Other words"));
+});
+
+test("a sales receipt is printed as paid, with nothing asked for", () => {
+  const sale = invoice({
+    receipt: true, contact: "Walk-in customer", due: null, paid: 23000, outstanding: 0,
+    paidOutside: [{ date: "2026-05-01", amount: 23000, accountCode: "Cash on hand - 090" }],
+  });
+  const html = invoiceDocument(sale, supplier);
+  assert.ok(html.includes("Tax invoice and receipt"));
+  assert.ok(html.includes("Sold to"));
+  assert.ok(html.includes(">Paid<"));
+  assert.ok(!html.includes("02-1100-0022001-000"), "no bank account to pay into");
+  assert.ok(invoiceDocument({ ...sale, tax: 0 }, { name: "Sole Trader" }).includes("<h1>Receipt</h1>"));
+  const mail = invoiceEmail(sale, supplier);
+  assert.ok(mail.body.includes("Paid: 230.00"));
+  assert.ok(!mail.body.includes("Amount due"));
+  assert.ok(!mail.body.includes("Payment details"));
+});
+
+test("a card payment link is printed and emailed while it is for what is owed, and not once paid", () => {
+  const link = { id: "plink_1", url: "https://buy.stripe.com/test_abc", amount: 23000, currency: "NZD", made: "2026-05-01" };
+  const withLink = invoice({ payLink: link });
+  assert.ok(invoiceDocument(withLink, supplier).includes("https://buy.stripe.com/test_abc"));
+  assert.ok(invoiceEmail(withLink, supplier).body.includes("Pay by card: https://buy.stripe.com/test_abc"));
+  // Part paid since: the link asks for the wrong amount, so it is left off.
+  assert.ok(!invoiceDocument(invoice({ payLink: link, paid: 5000, outstanding: 18000 }), supplier).includes("buy.stripe.com"));
+  assert.ok(!invoiceEmail(invoice({ payLink: { ...link, paidAt: "2026-05-03T01:00:00Z" } }), supplier).body.includes("buy.stripe.com"));
+  assert.ok(!invoiceDocument(invoice({ payLink: { ...link, url: "javascript:alert(1)" } }), supplier).includes("javascript:"));
+});

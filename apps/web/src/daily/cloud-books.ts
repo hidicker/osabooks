@@ -1,0 +1,669 @@
+import { countryChoices, defaultCountry, rememberNewBooksCountry } from "../new-books-country.js";
+import { ownProjectPanel } from "./own-project.js";
+import { cloudConfigured } from "../cloud-config.js";
+import {
+  createBook,
+  currentSession,
+  googleOffered,
+  listBooks,
+  signIn,
+  signInWithGoogle,
+  takeAuthError,
+  signOut,
+  renameBook,
+  signUp,
+} from "../cloud.js";
+import { backupTools, buildBackup, restoredName } from "../backup.js";
+import { renderMembers } from "./cloud-members.js";
+import { myRoles, rpc } from "../cloud.js";
+import { state } from "../state.js";
+import { copyToCloudBook, openCloudBook, openCloudBookId } from "../store.js";
+import { askOnPage, askTextOnPage, note } from "../ui.js";
+
+/**
+ * Books kept on a server, and the way in to them.
+ *
+ * The same page as the folder's books, because it answers the same question:
+ * which set is open. What differs is where they are and that there is somebody
+ * to be -- a folder needs no sign-in, and a server cannot do without one.
+ *
+ * Opening a set reloads the page, exactly as switching folders does. Half the
+ * app holding one ledger while half holds another is a class of bug that
+ * produces plausible wrong figures, and a reload cannot produce it.
+ */
+
+function heading(text: string): HTMLElement {
+  const h = document.createElement("h3");
+  h.textContent = text;
+  return h;
+}
+
+function say(box: HTMLElement, message: string, bad = false): void {
+  box.textContent = message;
+  box.className = bad ? "cloud-said bad" : "cloud-said";
+}
+
+/** Signing in, or making an account. */
+function signInForm(body: HTMLElement): void {
+  body.append(
+    note(
+      "Books on the server can be opened from any computer you sign in on, and shared " +
+        "with people you invite. The books in this browser are not affected.",
+    ),
+  );
+
+  const form = document.createElement("form");
+  form.className = "cloud-form";
+
+  const email = document.createElement("input");
+  email.type = "email";
+  email.autocomplete = "email";
+  email.placeholder = "you@example.co.nz";
+  email.required = true;
+  const emailLabel = document.createElement("label");
+  emailLabel.append("Email", email);
+
+  const password = document.createElement("input");
+  password.type = "password";
+  password.autocomplete = "current-password";
+  password.placeholder = "At least 10 characters";
+  password.required = true;
+  password.minLength = 10;
+  const passwordLabel = document.createElement("label");
+  passwordLabel.append("Password", password);
+
+  const enter = document.createElement("button");
+  enter.type = "submit";
+  enter.className = "primary";
+  enter.textContent = "Sign in";
+
+  const make = document.createElement("button");
+  make.type = "button";
+  make.textContent = "Create an account";
+
+  const said = document.createElement("p");
+  said.className = "cloud-said";
+
+  const working = (on: boolean, what: string): void => {
+    enter.disabled = on;
+    make.disabled = on;
+    if (on) say(said, what);
+  };
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    working(true, "Signing in…");
+    void signIn(email.value.trim(), password.value).then((result) => {
+      if (result.ok) {
+        // Everything on screen belongs to the books that were open, so the
+        // honest thing is to start again rather than repaint around it.
+        location.reload();
+        return;
+      }
+      working(false, "");
+      say(said, result.why, true);
+    });
+  });
+
+  make.addEventListener("click", () => {
+    if (email.value.trim() === "" || password.value.length < 10) {
+      say(said, "An email address and a password of at least 10 characters.", true);
+      return;
+    }
+    working(true, "Creating the account…");
+    void signUp(email.value.trim(), password.value).then((result) => {
+      working(false, "");
+      if (!result.ok) {
+        say(said, result.why, true);
+        return;
+      }
+      if (result.confirm) {
+        say(
+          said,
+          `Check ${email.value.trim()} for a message from NZOSA and follow the link in it. ` +
+            "Then come back here and sign in.",
+        );
+        return;
+      }
+      location.reload();
+    });
+  });
+
+  form.append(emailLabel, passwordLabel, enter, make);
+
+  // Google first when the project offers it: no password to make or forget.
+  const google = document.createElement("div");
+  google.className = "cloud-google";
+  google.hidden = true;
+  const googleButton = document.createElement("button");
+  googleButton.type = "button";
+  googleButton.className = "google-button";
+  googleButton.innerHTML = GOOGLE_MARK;
+  googleButton.append("Continue with Google");
+  googleButton.addEventListener("click", () => {
+    googleButton.disabled = true;
+    say(said, "Going to Google…");
+    void signInWithGoogle().then(() => {
+      // Still here only if it could not leave for Google.
+      const problem = takeAuthError();
+      if (problem === null) return;
+      googleButton.disabled = false;
+      say(said, `Google sign-in did not start: ${problem}`, true);
+    });
+  });
+  const or = document.createElement("p");
+  or.className = "cloud-or";
+  or.textContent = "or with an email address";
+  google.append(googleButton, or);
+  void googleOffered().then((offered) => {
+    google.hidden = !offered;
+  });
+
+  const agree = document.createElement("p");
+  agree.className = "cloud-agree";
+  const terms = document.createElement("a");
+  terms.href = "terms.html";
+  terms.target = "_blank";
+  terms.rel = "noopener";
+  terms.textContent = "terms of service";
+  const privacy = document.createElement("a");
+  privacy.href = "privacy.html";
+  privacy.target = "_blank";
+  privacy.rel = "noopener";
+  privacy.textContent = "privacy policy";
+  agree.append("By signing in you agree to the ", terms, " and the ", privacy, ".");
+
+  body.append(google, form, agree, said);
+  const refused = takeAuthError();
+  if (refused !== null) say(said, `Google sign-in did not finish: ${refused}`, true);
+}
+
+/** Google's mark, inline so the button needs nothing from elsewhere. */
+const GOOGLE_MARK =
+  '<svg viewBox="0 0 18 18" width="18" height="18" aria-hidden="true">' +
+  '<path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/>' +
+  '<path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/>' +
+  '<path fill="#FBBC05" d="M3.97 10.72A5.41 5.41 0 0 1 3.68 9c0-.6.1-1.18.29-1.72V4.95H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.05l3.01-2.33z"/>' +
+  '<path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/>' +
+  "</svg>";
+
+interface InvitationForMe {
+  id: string;
+  books: string;
+  role: string;
+  invited_by: string;
+  sent: string;
+}
+
+/**
+ * Books somebody has asked you to join.
+ *
+ * Nothing appears in your list because somebody else decided it should: an
+ * invitation waits here until you take it up, and declining ends it.
+ */
+async function renderInvitations(body: HTMLElement): Promise<void> {
+  const waiting = await rpc<InvitationForMe[]>("my_invitations", {});
+  if (waiting === null || waiting.length === 0) return;
+
+  const wrap = document.createElement("div");
+  wrap.className = "cloud-invitations";
+  const heading = document.createElement("h3");
+  heading.textContent = waiting.length === 1 ? "You have an invitation" : "You have invitations";
+  wrap.append(heading);
+
+  for (const one of waiting) {
+    const row = document.createElement("p");
+    row.className = "cloud-who";
+    const what = one.role === "readonly"
+      ? "to read them"
+      : one.role === "accountant"
+        ? "as their accountant"
+        : one.role === "owner"
+          ? "as an owner"
+          : "to code them";
+    row.append(
+      document.createTextNode(
+        `${one.invited_by === "" ? "Somebody" : one.invited_by} invited you to ${one.books}, ${what}.`,
+      ),
+    );
+
+    const accept = document.createElement("button");
+    accept.type = "button";
+    accept.className = "primary";
+    accept.textContent = "Accept";
+    accept.addEventListener("click", () => {
+      accept.disabled = true;
+      void rpc<string>("accept_invitation", { invitation: one.id }).then(() => location.reload());
+    });
+
+    const decline = document.createElement("button");
+    decline.type = "button";
+    decline.textContent = "Decline";
+    decline.addEventListener("click", () => {
+      decline.disabled = true;
+      void rpc<string>("decline_invitation", { invitation: one.id }).then(() => location.reload());
+    });
+
+    row.append(" ", accept, " ", decline);
+    wrap.append(row);
+  }
+  body.append(wrap);
+}
+
+/** The sets of books this person may open. */
+/** Sets this person owns that were deleted, each with a way back. */
+async function deletedSets(body: HTMLElement): Promise<void> {
+  const gone = await rpc<{ id: string; name: string; deleted_at: string }[]>("deleted_books", {});
+  if (gone === null || gone.length === 0) return;
+  const fold = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = `Deleted sets (${gone.length})`;
+  fold.append(summary);
+  const table = document.createElement("table");
+  table.className = "report-table books-table";
+  const tbody = document.createElement("tbody");
+  for (const book of gone) {
+    const row = document.createElement("tr");
+    const name = document.createElement("td");
+    name.textContent = book.name;
+    const when = document.createElement("td");
+    when.textContent = `Deleted ${new Date(book.deleted_at).toLocaleDateString()}`;
+    const actions = document.createElement("td");
+    actions.className = "report-amount";
+    const back = document.createElement("button");
+    back.type = "button";
+    back.textContent = "Restore";
+    back.addEventListener("click", () => {
+      back.disabled = true;
+      void rpc<string>("restore_book", { book: book.id }).then(() => location.reload());
+    });
+    actions.append(back);
+    row.append(name, when, actions);
+    tbody.append(row);
+  }
+  table.append(tbody);
+  fold.append(table);
+  fold.append(note("Deleted sets keep everything in them. Restoring puts one back for everyone who could see it."));
+  body.append(fold);
+}
+
+async function booksList(body: HTMLElement, email: string): Promise<void> {
+  const who = document.createElement("p");
+  who.className = "cloud-who";
+  who.textContent = `Signed in as ${email}.`;
+  const out = document.createElement("button");
+  out.type = "button";
+  out.textContent = "Sign out";
+  out.addEventListener("click", () => {
+    out.disabled = true;
+    void signOut().then(() => {
+      // The books that were open were reachable because of who was signed in.
+      openCloudBook(null);
+      location.reload();
+    });
+  });
+  who.append(" ", out);
+  body.append(who);
+
+  const said = document.createElement("p");
+  said.className = "cloud-said";
+  say(said, "Looking…");
+  body.append(said);
+
+  await renderInvitations(body);
+
+  const [books, roles] = await Promise.all([listBooks(), myRoles()]);
+  const open = openCloudBookId();
+  said.textContent = "";
+
+  if (books.length === 0) {
+    body.append(
+      note(
+        "No books on the server yet. Start one below; only you can see it unless you invite others.",
+      ),
+    );
+  } else {
+    const table = document.createElement("table");
+    table.className = "report-table books-table";
+    const head = document.createElement("thead");
+    head.innerHTML = "<tr><th>Books</th><th>Started</th><th></th></tr>";
+    const tbody = document.createElement("tbody");
+    for (const book of books) {
+      const row = document.createElement("tr");
+
+      const name = document.createElement("td");
+      name.textContent = book.name;
+      if (book.id === open) {
+        const here = document.createElement("span");
+        here.className = "books-open";
+        here.textContent = "open now";
+        name.append(" ", here);
+      }
+
+      const when = document.createElement("td");
+      const [year, month, day] = book.createdAt.slice(0, 10).split("-");
+      when.textContent = year && month && day ? `${day}/${month}/${year}` : "";
+
+      const actions = document.createElement("td");
+      actions.className = "report-amount";
+      if (book.id !== open) {
+        const openIt = document.createElement("button");
+        openIt.type = "button";
+        openIt.textContent = "Open";
+        openIt.addEventListener("click", () => {
+          openCloudBook({ id: book.id, name: book.name });
+          location.reload();
+        });
+        actions.append(openIt);
+      }
+
+      // Renaming and deleting are an owner's: the server refuses anybody
+      // else, so nobody else is offered them. Not knowing the role (it could
+      // not be read) offers them, and the server still decides.
+      const owner = roles === null || roles.get(book.id) === "owner";
+
+      // Renamed in place: the name cell becomes a box with Save beside it.
+      const rename = document.createElement("button");
+      rename.type = "button";
+      rename.textContent = "Rename";
+      rename.addEventListener("click", () => {
+        const box = document.createElement("input");
+        box.type = "text";
+        box.value = book.name;
+        box.maxLength = 120;
+        const keep = document.createElement("button");
+        keep.type = "button";
+        keep.className = "primary";
+        keep.textContent = "Save";
+        const cancel = document.createElement("button");
+        cancel.type = "button";
+        cancel.textContent = "Cancel";
+        cancel.addEventListener("click", () => location.reload());
+        keep.addEventListener("click", () => {
+          const wanted = box.value.trim();
+          if (wanted === "" || wanted === book.name) return;
+          keep.disabled = true;
+          void renameBook(book.id, wanted).then((result) => {
+            if (result === "renamed") {
+              if (book.id === open) openCloudBook({ id: book.id, name: wanted });
+              location.reload();
+              return;
+            }
+            keep.disabled = false;
+            say(
+              said,
+              result === "refused" ? "Only an owner of these books can rename them." : "Could not rename them.",
+              true,
+            );
+          });
+        });
+        name.textContent = "";
+        name.append(box, " ", keep, " ", cancel);
+        box.focus();
+        box.select();
+      });
+      if (owner) actions.append(" ", rename);
+
+      // Deleting hides the set from everybody and keeps everything in it; an
+      // owner can restore it below. Typing the name is the guard against the
+      // wrong row, which a yes/no box is not.
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "danger";
+      remove.textContent = "Delete";
+      remove.addEventListener("click", async () => {
+        const typed = await askTextOnPage(
+          `Delete "${book.name}"?\n\nIt disappears for everyone who can see it. Nothing in it is erased, ` +
+            "and an owner can restore it from this page.\n\nType the name to delete it:",
+        );
+        if (typed === null) return;
+        if (typed.trim() !== book.name.trim()) {
+          say(said, "The name did not match, so nothing was deleted.", true);
+          return;
+        }
+        remove.disabled = true;
+        void rpc<string>("delete_book", { book: book.id }).then((result) => {
+          if (result === "deleted") {
+            if (book.id === open) openCloudBook(null);
+            location.reload();
+            return;
+          }
+          remove.disabled = false;
+          say(said, "Could not delete them. Only an owner of these books can.", true);
+        });
+      });
+      if (owner) actions.append(" ", remove);
+
+      row.append(name, when, actions);
+      tbody.append(row);
+    }
+    table.append(head, tbody);
+    body.append(table);
+  }
+
+  await deletedSets(body);
+
+  // Starting a set of books, which is also how somebody's first set is made.
+  const add = document.createElement("div");
+  add.className = "cloud-add";
+  const name = document.createElement("input");
+  name.type = "text";
+  name.placeholder = "Name for a new set of books";
+  // The country it is kept in, which decides the starter chart it opens with.
+  const country = document.createElement("select");
+  country.setAttribute("aria-label", "Country these books are kept in");
+  for (const [id, label] of countryChoices()) {
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = label;
+    option.selected = id === defaultCountry();
+    country.append(option);
+  }
+  const make = document.createElement("button");
+  make.type = "button";
+  make.className = "primary";
+  make.textContent = "Start a new set";
+  make.addEventListener("click", () => {
+    const wanted = name.value.trim();
+    if (wanted === "") return;
+    // Two sets of one name cannot be told apart in this list. Suggest the
+    // next free one and let them start it, or type their own.
+    const taken = (n: string): boolean => books.some((book) => book.name.trim().toLowerCase() === n.toLowerCase());
+    if (taken(wanted)) {
+      let n = 2;
+      while (taken(`${wanted} (${n})`)) n += 1;
+      name.value = `${wanted} (${n})`;
+      say(said, `There is already a set called "${wanted}". Start "${name.value}" instead, or type another name.`);
+      name.focus();
+      return;
+    }
+    make.disabled = true;
+    say(said, "Starting…");
+    rememberNewBooksCountry(country.value);
+    void createBook(wanted).then((made) => {
+      if (made === null) {
+        make.disabled = false;
+        say(said, "Could not start that set of books.", true);
+        return;
+      }
+      openCloudBook({ id: made.id, name: made.name });
+      location.reload();
+    });
+  });
+  add.append(name, country, make);
+  body.append(add);
+
+  const openNow = books.find((book) => book.id === open);
+  if (openNow !== undefined) {
+    renderMembers(body, openNow);
+    backupTools(body, openNow.name, true);
+  } else {
+    browserBackup(body);
+    saveToServer(body);
+  }
+}
+
+/**
+ * Put the books in this browser on the server, as a new set.
+ *
+ * The second half of moving books up from a copy on somebody's own computer:
+ * restore its backup here, then save it to the server. Offered with the name
+ * the backup carried, so the set online is called what the books were called.
+ */
+function saveToServer(body: HTMLElement): void {
+  const count = state.ledger.transactions.length;
+  if (count === 0) return;
+  body.append(heading("Save these books to the server"));
+  body.append(
+    note(
+      `The books in this browser (${count} transaction${count === 1 ? "" : "s"}) become a new set ` +
+        "on the server, which you can then open from any computer and share. Everything comes " +
+        "across, including rules and history; bank feeds and AI keys are connected again there.",
+    ),
+  );
+  const row = document.createElement("div");
+  row.className = "cloud-add";
+  const name = document.createElement("input");
+  name.type = "text";
+  name.placeholder = "Name for the set on the server";
+  name.value = restoredName();
+  const go = document.createElement("button");
+  go.type = "button";
+  go.className = "primary";
+  go.textContent = "Save to the server";
+  const said = document.createElement("p");
+  said.className = "cloud-said";
+  // Where a choice is offered, when the name is taken.
+  const choice = document.createElement("div");
+  choice.className = "cloud-add";
+  choice.hidden = true;
+
+  const fill = async (made: { id: string; name: string } | null): Promise<void> => {
+    if (made === null) {
+      go.disabled = false;
+      say(said, "Could not start a set on the server.", true);
+      return;
+    }
+    say(said, "Saving to the server…");
+    const backup = await buildBackup();
+    const result = await copyToCloudBook(made.id, backup.ledger, {
+      rules: backup.rules,
+      rulesarchive: backup.rulesArchive,
+      events: backup.events,
+    });
+    if (!result.ok) {
+      go.disabled = false;
+      say(
+        said,
+        `${result.why} The set "${made.name}" was started on the server and may be partly ` +
+          "filled; nothing in this browser was changed.",
+        true,
+      );
+      return;
+    }
+    openCloudBook({ id: made.id, name: made.name });
+    location.reload();
+  };
+
+  go.addEventListener("click", () => {
+    const wanted = name.value.trim();
+    if (wanted === "") {
+      say(said, "Give the set a name first.", true);
+      return;
+    }
+    go.disabled = true;
+    choice.hidden = true;
+    say(said, "Checking the name…");
+    void (async () => {
+      const books = await listBooks();
+      const taken = (n: string): boolean => books.some((book) => book.name.trim().toLowerCase() === n.toLowerCase());
+      const same = books.find((book) => book.name.trim().toLowerCase() === wanted.toLowerCase());
+      if (same === undefined) {
+        await fill(await createBook(wanted));
+        return;
+      }
+      // The name is taken -- often by a set an earlier attempt left part
+      // filled, sometimes by books that matter. Both answers are offered, the
+      // safe one first: a new set beside it, or that set's contents replaced.
+      let n = 2;
+      while (taken(`${wanted} (${n})`)) n += 1;
+      const fresh = `${wanted} (${n})`;
+      say(said, `A set called "${same.name}" is already on the server.`);
+      const asNew = document.createElement("button");
+      asNew.type = "button";
+      asNew.className = "primary";
+      asNew.textContent = `Save as a new set, "${fresh}"`;
+      asNew.addEventListener("click", () => {
+        choice.hidden = true;
+        void createBook(fresh).then(fill);
+      });
+      const replace = document.createElement("button");
+      replace.type = "button";
+      replace.className = "danger";
+      replace.textContent = `Replace what is in "${same.name}"`;
+      replace.addEventListener("click", async () => {
+        if (!await askOnPage(`Replace everything in "${same.name}" on the server with the books in this browser?`)) return;
+        choice.hidden = true;
+        void fill(same);
+      });
+      const cancel = document.createElement("button");
+      cancel.type = "button";
+      cancel.textContent = "Cancel";
+      cancel.addEventListener("click", () => {
+        choice.hidden = true;
+        go.disabled = false;
+        say(said, "Nothing was saved.");
+      });
+      choice.textContent = "";
+      choice.append(asNew, replace, cancel);
+      choice.hidden = false;
+    })();
+  });
+  row.append(name, go);
+  body.append(row, said, choice);
+}
+
+/**
+ * Backup for the books in this browser, when no set on the server is open.
+ *
+ * Those are the books on screen until somebody signs in and opens a set, and
+ * the server panel used to replace the whole page, so they had no backup at
+ * all here. It is also how books come up from a copy on somebody's own
+ * computer: restore its backup into a new set on the server.
+ */
+function browserBackup(body: HTMLElement): void {
+  backupTools(body, "the books in this browser", false);
+  body.append(
+    note(
+      "No set of books on the server is open, so this backs up and restores the books held in " +
+        "this browser. To move books up from NZOSA on your own computer, download a backup " +
+        "there, start a set here, open it, and restore the backup into it.",
+    ),
+  );
+}
+
+/**
+ * The hosted half of the Books page.
+ *
+ * Returns false when this build has no project behind it, so the page can say
+ * what it always said: there is one set of books, the one in this browser.
+ */
+export function renderCloudBooks(body: HTMLElement): boolean {
+  if (!cloudConfigured()) return false;
+
+  const hint = document.getElementById("books-hint");
+  if (hint !== null) {
+    hint.textContent =
+      "The sets of books on the server you can open, and any invitation waiting for you. " +
+      "Nothing is shared until you accept it.";
+  }
+
+  body.append(heading("Books on the server"));
+  const session = currentSession();
+  if (session === null) {
+    signInForm(body);
+    browserBackup(body);
+    body.append(ownProjectPanel());
+  } else void booksList(body, session.email).then(() => body.append(ownProjectPanel()));
+  return true;
+}

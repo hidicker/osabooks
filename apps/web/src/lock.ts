@@ -1,0 +1,172 @@
+import { postedJournals, varianceInput } from "./books.js";
+import { computeOurReturns } from "./variance.js";
+import { state } from "./state.js";
+import { booksReadOnly, setSaveGuard } from "./store.js";
+import type { StoredLedger } from "./store.js";
+import { lockBroken, lockedDifferences, lockedFigures } from "@nzosa/core";
+import { noteLockedMove } from "./locked-changes.js";
+import type { Account, LockDates, LockedFigures } from "@nzosa/core";
+import { tellOnPage } from "./ui.js";
+
+/**
+ * Keeping locked periods as they were locked.
+ *
+ * Every save passes through the guard below. It works out what the locked
+ * periods hold -- every posting up to the year lock, every GST return up to
+ * the GST lock -- for the books about to be written and for the books last
+ * written, and refuses the save when the two differ. Refusing puts the books
+ * back as they were, so the screen and the file never disagree.
+ *
+ * Measured against the last books that were allowed, under the locks being
+ * saved: moving a lock, which changes no figure, is allowed; anything that
+ * moves a figure inside a lock is not, whichever page did it.
+ */
+
+export class LockedChange extends Error {}
+
+/** A change by somebody who may only read these books (see booksReadOnly). */
+export class ReadOnlyChange extends Error {}
+
+interface Baseline {
+  ledger: StoredLedger;
+  chart: Account[];
+  /** The figures of `ledger`, under the locks named by `key`. */
+  figures: LockedFigures | null;
+  key: string;
+}
+
+let baseline: Baseline | null = null;
+
+function keyOf(locks: LockDates | undefined): string {
+  return `${locks?.gst ?? ""}|${locks?.year ?? ""}`;
+}
+
+function hasLocks(locks: LockDates | undefined): boolean {
+  return (locks?.gst ?? "") !== "" || (locks?.year ?? "") !== "";
+}
+
+/** The locked figures of the books in `state`, under `locks`. */
+function figuresNow(locks: LockDates | undefined): LockedFigures {
+  // Every entity, whichever is chosen on screen: the choice changes how often
+  // GST is filed, and with it the periods, which is not a change to the books.
+  const chosen = state.entityFilter;
+  state.entityFilter = "";
+  try {
+    return figuresForAll(locks);
+  } finally {
+    state.entityFilter = chosen;
+  }
+}
+
+function figuresForAll(locks: LockDates | undefined): LockedFigures {
+  const journals = locks?.year ? postedJournals() : [];
+  let returns: ReturnType<typeof computeOurReturns> = [];
+  if (locks?.gst) {
+    const dates = state.ledger.transactions.map((t) => t.date);
+    const from = dates.length === 0 ? locks.gst : dates.reduce((a, b) => (a < b ? a : b));
+    returns = computeOurReturns({ ...varianceInput(), accounts: [] }, from, locks.gst);
+  }
+  return lockedFigures(locks, journals, returns);
+}
+
+/** The figures of some other books, worked out by borrowing the state for a moment. */
+function figuresOf(ledger: StoredLedger, chart: Account[], locks: LockDates | undefined): LockedFigures {
+  const held = { ledger: state.ledger, chart: state.chart };
+  state.ledger = ledger;
+  state.chart = chart;
+  try {
+    return figuresNow(locks);
+  } finally {
+    state.ledger = held.ledger;
+    state.chart = held.chart;
+  }
+}
+
+/** Start again from the books as they are: on opening, restoring or clearing them. */
+export function resetLockBaseline(): void {
+  baseline = { ledger: state.ledger, chart: state.chart, figures: null, key: "" };
+}
+
+/**
+ * Whether this save moved figures in a period that had been locked and has
+ * been opened again, to be put on record. The furthest the locks ever
+ * reached is kept on the books; a lock moved back to make a change leaves
+ * that span unguarded, and so watched.
+ */
+function noteOnceLocked(ledger: StoredLedger): void {
+  if (baseline === null) return;
+  const high = ledger.lockHighWater;
+  if (!hasLocks(high)) return;
+  const now = ledger.lockDates;
+  // Nothing beyond the locks in force: those the guard itself keeps.
+  if ((high?.year ?? "") <= (now?.year ?? "") && (high?.gst ?? "") <= (now?.gst ?? "")) return;
+  const before = figuresOf(baseline.ledger, baseline.chart, high);
+  const after = ledger === state.ledger ? figuresNow(high) : figuresOf(ledger, state.chart, high);
+  const moved = lockedDifferences(before, after);
+  if (moved.length > 0) noteLockedMove(moved);
+}
+
+function guard(ledger: StoredLedger): void {
+  // Read only refuses everything, and the same way a lock does: the books go
+  // back as they were opened, so nothing on screen pretends to be saved.
+  if (booksReadOnly() && baseline !== null) {
+    state.ledger = baseline.ledger;
+    state.chart = baseline.chart;
+    throw new ReadOnlyChange("You can read these books but not change them.");
+  }
+  const locks = ledger.lockDates;
+  if (baseline === null || (!hasLocks(locks) && !hasLocks(baseline.ledger.lockDates))) {
+    noteOnceLocked(ledger);
+    baseline = { ledger, chart: state.chart, figures: null, key: "" };
+    return;
+  }
+  const key = keyOf(locks);
+  const before =
+    baseline.figures !== null && baseline.key === key
+      ? baseline.figures
+      : figuresOf(baseline.ledger, baseline.chart, locks);
+  const after = ledger === state.ledger ? figuresNow(locks) : figuresOf(ledger, state.chart, locks);
+  const broken = lockBroken(locks, before, after);
+  if (broken !== null) {
+    // Back as they were, so what is on the screen is what is on file.
+    state.ledger = baseline.ledger;
+    state.chart = baseline.chart;
+    throw new LockedChange(broken);
+  }
+  noteOnceLocked(ledger);
+  baseline = { ledger, chart: state.chart, figures: after, key };
+}
+
+/**
+ * Install the guard, and say plainly when it refuses.
+ *
+ * A refused save throws, which stops whatever the page was doing next --
+ * recording it in History included -- and arrives here.
+ */
+export function installLockGuard(redrawPage: () => void): void {
+  setSaveGuard(guard);
+  window.addEventListener("unhandledrejection", (event) => {
+    // The page is put back first, so what is behind the message is the books
+    // as they still are.
+    if (event.reason instanceof ReadOnlyChange) {
+      event.preventDefault();
+      redrawPage();
+      void tellOnPage(
+        `${event.reason.message}
+
+Nothing was changed. An owner of these books can give you ` +
+          "more than read-only access.",
+      );
+      return;
+    }
+    if (!(event.reason instanceof LockedChange)) return;
+    event.preventDefault();
+    redrawPage();
+    void tellOnPage(
+      `${event.reason.message}
+
+Nothing was changed. To change it, move the lock first ` +
+        "(Setup → Lock dates).",
+    );
+  });
+}

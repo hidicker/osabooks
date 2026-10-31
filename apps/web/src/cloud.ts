@@ -1,0 +1,828 @@
+import { CLOUD, cloudConfigured } from "./cloud-config.js";
+
+/**
+ * The hosted books: signing in, and reading and writing parts over the wire.
+ *
+ * Written against Supabase's REST endpoints directly rather than its client
+ * library. The library is most of a megabyte unpacked, and this app has to
+ * stay a small static bundle somebody can put on free hosting -- which is the
+ * same reason the core has no dependencies at all. What is actually needed is
+ * a sign-in, a token refresh, three queries and one function call.
+ *
+ * Nothing here decides what a person may see. The database does that, on every
+ * request, from the policies beside the tables: this module could ask for
+ * another user's books and would simply be handed nothing.
+ */
+
+const SESSION_KEY = "nzosa:cloud-session";
+
+export interface CloudSession {
+  userId: string;
+  email: string;
+  accessToken: string;
+  refreshToken: string;
+  /** Unix seconds. Refreshed before it runs out rather than after it fails. */
+  expiresAt: number;
+}
+
+export interface CloudBook {
+  id: string;
+  name: string;
+  createdAt: string;
+}
+
+/** What a part came back as, the version included so a save can be checked. */
+export interface CloudPart {
+  version: number;
+  data: unknown;
+}
+
+export type SaveOutcome =
+  | { kind: "saved"; version: number }
+  | { kind: "conflict" }
+  | { kind: "refused"; why: string }
+  | { kind: "failed"; why: string };
+
+let session: CloudSession | null = null;
+
+// The session outlives a reload, or signing in would be the first thing
+// anybody did every morning. It is this browser's alone: the refresh token is
+// no more powerful than being signed in already, and the alternative --
+// holding it only in memory -- trades a real annoyance for no real gain.
+function remember(next: CloudSession | null): void {
+  session = next;
+  try {
+    if (next === null) localStorage.removeItem(SESSION_KEY);
+    else localStorage.setItem(SESSION_KEY, JSON.stringify(next));
+  } catch {
+    // A browser that refuses storage still works; it just asks again later.
+  }
+}
+
+function recall(): CloudSession | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw) as Partial<CloudSession>;
+    if (typeof parsed.accessToken !== "string" || typeof parsed.refreshToken !== "string") {
+      return null;
+    }
+    return {
+      userId: String(parsed.userId ?? ""),
+      email: String(parsed.email ?? ""),
+      accessToken: parsed.accessToken,
+      refreshToken: parsed.refreshToken,
+      expiresAt: Number(parsed.expiresAt ?? 0),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Who is signed in, if anybody. Read from storage once, then held. */
+export function currentSession(): CloudSession | null {
+  if (session === null) session = recall();
+  return session;
+}
+
+export function signedIn(): boolean {
+  return cloudConfigured() && currentSession() !== null;
+}
+
+interface TokenReply {
+  access_token?: string;
+  refresh_token?: string;
+  expires_in?: number;
+  user?: { id?: string; email?: string };
+  error_description?: string;
+  msg?: string;
+  message?: string;
+}
+
+function sessionFrom(reply: TokenReply): CloudSession | null {
+  if (typeof reply.access_token !== "string" || typeof reply.refresh_token !== "string") {
+    return null;
+  }
+  return {
+    userId: reply.user?.id ?? "",
+    email: reply.user?.email ?? "",
+    accessToken: reply.access_token,
+    refreshToken: reply.refresh_token,
+    expiresAt: Math.floor(Date.now() / 1000) + (reply.expires_in ?? 3600),
+  };
+}
+
+function why(reply: TokenReply, fallback: string): string {
+  return reply.error_description ?? reply.msg ?? reply.message ?? fallback;
+}
+
+async function auth(path: string, body: unknown): Promise<TokenReply & { status: number }> {
+  try {
+    const response = await fetch(`${CLOUD.url}/auth/v1/${path}`, {
+      method: "POST",
+      headers: { "content-type": "application/json", apikey: CLOUD.publishableKey },
+      body: JSON.stringify(body),
+    });
+    const reply = (await response.json().catch(() => ({}))) as TokenReply;
+    return { ...reply, status: response.status };
+  } catch {
+    // No connection. Status 0 says so, and is not a refusal.
+    return { status: 0, msg: "Could not reach the server." };
+  }
+}
+
+export async function signIn(
+  email: string,
+  password: string,
+): Promise<{ ok: true } | { ok: false; why: string }> {
+  const reply = await auth("token?grant_type=password", { email, password });
+  const next = sessionFrom(reply);
+  if (next === null) return { ok: false, why: why(reply, "Could not sign in.") };
+  remember(next);
+  return { ok: true };
+}
+
+/**
+ * Making an account.
+ *
+ * The project asks for the address to be confirmed, so a sign-up usually comes
+ * back with no session: the person has an email to open first. Said plainly,
+ * because "nothing happened" is what an unexplained empty reply looks like.
+ */
+export async function signUp(
+  email: string,
+  password: string,
+): Promise<{ ok: true; confirm: boolean } | { ok: false; why: string }> {
+  // Where the link in the confirmation email comes back to. Without it the
+  // link lands on whatever the project calls its site address, which need not
+  // be the page somebody actually signed up from -- and the tokens it carries
+  // are then handed to a page that knows nothing about them.
+  const back = encodeURIComponent(location.href.split("#")[0] ?? location.href);
+  const reply = await auth(`signup?redirect_to=${back}`, { email, password });
+  const next = sessionFrom(reply);
+  if (next !== null) {
+    remember(next);
+    return { ok: true, confirm: false };
+  }
+  // No session and no error means it worked and is waiting on the email.
+  const problem = reply.error_description ?? reply.msg ?? reply.message;
+  if (problem !== undefined) {
+    // The site caps its accounts. The database refuses the new one, and the
+    // sign-up service says only that it could not save the user.
+    if (/database error saving new user/i.test(problem)) {
+      return {
+        ok: false,
+        why:
+          "Online accounts are limited at this stage. Please contact me at nzosa@proton.me " +
+          "and I will check if I can include you. Run NZOSA on your own computer and there is no limit.",
+      };
+    }
+    return { ok: false, why: problem };
+  }
+  return { ok: true, confirm: true };
+}
+
+/**
+ * What an access token says about who it is for.
+ *
+ * The middle part of a JWT is public: it is signed, not secret, and every
+ * holder can read it. Only the claims this app needs are taken, and nothing is
+ * trusted because of them -- the server checks the signature on every request,
+ * and this is only so the page can say a name and address a row.
+ */
+function claimsOf(accessToken: string): { sub?: string; email?: string } {
+  try {
+    const part = accessToken.split(".")[1] ?? "";
+    const padded = part.replace(/-/g, "+").replace(/_/g, "/");
+    const json = atob(padded + "=".repeat((4 - (padded.length % 4)) % 4));
+    return JSON.parse(json) as { sub?: string; email?: string };
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Tokens handed back in the address bar.
+ *
+ * A confirmation link returns with the session in the fragment rather than in
+ * a reply to anything this page asked for, so somebody who has just confirmed
+ * their address arrives holding a session nothing has read. This is what turns
+ * clicking the link in the email into being signed in.
+ *
+ * The fragment is then cleared. A web address somebody might copy, bookmark or
+ * paste to somebody else has no business carrying a refresh token.
+ */
+export async function sessionFromUrl(): Promise<boolean> {
+  if (!cloudConfigured()) return false;
+  const hash = location.hash.startsWith("#") ? location.hash.slice(1) : "";
+  if (hash === "") return false;
+
+  const params = new URLSearchParams(hash);
+  // Back from Google directly (signInWithGoogle, below) with Google's token,
+  // which Supabase turns into a session.
+  const idToken = params.get("id_token");
+  if (idToken !== null) {
+    history.replaceState(null, "", location.pathname + location.search);
+    return googleSession(idToken, params.get("state"));
+  }
+  // Turned back rather than signed in: Google refused, or the person cancelled.
+  // Kept for the sign-in form to say, and cleared from the address like a token.
+  const refused = params.get("error_description") ?? params.get("error");
+  if (refused !== null && params.get("access_token") === null) {
+    authError = refused;
+    history.replaceState(null, "", location.pathname + location.search);
+    return false;
+  }
+  const accessToken = params.get("access_token");
+  const refreshToken = params.get("refresh_token");
+  if (accessToken === null || refreshToken === null) return false;
+
+  const claims = claimsOf(accessToken);
+  remember({
+    userId: claims.sub ?? "",
+    email: claims.email ?? "",
+    accessToken,
+    refreshToken,
+    expiresAt: Math.floor(Date.now() / 1000) + Number(params.get("expires_in") ?? 3600),
+  });
+  history.replaceState(null, "", location.pathname + location.search);
+  return true;
+}
+
+let authError: string | null = null;
+
+/** Why the last sign-in sent back from Google failed, once. */
+export function takeAuthError(): string | null {
+  const said = authError;
+  authError = null;
+  return said;
+}
+
+/**
+ * Whether the project offers signing in with Google.
+ *
+ * Asked of the project rather than assumed: Google is switched on in Supabase,
+ * with a client from Google's console, and until then a button for it would
+ * only lead to an error page. Asked once a visit.
+ */
+let googleAsked: Promise<boolean> | null = null;
+export function googleOffered(): Promise<boolean> {
+  if (!cloudConfigured()) return Promise.resolve(false);
+  googleAsked ??= fetch(`${CLOUD.url}/auth/v1/settings`, { headers: { apikey: CLOUD.publishableKey } })
+    .then((response) => (response.ok ? response.json() : null))
+    .then((settings: { external?: { google?: boolean } } | null) => settings?.external?.google === true)
+    .catch(() => false);
+  return googleAsked;
+}
+
+/**
+ * Sign in with Google.
+ *
+ * On the site named in `googleReturn`, the page goes to Google itself and
+ * Google comes straight back to it with a signed token saying who this is,
+ * which Supabase then exchanges for a session. Google's screen therefore names
+ * this site rather than the database's address. Anywhere else -- a copy on
+ * somebody's own computer, a self-hosted one -- it goes through Supabase,
+ * which sends it on to Google and back here with the session in the address.
+ * Either way a first sign-in makes the account.
+ *
+ * `prompt=select_account` lets somebody pick which Google account, rather than
+ * silently getting whichever one the browser is already signed in to.
+ */
+const GOOGLE_PENDING = "nzosa:google-pending";
+
+export async function signInWithGoogle(): Promise<void> {
+  const here = location.href.split("#")[0] ?? location.href;
+  if (CLOUD.googleClientId === "" || CLOUD.googleReturn === "" || !here.startsWith(CLOUD.googleReturn)) {
+    const query = new URLSearchParams({ provider: "google", redirect_to: here, prompt: "select_account" });
+    location.assign(`${CLOUD.url}/auth/v1/authorize?${query.toString()}`);
+    return;
+  }
+  // The nonce ties Google's token to this sign-in: Google signs its hash into
+  // the token, and Supabase checks the token against the nonce itself. The
+  // state ties the return to this browser, so a token pushed at the page by
+  // anybody else is refused.
+  const nonce = randomToken();
+  const state = randomToken();
+  try {
+    sessionStorage.setItem(GOOGLE_PENDING, JSON.stringify({ nonce, state }));
+  } catch {
+    authError = "this browser would not keep the sign-in while it went to Google.";
+    return;
+  }
+  const query = new URLSearchParams({
+    client_id: CLOUD.googleClientId,
+    redirect_uri: CLOUD.googleReturn,
+    response_type: "id_token",
+    scope: "openid email profile",
+    nonce: await sha256Hex(nonce),
+    state,
+    prompt: "select_account",
+  });
+  location.assign(`https://accounts.google.com/o/oauth2/v2/auth?${query.toString()}`);
+}
+
+/** Google's token, back in the address, for a session. */
+async function googleSession(idToken: string, state: string | null): Promise<boolean> {
+  let pending: { nonce?: string; state?: string } = {};
+  try {
+    pending = JSON.parse(sessionStorage.getItem(GOOGLE_PENDING) ?? "{}") as typeof pending;
+    sessionStorage.removeItem(GOOGLE_PENDING);
+  } catch {
+    // Nothing kept: refused below, as a return this browser did not start.
+  }
+  if (pending.nonce === undefined || state === null || state !== pending.state) {
+    authError = "the reply from Google did not match a sign-in started in this browser. Try again.";
+    return false;
+  }
+  const reply = await auth("token?grant_type=id_token", { provider: "google", id_token: idToken, nonce: pending.nonce });
+  const next = sessionFrom(reply);
+  if (next === null) {
+    authError = why(reply, "Supabase did not accept Google's sign-in.");
+    return false;
+  }
+  remember(next);
+  return true;
+}
+
+function randomToken(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(24));
+  return Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+async function sha256Hex(text: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(digest), (b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+export async function signOut(): Promise<void> {
+  // A fresh token first. Access tokens last an hour, and a logout sent with an
+  // expired one is refused -- which used to be swallowed, so the page forgot
+  // the session while every session on the server stayed alive, refresh tokens
+  // and all. That is the opposite of what somebody pressing Sign out wants.
+  //
+  // The server's logout is global: it ends every session this account has, on
+  // every computer, which is also the right answer for a token that has leaked.
+  const token = await freshToken();
+  if (token !== null) {
+    try {
+      await fetch(`${CLOUD.url}/auth/v1/logout`, {
+        method: "POST",
+        headers: {
+          apikey: CLOUD.publishableKey,
+          authorization: `Bearer ${token}`,
+        },
+      });
+    } catch {
+      // No connection. Forgotten here regardless; the server's sessions end
+      // with their refresh tokens, and the next sign-out that reaches it ends
+      // them all.
+    }
+  }
+  remember(null);
+}
+
+/**
+ * A token good for the next minute at least.
+ *
+ * Refreshed a minute early rather than on the first rejection: a save that
+ * fails because a token expired mid-request looks to the person like a save
+ * that failed, and this app is not in the business of losing somebody's work
+ * to a clock.
+ */
+async function freshToken(): Promise<string | null> {
+  const held = currentSession();
+  if (held === null) return null;
+  if (held.expiresAt - 60 > Math.floor(Date.now() / 1000)) return held.accessToken;
+  // Several requests at once each find the token stale; one refresh serves them
+  // all. Sent separately, each spent the same refresh token, and the server
+  // treats a refresh token used twice as stolen.
+  refreshing ??= refresh(held).finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+let refreshing: Promise<string | null> | null = null;
+
+async function refresh(held: CloudSession): Promise<string | null> {
+  // Another tab may have refreshed already. Refresh tokens are used once, so
+  // the one this tab holds in memory is spent, and sending it would end the
+  // session for every tab -- which is how a second tab signed somebody out.
+  const stored = recall();
+  if (stored !== null && stored.refreshToken !== held.refreshToken) {
+    session = stored;
+    if (stored.expiresAt - 60 > Math.floor(Date.now() / 1000)) return stored.accessToken;
+    held = stored;
+  }
+
+  const reply = await auth("token?grant_type=refresh_token", { refresh_token: held.refreshToken });
+  const next = sessionFrom(reply);
+  if (next === null) {
+    // Signed out only when the server says the refresh token is no good. No
+    // connection, or the server having a bad moment, is not that: it used to
+    // be read as one, so a laptop opened before its wifi was up was signed
+    // out every time. The session is kept and tried again on the next request.
+    const refused = reply.status === 400 || reply.status === 401 || reply.status === 403;
+    if (!refused) return null;
+    // Unless a tab beside this one refreshed in the meantime.
+    const again = recall();
+    if (again !== null && again.refreshToken !== held.refreshToken) {
+      session = again;
+      return again.accessToken;
+    }
+    remember(null);
+    return null;
+  }
+  remember({ ...next, email: next.email === "" ? held.email : next.email });
+  return next.accessToken;
+}
+
+async function rest(path: string, init: RequestInit = {}): Promise<Response | null> {
+  const token = await freshToken();
+  if (token === null) return null;
+  try {
+    return await fetch(`${CLOUD.url}/rest/v1/${path}`, {
+      ...init,
+      headers: {
+        apikey: CLOUD.publishableKey,
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+        ...(init.headers ?? {}),
+      },
+    });
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A file attached in books kept online: in the private attachments bucket,
+ * under the books' own id, so only their members can read it and only those
+ * who may change the books can add or remove one (storage policies).
+ */
+async function storage(method: "GET" | "POST" | "DELETE", path: string, body?: Blob): Promise<Response | null> {
+  const token = await freshToken();
+  if (token === null) return null;
+  const where = method === "GET" ? `object/authenticated/attachments/${path}` : `object/attachments/${path}`;
+  try {
+    return await fetch(`${CLOUD.url}/storage/v1/${where}`, {
+      method,
+      headers: {
+        apikey: CLOUD.publishableKey,
+        authorization: `Bearer ${token}`,
+        ...(body !== undefined ? { "content-type": body.type || "application/octet-stream", "x-upsert": "true" } : {}),
+      },
+      ...(body !== undefined ? { body } : {}),
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function putCloudFile(book: string, id: string, file: Blob): Promise<boolean> {
+  const response = await storage("POST", `${book}/${id}`, file);
+  return response !== null && response.ok;
+}
+
+export async function getCloudFile(book: string, id: string): Promise<Blob | null> {
+  const response = await storage("GET", `${book}/${id}`);
+  return response !== null && response.ok ? await response.blob() : null;
+}
+
+export async function deleteCloudFile(book: string, id: string): Promise<boolean> {
+  const response = await storage("DELETE", `${book}/${id}`);
+  return response !== null && response.ok;
+}
+
+/** Every set of books this person is a member of. */
+export async function listBooks(): Promise<CloudBook[]> {
+  const response = await rest("books?select=id,name,created_at&order=name.asc");
+  if (response === null || !response.ok) return [];
+  const rows = (await response.json().catch(() => [])) as {
+    id: string;
+    name: string;
+    created_at: string;
+  }[];
+  return rows.map((row) => ({ id: row.id, name: row.name, createdAt: row.created_at }));
+}
+
+/**
+ * The role the person signed in has in each set of books they are in: owner,
+ * bookkeeper, accountant or readonly. Null when it could not be read.
+ */
+export async function myRoles(): Promise<Map<string, string> | null> {
+  const me = currentSession()?.userId ?? "";
+  if (me === "") return null;
+  const response = await rest(`book_members?user_id=eq.${encodeURIComponent(me)}&select=book_id,role`);
+  if (response === null || !response.ok) return null;
+  const rows = (await response.json().catch(() => null)) as { book_id: string; role: string }[] | null;
+  return Array.isArray(rows) ? new Map(rows.map((row) => [row.book_id, row.role])) : null;
+}
+
+/**
+ * A new set of books, owned by whoever made it.
+ *
+ * Through a function rather than by inserting a row, and not for tidiness:
+ * inserting cannot work. A row handed back by an insert has to satisfy the
+ * read policy too, that policy asks whether the caller is a member of these
+ * books, and the trigger that makes them the owner has not fired at that
+ * moment -- so the whole statement is refused and nothing is made at all. The
+ * page needs the id back, so it has to ask for the row.
+ *
+ * The function does both halves as its definer, where no policy stands between
+ * making the books and being their owner.
+ */
+export async function createBook(name: string): Promise<CloudBook | null> {
+  const rows = await rpc<{ id: string; name: string; created_at: string }[]>("create_book", {
+    wanted: name,
+  });
+  const made = rows?.[0];
+  return made === undefined
+    ? null
+    : { id: made.id, name: made.name, createdAt: made.created_at };
+}
+
+/**
+ * Give a set of books another name. Only an owner may: the update policy on
+ * books says so, and anybody else's request changes no row -- which is why the
+ * changed row is asked back, and an empty answer read as a refusal.
+ */
+export async function renameBook(id: string, name: string): Promise<"renamed" | "refused" | "failed"> {
+  const response = await rest(`books?id=eq.${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { prefer: "return=representation" },
+    body: JSON.stringify({ name }),
+  });
+  if (response === null || !response.ok) return "failed";
+  const rows = (await response.json().catch(() => [])) as unknown[];
+  return rows.length > 0 ? "renamed" : "refused";
+}
+
+/** One part of a set of books, or null where it has none (or it could not be read). */
+export async function loadPart(bookId: string, part: string): Promise<CloudPart | null> {
+  const response = await rest(
+    `book_parts?book_id=eq.${encodeURIComponent(bookId)}&part=eq.${encodeURIComponent(part)}&select=version,data`,
+  );
+  if (response === null || !response.ok) return null;
+  const rows = (await response.json().catch(() => [])) as { version: number; data: unknown }[];
+  const row = rows[0];
+  return row === undefined ? null : { version: row.version, data: swapChars(row.data, STAND_IN, NUL) };
+}
+
+/** Every part of one set of books, with the version each is at. */
+export async function loadParts(bookId: string): Promise<Record<string, CloudPart> | null> {
+  const response = await rest(
+    `book_parts?book_id=eq.${encodeURIComponent(bookId)}&select=part,version,data`,
+  );
+  // Null rather than nothing: a set of books that could not be read is not a
+  // set of books with nothing in it, and the caller must be able to tell.
+  if (response === null || !response.ok) return null;
+  const rows = (await response.json().catch(() => [])) as {
+    part: string;
+    version: number;
+    data: unknown;
+  }[];
+  const parts: Record<string, CloudPart> = {};
+  for (const row of rows) parts[row.part] = { version: row.version, data: swapChars(row.data, STAND_IN, NUL) };
+  return parts;
+}
+
+/** Some parts of one set of books, as they are now; null if they could not be read. */
+export async function loadNamedParts(bookId: string, names: readonly string[]): Promise<Record<string, CloudPart> | null> {
+  const list = names.map((name) => encodeURIComponent(name)).join(",");
+  const response = await rest(
+    `book_parts?book_id=eq.${encodeURIComponent(bookId)}&part=in.(${list})&select=part,version,data`,
+  );
+  if (response === null || !response.ok) return null;
+  const rows = (await response.json().catch(() => [])) as { part: string; version: number; data: unknown }[];
+  const parts: Record<string, CloudPart> = {};
+  for (const row of rows) parts[row.part] = { version: row.version, data: swapChars(row.data, STAND_IN, NUL) };
+  return parts;
+}
+
+/**
+ * The null character, which Postgres will not store.
+ *
+ * The app joins the parts of some keys with it -- a person, a year and a
+ * question for the personal year-end answers; a bank line's fields for a
+ * duplicate kept on purpose -- because it can never occur in what is joined.
+ * Files and the browser keep it happily, but Postgres refuses any JSON holding
+ * it ("unsupported Unicode escape sequence"), so restored books would not save
+ * to the server. It goes up as U+E000, a private-use character no bank or
+ * person writes, and comes back as itself: the books never see the swap.
+ */
+const NUL = "\u0000";
+const STAND_IN = "";
+
+function swapChars(value: unknown, from: string, to: string): unknown {
+  if (typeof value === "string") return value.includes(from) ? value.split(from).join(to) : value;
+  if (Array.isArray(value)) return value.map((item) => swapChars(item, from, to));
+  if (value !== null && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value)) {
+      out[key.includes(from) ? key.split(from).join(to) : key] = swapChars(item, from, to);
+    }
+    return out;
+  }
+  return value;
+}
+
+interface PostgrestError {
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Write one part, saying which version it replaces.
+ *
+ * The version is the whole point. Two people with the same books open will
+ * sooner or later save the same part, and whoever saves second would otherwise
+ * wipe out the first without either of them seeing anything. The database
+ * refuses that save; the caller reloads and tries again.
+ *
+ * Errors are told apart by the code the database raised rather than by the
+ * HTTP status, because the status depends on how PostgREST happens to map it.
+ */
+export async function savePart(
+  bookId: string,
+  part: string,
+  data: unknown,
+  version: number,
+): Promise<SaveOutcome> {
+  const response = await rest("rpc/save_part", {
+    method: "POST",
+    body: JSON.stringify({ p_book: bookId, p_part: part, p_data: swapChars(data, NUL, STAND_IN), p_version: version }),
+  });
+  if (response === null) return { kind: "failed", why: "Not signed in, or no connection." };
+
+  if (response.ok) {
+    const next = (await response.json().catch(() => null)) as number | null;
+    return typeof next === "number"
+      ? { kind: "saved", version: next }
+      : { kind: "failed", why: "The server did not say which version it wrote." };
+  }
+
+  const error = (await response.json().catch(() => ({}))) as PostgrestError;
+  // PT409, sent as HTTP 409. It was 40001, which PostgREST retries as a
+  // transient failure -- so the refusal was retried until the gateway gave up,
+  // and this line never saw it.
+  if (response.status === 409 || error.code === "PT409") return { kind: "conflict" };
+  if (error.code === "42501") {
+    return { kind: "refused", why: "You do not have permission to change these books." };
+  }
+  return { kind: "failed", why: error.message ?? `Save failed (${response.status}).` };
+}
+
+/** One part in a save of several: its changes, or the part whole. */
+export type PartChange =
+  | { part: string; version: number; ops: unknown[] }
+  | { part: string; version: number; data: unknown };
+
+export type ChangesOutcome =
+  | { kind: "saved"; versions: number[] }
+  | { kind: "conflict" }
+  | { kind: "refused"; why: string }
+  | { kind: "failed"; why: string }
+  /** The project has no save_part_changes: one set up before it existed. */
+  | { kind: "missing" };
+
+/**
+ * Save several parts in one request, each as its changes or whole.
+ *
+ * All of them or none: a coding and the history entry that records it are
+ * saved together, so the history never tells of a change that did not save.
+ * Each names the version it was built on, as with `savePart`.
+ */
+export async function saveChanges(bookId: string, changes: readonly PartChange[]): Promise<ChangesOutcome> {
+  const response = await rest("rpc/save_part_changes", {
+    method: "POST",
+    body: JSON.stringify({ p_book: bookId, p_changes: swapChars(changes, NUL, STAND_IN) }),
+  });
+  if (response === null) return { kind: "failed", why: "Not signed in, or no connection." };
+
+  if (response.ok) {
+    const next = (await response.json().catch(() => null)) as unknown;
+    return Array.isArray(next) && next.length === changes.length && next.every((v) => typeof v === "number")
+      ? { kind: "saved", versions: next as number[] }
+      : { kind: "failed", why: "The server did not say which versions it wrote." };
+  }
+
+  const error = (await response.json().catch(() => ({}))) as PostgrestError;
+  if (response.status === 409 || error.code === "PT409") return { kind: "conflict" };
+  if (error.code === "42501") {
+    return { kind: "refused", why: "You do not have permission to change these books." };
+  }
+  // PostgREST's "no such function": a project of somebody's own, set up from
+  // an older own-project.sql.
+  if (error.code === "PGRST202" || (response.status === 404 && error.code === undefined)) return { kind: "missing" };
+  return { kind: "failed", why: error.message ?? `Save failed (${response.status}).` };
+}
+
+/**
+ * Call one of the project's edge functions, as the person signed in.
+ *
+ * The bank feed lives behind one of these: the tokens it uses are in a vault
+ * no browser can open, so the page asks the function to do the fetching and
+ * gets transactions back, never credentials.
+ */
+export async function callFunction<T>(name: string, body: unknown): Promise<T> {
+  const token = await freshToken();
+  if (token === null) throw new Error("not signed in");
+  const response = await fetch(`${CLOUD.url}/functions/v1/${name}`, {
+    method: "POST",
+    headers: {
+      apikey: CLOUD.publishableKey,
+      authorization: `Bearer ${token}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+  const answer = (await response.json().catch(() => ({}))) as { error?: string };
+  if (!response.ok) throw new Error(answer.error ?? `the server said ${response.status}`);
+  return answer as T;
+}
+
+/**
+ * Call one of the database's own functions.
+ *
+ * Looking somebody up by email, or adding them to a set of books, cannot be
+ * given to a client directly: nobody should be able to ask this system whether
+ * an address has an account. Those are functions that check the caller's
+ * standing before doing anything, and this is how they are reached.
+ */
+export async function rpc<T>(name: string, args: Record<string, unknown>): Promise<T | null> {
+  const response = await rest(`rpc/${name}`, {
+    method: "POST",
+    body: JSON.stringify(args),
+  });
+  if (response === null || !response.ok) return null;
+  return (await response.json().catch(() => null)) as T | null;
+}
+
+/** Whether a set of books has a bank feed connected. The tokens stay server-side. */
+export async function feedStatus(
+  bookId: string,
+): Promise<{ connected: boolean; accounts: unknown; settings: unknown } | null> {
+  const response = await rest("rpc/feed_status", {
+    method: "POST",
+    body: JSON.stringify({ book: bookId }),
+  });
+  if (response === null || !response.ok) return null;
+  const rows = (await response.json().catch(() => [])) as {
+    connected: boolean;
+    accounts: unknown;
+    settings: unknown;
+  }[];
+  const row = rows[0];
+  return row === undefined
+    ? { connected: false, accounts: {}, settings: {} }
+    : { connected: row.connected, accounts: row.accounts, settings: row.settings };
+}
+
+/** The connector's address for one set of books: what an outside AI app is given. */
+export function connectorUrl(bookId: string): string {
+  return `${CLOUD.url}/functions/v1/mcp/${bookId}`;
+}
+
+/** An outside app asking to connect, as Supabase's OAuth server describes it. */
+export interface ConnectRequest {
+  authorization_id?: string;
+  client?: { name?: string; client_name?: string; uri?: string };
+  scope?: string;
+  /** Set alone when this person already allowed this app. */
+  redirect_url?: string;
+}
+
+/** What an outside app is asking for, or null when the request is gone or not this person's. */
+export async function connectRequest(id: string): Promise<ConnectRequest | null> {
+  const token = await freshToken();
+  if (token === null) return null;
+  try {
+    const response = await fetch(`${CLOUD.url}/auth/v1/oauth/authorizations/${encodeURIComponent(id)}`, {
+      headers: { apikey: CLOUD.publishableKey, authorization: `Bearer ${token}` },
+    });
+    if (!response.ok) return null;
+    return (await response.json()) as ConnectRequest;
+  } catch {
+    return null;
+  }
+}
+
+/** Allow or refuse it. Returns where to send the browser back to the app, or null. */
+export async function answerConnectRequest(id: string, action: "approve" | "deny"): Promise<string | null> {
+  const token = await freshToken();
+  if (token === null) return null;
+  try {
+    const response = await fetch(`${CLOUD.url}/auth/v1/oauth/authorizations/${encodeURIComponent(id)}/consent`, {
+      method: "POST",
+      headers: { apikey: CLOUD.publishableKey, authorization: `Bearer ${token}`, "content-type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+    if (!response.ok) return null;
+    const answer = (await response.json()) as { redirect_url?: string };
+    return answer.redirect_url ?? null;
+  } catch {
+    return null;
+  }
+}

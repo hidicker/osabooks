@@ -1,0 +1,5951 @@
+import { renderAuRentalSchedule, renderAuTax, renderBas, renderContractors, renderKrBusiness, renderKrRental, renderKrTax, renderKrVat, renderScheduleC, renderBudgetVsActual, renderProfitByClass, renderProfitByJob, renderPayrollTax, renderSalesTax, renderScheduleE, renderUsTax } from "./country-reports.js";
+import { attachmentsControl } from "./attachments-ui.js";
+import { comparing, drawPeriodControls, earlierRange, periodFileName, periodHeading, reportRange } from "./report-period.js";
+import { cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell } from "@nzosa/core";
+import type { OwingDocument } from "@nzosa/core";
+import { computeOurReturns } from "../variance.js";
+import { renderCashFlow } from "./cash-flow-report.js";
+import { INCOME_HEAD, incomeRows } from "./income-rows.js";
+import { provisionalPaidFromIrd } from "./ird-provisional.js";
+import { renderYearEnd } from "./year-end.js";
+import { agentReaderPanel } from "./agent-statement-reader.js";
+import { anyModuleOn, moduleOn, previousSystem } from "../modules.js";
+import { agedCsv, agedFor, agedTotal, renderAged } from "./aged-report.js";
+import { renderBankReconcile, bankReconcileCsv } from "./bank-reconcile-report.js";
+import { redraw, showPage } from "../app.js";
+import {
+  recordFiledReturn,
+  varianceInput,
+  accountsFor,
+  accountsForEditing,
+  assetProceedsInUse,
+  bankLabel,
+  bookYears,
+  banks,
+  invoiceBalanceMap,
+  ledgerAccountFor,
+  postedJournals,
+  record,
+  reportEngine,
+  saveManualJournals,
+  journalInEntity,
+  entityOfCoding,
+  betweenTagFor,
+  manualJournalGstAccount,
+  ledgerFromStart,
+  invoicesInPlay,
+} from "../books.js";
+import { renderBetweenReport } from "./between-report.js";
+import { monthlyColumns, rankedBars, statTiles } from "../charts.js";
+import { combobox } from "../combobox.js";
+import { $, state } from "../state.js";
+import { savePart } from "../store.js";
+import { amountCell, askOnPage, download, escapeHtml, nameCell, note, tellOnPage, wideTable } from "../ui.js";
+import { createZip, downloadBytes, downloadExcelReport } from "./excel-export.js";
+import { bankReconcileCsv as packageBankCsv } from "./bank-reconcile-report.js";
+import { unresolvedNote } from "../widgets.js";
+import { allLines } from "../ai.js";
+import {
+  accountEntityKey,
+  filedReturnFromOurs,
+  formatGstReturn,
+  gstOutcomeLabel,
+  gstReturnBoxRows,
+  gstTransactionGroups,
+  agentStatementProblems,
+  agentStatementTotals,
+  ir3Return,
+  isRental,
+  ownerRentalSchedule,
+  rentalSchedule,
+  splitAccountLabel,
+  nestSubAccounts,
+  IR10_LAYOUT,
+  TAX_EXTRA_CATEGORIES,
+  accountTransactionRows,
+  balanceSheetRole,
+  accrualProfitAndLoss,
+  checkManualJournal,
+  splitManualGst,
+  dayAfter,
+  reversalOf,
+  computeBalanceSheet,
+  postedFromImported,
+  depreciationSchedule,
+  emptyEntityModel,
+  formatAccountTransactions,
+  formatAmount,
+  formatDepreciationSchedule,
+  formatGeneralLedger,
+  formatOwnerSummary,
+  formatProfitAndLoss,
+  generalLedgerRows,
+  generalLedgerTotals,
+  groupProfitAndLoss,
+  gstWithin,
+  ir10Summary,
+  companyIncomeTax,
+  provisionalStandardOption,
+  manualJournalsIn,
+  overdrawnWarning,
+  ownersOf,
+  parseAmount,
+  profitAndLoss,
+  reportLabeller as coreReportLabeller,
+  reportLookups as coreReportLookups,
+  reportsNetOfGst,
+  shareholderSchedule,
+  splitByShareholding,
+  summariseForOwner,
+  taxSummary,
+  totalExtras,
+  trialBalance,
+} from "@nzosa/core";
+import type {
+  GstReturnResult,
+  AgentStatement,
+  AgentStatementLine,
+  ReadAgentLine,
+  ReadAgentStatement,
+  CodingEngine,
+  EntityModel,
+  Ir3Details,
+  OwnerRentalSchedule,
+  RentalLine,
+  RentalSchedule,
+  BalanceSheetLine,
+  Cents,
+  DateRange,
+  Entity,
+  Journal,
+  ManualJournal,
+  OwnerSummary,
+  PlClass,
+  PlGroup,
+  PostedJournal,
+  ProfitAndLoss,
+  ReportLine,
+  ReportSection,
+  RuleSet,
+  TaxExtra,
+  TaxExtraCategory,
+  Transaction,
+} from "@nzosa/core";
+import { taxYearEnd, taxYearEndSaid, taxYearEndShort, taxYearStart, taxYearStartSaid, depreciationRules, monthsOfTaxYear } from "../tax-year.js";
+import { booksCountry, booksLocale, moneyPlaces, booksMoney, noSalesTax, taxTypeLabel, booksCurrency } from "../country.js";
+import { type DownloadKind, hasDownload } from "./report-downloads.js";
+import { balanceSheetLabel } from "./balance-sheet-label.js";
+
+/**
+ * The entity and registration last applied to the GST control.
+ *
+ * Following has to happen when the answer changes and not on every redraw, or
+ * picking "Including GST" by hand would be undone by the next thing that
+ * caused a render. The registration is part of the key and not just the
+ * entity: ticking "GST registered" on the entity you are already looking at
+ * changes what the report should say, and keying on the id alone left the
+ * control explaining one thing while showing the other.
+ */
+let gstFollowing: string | null = null;
+
+/**
+ * The reports, and the three bases they can be read on.
+ *
+ * The same books answer differently depending on what is being asked. Accrual
+ * from our own postings is what the ledger says; accrual from the imported
+ * file is what the other system said, kept so the two can be compared; cash is
+ * what the bank did. None is more correct than the others, and a report that
+ * did not say which it was would be worse than no report.
+ *
+ * Every figure here is derived, never stored. The composition is in core --
+ * `postLedger` and the coding engine -- and this file is the presentation of
+ * it: which years, which entity, net or gross, and the tables and charts that
+ * result. A figure appearing only here and nowhere in core would be a figure
+ * nothing tests, which is why the split falls where it does.
+ */
+
+/**
+ * How a posted line is named on a report.
+ *
+ * A chart account is found by its code where it has one, and by its name where
+ * it does not. The name half matters: an account with no code used to produce
+ * an empty label, and a report skips lines it cannot name -- so the three
+ * rentals, whose accounts are all named rather than numbered, had nothing at
+ * all on either accrual basis while the cash one worked from the coding label
+ * directly.
+ *
+ * The label is the same string the cash report and the entity filter use, so
+ * the three agree about what an account is called.
+ */
+export function reportLabeller(): (line: { accountCode: string; accountName: string }) => string {
+  return coreReportLabeller({
+    chart: state.chart,
+    ...(state.rules ? { rules: state.rules as RuleSet } : {}),
+    overrides: state.ledger.overrides ?? {},
+  });
+}
+
+export function reportLookups(): {
+  entityOfCode: Map<string, string>;
+  sectionOf: (code: string) => ReportSection | null;
+  classOf: (code: string) => PlClass | null;
+  roleOf: (code: string) => string | null;
+} {
+  return coreReportLookups({
+    model: state.ledger.entities ?? emptyEntityModel(),
+    accounts: accountsForEditing(),
+    // "the ATO" reads better than "ATO" in a sentence; New Zealand's is a name.
+    authority: booksCountry().id === "au" ? "ATO" : booksCountry().taxAuthority.name,
+  });
+}
+
+/**
+ * What each line below the profit is, in words.
+ *
+ * The chart answers for its own accounts. Two kinds of line are not in it: a
+ * bank account the postings name by its number, and the lines posted to no
+ * account at all. Both are said plainly rather than left as "no type set",
+ * which would send somebody looking for a setting that is not the problem.
+ */
+/** A sub-account's parent's code, from the chart. */
+function subAccountParent(code: string): string | undefined {
+  const account = state.chart.find((a) => a.code.trim() === code);
+  const parent = account?.parent;
+  return parent !== undefined && state.chart.some((a) => a.code.trim() === parent) ? parent : undefined;
+}
+
+/** An account by its code, as a report names it. */
+function chartLabelOf(code: string): string {
+  const account = state.chart.find((a) => a.code.trim() === code);
+  return account === undefined ? code : `${account.name} - ${code}`;
+}
+
+function lineRoles(): (code: string) => string {
+  const lookups = reportLookups();
+  const held = new Set<string>();
+  for (const account of new Set(state.ledger.transactions.map((t) => t.account))) {
+    const named = bankLabel(account);
+    held.add(named);
+    held.add(`${named} ${named}`);
+    // And by its id: an account named in its import, as Xero's own bank
+    // export names "business-bank-account", is posted as id then name, and
+    // was listed as an account with no type set.
+    held.add(account);
+    held.add(`${account} ${named}`);
+  }
+  for (const t of state.ledger.transactions) {
+    const label = String(t.extras?.["accountLabel"] ?? t.account);
+    held.add(label);
+    held.add(`${label} ${label}`);
+  }
+  return (code) => {
+    if (held.has(code)) return balanceSheetRole("Bank", code);
+    if (code.trim() === "(uncoded)") return "Not coded to an account yet";
+    return lookups.roleOf(code) ?? "No account type set";
+  };
+}
+
+/** A day in words: "30 September 2025", or short, "30 Sep 2025". */
+function daySaid(date: string, short = false): string {
+  // Short months are the same three letters the period list uses ("Sep"),
+  // not the browser's own ("Sept" in New Zealand English), so a heading and
+  // its columns agree.
+  if (short) {
+    const [y = "", m = "1", d = "1"] = date.split("-");
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${Number(d)} ${months[Number(m) - 1] ?? ""} ${y}`;
+  }
+  return new Date(`${date}T00:00:00`).toLocaleDateString(booksLocale(), {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+/** Build the report currently selected, or null when there is nothing to build. */
+export function currentReport(
+  /**
+   * A shorter span than the year, for a chart plotting month by month.
+   *
+   * The charts run this same builder rather than totalling transactions
+   * themselves, so a bar and the profit and loss cannot come to disagree:
+   * whatever basis, entity, and GST choice the page is set to applies to
+   * both, and there is one place where that is decided.
+   */
+  over?: DateRange,
+): { report: ProfitAndLoss; title: string; year: number } | null {
+  if (state.ledger.transactions.length === 0) return null;
+
+  // Above the figures, not below them: a warning under a total is read after
+  // the total has already been believed. Not while filling in a chart: the
+  // note belongs to the page, and writing it twelve times would only move it.
+  if (over === undefined) {
+    const hint = $("reports-hint");
+    hint.parentElement?.querySelector(".unresolved-note")?.remove();
+    const unresolved = unresolvedNote();
+    if (unresolved) hint.insertAdjacentElement("afterend", unresolved);
+  }
+
+  const years = bookYears();
+  const chosenYear = Number($<HTMLSelectElement>("report-year").value) || years[0];
+  if (chosenYear === undefined) return null;
+
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const entityValue = state.entityFilter;
+  const entity = model.entities.find((e) => e.id === entityValue);
+  const { entityOfCode, sectionOf } = reportLookups();
+
+  const journals = state.ledger.journals ?? [];
+  const basis = $<HTMLSelectElement>("report-basis").value;
+  // Only where it can be honoured. A ledger read from a file keeps its GST on
+  // separate lines with nothing tying them to the cost, so there is no gross
+  // to report and pretending otherwise would just show the net twice.
+  const includeGst = $<HTMLSelectElement>("report-gst").value === "gross" && basis !== "accrual";
+  const period = over ?? reportRange(chosenYear);
+
+  if (basis === "posted") {
+    const ours = ourAccrualJournals();
+    return {
+      report: accrualProfitAndLoss(ours, {
+        period,
+        sectionOf,
+        includeGst,
+        labelOf: reportLabeller(),
+        ...(entity ? { includeCode: (code: string) => entityOfCode.get(code) === entity.id } : {}),
+      }),
+      title: entity ? entity.name : "All accounts",
+      year: chosenYear,
+    };
+  }
+
+  if (basis === "accrual" && journals.length > 0) {
+    // The ledger names accounts by code; the report names them the way the
+    // rest of the app does, so the two can sit side by side.
+    const labelOf = reportLabeller();
+    return {
+      report: accrualProfitAndLoss(journals, {
+        period,
+        sectionOf,
+        includeGst,
+        labelOf,
+        ...(entity ? { includeCode: (code: string) => entityOfCode.get(code) === entity.id } : {}),
+      }),
+      title: entity ? entity.name : "All accounts",
+      year: chosenYear,
+    };
+  }
+
+  const engine = reportEngine();
+  if (!engine) return null;
+  const { transactions, codeOf, classify } = engine;
+
+  const report = profitAndLoss(transactions, {
+    period,
+    codeOf,
+    classify,
+    sectionOf,
+    includeGst,
+    // With no entity chosen the whole ledger is reported, which is the right
+    // default before any account has been assigned to one. With one chosen, a
+    // line is the entity's when it is coded to one of the entity's accounts,
+    // whichever bank account it went through: a rental's rates paid on the
+    // household's card are the rental's. Narrowing by the bank accounts as well
+    // left a lease paid into a joint account off the property's own figures,
+    // while the rental schedule, which went by the coding, had it.
+    ...(entity
+      ? { includeCode: (code: string) => entityOfCode.get(code) === entity.id }
+      : {}),
+  });
+
+  return {
+    report,
+    title: entity ? entity.name : "All accounts",
+    year: chosenYear,
+  };
+}
+
+function entityReports(year: number): {
+  entity: Entity;
+  report: ProfitAndLoss;
+}[] {
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const { entityOfCode, sectionOf } = reportLookups();
+  const engine = reportEngine();
+  if (!engine) return [];
+
+  return model.entities.map((entity) => ({
+    entity,
+    report: profitAndLoss(engine.transactions, {
+      period: { from: taxYearStart(year), to: taxYearEnd(year) },
+      codeOf: engine.codeOf,
+      classify: engine.classify,
+      sectionOf,
+      includeCode: (code: string) => entityOfCode.get(code) === entity.id,
+    }),
+  }));
+}
+
+/** One owner's share of every entity they own part of. */
+export function ownerSummaryFor(owner: string, year: number): OwnerSummary {
+  return summariseForOwner(
+    owner,
+    // A person's own entity -- salary, living costs -- is no rent or business.
+    entityReports(year).filter(({ entity }) => entity.kind !== "personal").map(({ entity, report }) => ({
+      entity: entity.name,
+      kind: entity.kind ?? "business",
+      percent: (entity.owners ?? []).find((o) => o.name === owner)?.percent ?? 0,
+      report,
+    })),
+  );
+}
+
+/** Reports that can be shown as the books stood before adjusting entries. */
+const ADJUSTABLE_REPORTS = new Set(["pl", "balancesheet", "journal", "general"]);
+
+/** Whether the report showing leaves the adjusting entries out. */
+function beforeAdjusting(): boolean {
+  const wrap = document.getElementById("report-unadjusted-wrap");
+  return wrap !== null && !wrap.hidden && document.querySelector<HTMLInputElement>("#report-unadjusted")?.checked === true;
+}
+
+/** The postings the reports read: all of them, or those before adjusting entries. */
+function reportPostings(): PostedJournal[] {
+  const all = postedJournals();
+  return beforeAdjusting() ? all.filter((j) => j.adjusting !== true) : all;
+}
+
+function ourAccrualJournals(): Journal[] {
+  return reportPostings().map((journal, index) => ({
+    id: journal.transactionId,
+    date: journal.date,
+    narration: journal.narration,
+    // Derived, not entered: there is no posting date or author to record,
+    // because nobody posted them — they are recomputed from the coding.
+    postedDate: journal.date,
+    postedBy: "derived",
+    lines: journal.lines.map((line, n) => ({
+      accountCode: line.accountCode,
+      accountName: line.accountName,
+      description: line.description,
+      amount: line.amount,
+      ...(line.taxBase !== undefined ? { taxBase: line.taxBase } : {}),
+      line: index * 100 + n,
+    })),
+  }));
+}
+
+/**
+ * Manual journals: the entries a person writes and no bank line implies.
+ *
+ * Shown with their narration, because that is the part that matters a year
+ * later. The figures will still be obvious then; why somebody moved 1,287.40
+ * out of interest and into drawings will not.
+ */
+/** Begin a journal, from anywhere: the Manual journals report, with a fresh one open. */
+export function startNewJournal(): void {
+  if (journalDraft === null) {
+    const year = Number($<HTMLSelectElement>("report-year").value) || bookYears()[0];
+    journalDraft = {
+      date: year === undefined ? new Date().toLocaleDateString("en-CA") : reportRange(year).to,
+      narration: "",
+      lines: [blankJournalLine(), blankJournalLine()],
+    };
+  }
+  const select = document.querySelector<HTMLSelectElement>("#report-kind");
+  if (select) select.value = "manual";
+  showPage("reports", "top");
+  redraw("reports");
+}
+
+function renderManualJournals(body: HTMLElement, year: number): void {
+  const from = taxYearStart(year);
+  const to = taxYearEnd(year);
+  const all = state.ledger.manualJournals ?? [];
+  const inYear = all.filter((j) => j.date >= from && j.date <= to);
+  const held = adjustingOnly ? inYear.filter((j) => j.adjusting === true) : inYear;
+
+  const heading = document.createElement("h3");
+  heading.textContent = `Manual journals, year ended ${taxYearEndSaid(year)}`;
+  body.append(heading);
+
+  const actions = document.createElement("div");
+  actions.className = "page-actions";
+  const add = document.createElement("button");
+  add.type = "button";
+  add.textContent = "Write a journal";
+  add.disabled = journalDraft !== null;
+  add.addEventListener("click", () => {
+    journalDraft = {
+      date: to,
+      narration: "",
+      lines: [blankJournalLine(), blankJournalLine()],
+    };
+    redraw("reports");
+  });
+  actions.append(add);
+  if (inYear.some((j) => j.adjusting === true) || adjustingOnly) {
+    const only = document.createElement("label");
+    only.className = "checkbox";
+    const tick = document.createElement("input");
+    tick.type = "checkbox";
+    tick.checked = adjustingOnly;
+    tick.addEventListener("change", () => {
+      adjustingOnly = tick.checked;
+      redraw("reports");
+    });
+    const count = inYear.filter((j) => j.adjusting === true && j.deleted === undefined).length;
+    only.append(tick, ` Adjusting entries only (${count})`);
+    actions.append(only);
+  }
+
+  // Only offered when there is a report to read them out of, and only for the
+  // ones not already held.
+  const importable = manualJournalsIn(state.ledger.journals ?? []).filter(
+    (j) => !all.some((existing) => existing.id === j.id),
+  );
+  if (importable.length > 0) {
+    const take = document.createElement("button");
+    take.type = "button";
+    take.textContent = `Read ${importable.length} from the journal report`;
+    take.addEventListener("click", () => void importManualJournals());
+    actions.append(take);
+  }
+  body.append(actions);
+  if (journalDraft !== null) body.append(journalEditor(journalDraft));
+
+  if (held.length === 0 && adjustingOnly) {
+    body.append(note("No adjusting entries this year."));
+    return;
+  }
+  if (held.length === 0) {
+    body.append(
+      note(
+        "None this year. Use journals for year-end adjustments the bank data cannot show, such " +
+          "as reclassifying a personal expense" +
+          (booksCountry().id === "nz"
+            ? " or correcting the GST balance to Inland Revenue's."
+            : booksCountry().id === "au"
+              ? " or correcting the GST balance to the ATO's."
+              : "."),
+      ),
+    );
+    return;
+  }
+
+  const money = (cents: Cents): string =>
+    booksMoney(cents);
+
+  for (const journal of [...held].sort((a, b) => a.date.localeCompare(b.date))) {
+    const problems = checkManualJournal(journal);
+
+    const card = document.createElement("div");
+    card.className =
+      journal.deleted !== undefined
+        ? "journal-card journal-deleted"
+        : problems.length > 0
+          ? "journal-card journal-broken"
+          : "journal-card";
+
+    const title = document.createElement("p");
+    title.className = "journal-narration";
+    title.textContent = `${journal.date} — ${journal.narration}`;
+    if (journal.adjusting === true) {
+      const tag = document.createElement("span");
+      tag.className = "journal-tag";
+      tag.textContent = "Adjusting";
+      title.append(" ", tag);
+    }
+    card.append(title);
+
+    if (journal.deleted !== undefined) {
+      const gone = document.createElement("p");
+      gone.className = "journal-out";
+      gone.textContent =
+        `Deleted ${new Date(journal.deleted.at).toLocaleDateString(booksLocale())} by ${journal.deleted.by}. ` +
+        "Kept here so the record shows it; it posts nothing.";
+      card.append(gone);
+    } else if (problems.length > 0) {
+      const bad = document.createElement("p");
+      bad.className = "journal-out";
+      bad.textContent =
+        `Not posted: ${problems.map((p) => p.message).join("; ")}. ` +
+        "Unbalanced journals are left out of the reports.";
+      card.append(bad);
+    }
+
+    const table = document.createElement("table");
+    table.className = "report-table opening-table";
+    const tbody = document.createElement("tbody");
+    // Drawn as it posts: a line carrying GST is its net amount and, beneath it,
+    // the GST on the GST account, so the debits and credits can be read to balance.
+    const drawLine = (label: string, amount: number): void => {
+      const row = document.createElement("tr");
+      row.append(nameCell(label));
+      row.append(amountCell(amount > 0 ? money(amount as Cents) : ""));
+      row.append(amountCell(amount < 0 ? money(-amount as Cents) : ""));
+      tbody.append(row);
+    };
+    for (const line of journal.lines) {
+      if (line.gst === undefined || line.amount === 0) {
+        drawLine(line.code, line.amount);
+        continue;
+      }
+      const { net, tax } = splitManualGst(line.amount);
+      const gstAccount = manualJournalGstAccount(line.code);
+      drawLine(
+        `${line.code} · ${taxTypeLabel(line.gst === "INPUT2" ? "15% GST on expenses" : "15% GST on income")}`,
+        net,
+      );
+      drawLine(`${gstAccount.name} - ${gstAccount.code}`, tax);
+    }
+    table.append(tbody);
+    card.append(table);
+
+    if (journal.source !== undefined && journal.source !== "") {
+      card.append(note(journal.source));
+    }
+
+    // Which journal reversed which, both ways, so neither is read alone.
+    const reversed = all.find((j) => j.reverses === journal.id && j.deleted === undefined);
+    if (reversed !== undefined) card.append(note(`Reversed by the journal of ${reversed.date}.`));
+    card.append(journalActions(journal, reversed !== undefined));
+    // The workings behind it: a spreadsheet, the accountant's letter.
+    if (journal.deleted === undefined) card.append(attachmentsControl({ kind: "journal", id: journal.id }, `the journal of ${journal.date}`));
+    body.append(card);
+  }
+}
+
+interface JournalDraftLine {
+  code: string;
+  debit: string;
+  credit: string;
+  description: string;
+  /** "" for No GST, which a journal line almost always is. */
+  gst: "" | "INPUT2" | "OUTPUT2";
+}
+
+interface JournalDraft {
+  date: string;
+  narration: string;
+  lines: JournalDraftLine[];
+  /** An adjusting entry: year-end, or the accountant's. */
+  adjusting?: boolean;
+}
+
+/**
+ * The journal being written on the page, or null when none is.
+ *
+ * Kept outside the page so a redraw for some other reason -- a save elsewhere,
+ * a change of year -- does not throw away what has been typed.
+ */
+let journalDraft: JournalDraft | null = null;
+/** Told when the journal on the page is saved: set when it came from a suggestion. */
+let journalSaved: (() => void) | null = null;
+
+/**
+ * Open the journal editor with a journal already written -- one the person's
+ * AI app suggested -- for them to check and save, or cancel. Amounts in cents.
+ */
+export function openJournalDraft(
+  given: { date: string; narration: string; lines: readonly { code: string; debit: number; credit: number; description?: string }[] },
+  saved: () => void,
+): void {
+  const decimal = (cents: number): string => (cents === 0 ? "" : (cents / 100).toFixed(2));
+  journalDraft = {
+    date: given.date,
+    narration: given.narration,
+    lines: given.lines.map((l) => ({ code: l.code, debit: decimal(l.debit), credit: decimal(l.credit), description: l.description ?? "", gst: "" })),
+  };
+  journalSaved = saved;
+  const select = document.querySelector<HTMLSelectElement>("#report-kind");
+  if (select) select.value = "manual";
+  showPage("reports", "top");
+  redraw("reports");
+}
+/** Whether the manual journals list shows only the adjusting entries. */
+let adjustingOnly = false;
+
+function blankJournalLine(): JournalDraftLine {
+  return { code: "", debit: "", credit: "", description: "", gst: "" };
+}
+
+/**
+ * Write a journal of as many lines as it needs.
+ *
+ * It used to be two: a debit, a credit and one amount, asked one question at a
+ * time. That is what a correction usually is, but not always -- clearing three
+ * supplier bills takes Accounts Payable, the expense, and the GST on it, and
+ * split into two-line journals the entry no longer reads as the one thing it
+ * was.
+ *
+ * The rules are the ones a journal is posted under, checked while it is typed
+ * rather than after: it must balance to the cent, have at least two lines and a
+ * reason, and every line needs an account from the chart and an amount on one
+ * side only. Saving stays off until all of that holds, and what is still wrong
+ * is said underneath -- so an unbalanced journal is never saved at all, rather
+ * than saved and then left out of the reports.
+ */
+function journalEditor(draft: JournalDraft): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "split-editor journal-editor";
+
+  const title = document.createElement("h4");
+  title.textContent = "Write a journal";
+  wrap.append(title);
+
+  const head = document.createElement("div");
+  head.className = "journal-editor-head";
+  const date = document.createElement("input");
+  date.type = "date";
+  date.value = draft.date;
+  date.title = "Date of the journal";
+  date.addEventListener("input", () => {
+    draft.date = date.value;
+    refresh();
+  });
+  const narration = document.createElement("input");
+  narration.type = "text";
+  narration.placeholder =
+    "Why this journal is needed, e.g. year-end GST correction";
+  narration.value = draft.narration;
+  narration.addEventListener("input", () => {
+    draft.narration = narration.value;
+    refresh();
+  });
+  const adjusting = document.createElement("label");
+  adjusting.className = "checkbox journal-adjusting";
+  adjusting.title = "A year-end or accountant's adjustment: listed apart, and left out of a report asked for the books before adjustments";
+  const adjustingBox = document.createElement("input");
+  adjustingBox.type = "checkbox";
+  adjustingBox.checked = draft.adjusting === true;
+  adjustingBox.addEventListener("change", () => {
+    draft.adjusting = adjustingBox.checked;
+  });
+  adjusting.append(adjustingBox, " Adjusting entry");
+  head.append(date, narration, adjusting);
+  wrap.append(head);
+
+  const columns = document.createElement("div");
+  columns.className = "journal-row journal-columns";
+  for (const label of ["Account", "Debit", "Credit", "GST", "Description (optional)", ""]) {
+    const cell = document.createElement("span");
+    cell.textContent = label;
+    columns.append(cell);
+  }
+  wrap.append(columns);
+
+  const rows = document.createElement("div");
+  rows.className = "split-rows";
+  wrap.append(rows);
+
+  // The chart's accounts, and any bank account the ledger holds that no chart
+  // account is linked to. A linked one is offered under its chart name, which
+  // posts to the same account.
+  const linkedBanks = new Set(
+    state.chart.map((a) => (a.ledgerAccount ?? "").trim()).filter((id) => id !== ""),
+  );
+  const unlinkedBanks = [...banks().accounts]
+    .filter((id) => !linkedBanks.has(id))
+    .map((id) => bankLabel(id));
+  const codes = [...new Set([...accountsForEditing().map((a) => a.label), ...unlinkedBanks])];
+  const knownAccount = new Set(codes);
+
+  const status = document.createElement("p");
+  status.className = "split-balance";
+
+  // Shown once any line has GST. It is the exception: most journals move
+  // amounts whose GST was dealt with when they were first entered, and a rate
+  // here puts the line on the GST return a second time.
+  const gstWarning = note(
+    "GST is not usually applied to a manual journal. Most journals move amounts whose GST was " +
+      "dealt with when they were first entered, and GST here puts the line on the GST return " +
+      "again, in the period of the journal's date. Use it only for a supply no bank line shows, such as a refund the bank feed " +
+      "missed. The amount is GST-inclusive: the account takes it less GST.",
+  );
+  gstWarning.className = "journal-gst-warning";
+
+  const addLine = document.createElement("button");
+  addLine.type = "button";
+  addLine.textContent = "Add line";
+  addLine.addEventListener("click", () => {
+    readRows();
+    draft.lines.push(blankJournalLine());
+    draw();
+  });
+
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "primary";
+  save.textContent = "Save journal";
+  save.addEventListener("click", async () => {
+    readRows();
+    const { journal, problems } = assemble();
+    if (problems.length > 0) return;
+    const slip = dateLooksWrong(journal.date, new Date().toLocaleDateString("en-CA"));
+    if (slip !== null && !(await askOnPage(`${slip}\n\nSave the journal with this date?`))) return;
+    journalDraft = null;
+    const told = journalSaved;
+    journalSaved = null;
+    void saveManualJournals(
+      [...(state.ledger.manualJournals ?? []), journal],
+      `Journal: ${journal.narration}`,
+    ).then(() => told?.());
+  });
+
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => {
+    journalDraft = null;
+    journalSaved = null;
+    redraw("reports");
+  });
+
+  const buttons = document.createElement("div");
+  buttons.className = "page-actions";
+  buttons.append(addLine, save, cancel);
+  wrap.append(gstWarning, status, buttons);
+
+  /**
+   * Read-backs for the account pickers, which commit on a mousedown they have
+   * already handled and fire nothing -- the same arrangement as the split
+   * editor.
+   */
+  let readers: Array<() => void> = [];
+  function readRows(): void {
+    for (const read of readers) read();
+  }
+
+  const money = (cents: Cents): string => formatAmount(cents);
+
+  /** The journal as it would be saved, and everything still stopping that. */
+  function assemble(): { journal: ManualJournal; problems: string[] } {
+    const problems: string[] = [];
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(draft.date)) problems.push("choose a date");
+    if (draft.narration.trim() === "") problems.push("say why the journal exists");
+
+    const lines: ManualJournal["lines"] = [];
+    draft.lines.forEach((line, index) => {
+      const n = index + 1;
+      const code = line.code.trim();
+      const hasDebit = line.debit.trim() !== "";
+      const hasCredit = line.credit.trim() !== "";
+      if (code === "" && !hasDebit && !hasCredit) return;
+
+      const debit = hasDebit ? parseAmount(line.debit.trim(), booksCurrency()) : 0;
+      const credit = hasCredit ? parseAmount(line.credit.trim(), booksCurrency()) : 0;
+      if (debit === null || credit === null) {
+        problems.push(`line ${n}: that is not an amount`);
+        return;
+      }
+      if (debit < 0 || credit < 0) {
+        problems.push(`line ${n}: enter amounts without a minus sign, in the debit or the credit column`);
+        return;
+      }
+      if (debit !== 0 && credit !== 0) {
+        problems.push(`line ${n}: a line is a debit or a credit, not both`);
+        return;
+      }
+      if (debit === 0 && credit === 0) {
+        problems.push(`line ${n}: needs an amount`);
+        return;
+      }
+      if (code === "") {
+        problems.push(`line ${n}: needs an account`);
+        return;
+      }
+      if (!knownAccount.has(code)) {
+        problems.push(`line ${n}: "${code}" is not an account in the chart; choose one from the list`);
+        return;
+      }
+      lines.push({
+        code,
+        amount: debit - credit,
+        ...(line.description.trim() !== "" ? { description: line.description.trim() } : {}),
+        ...(line.gst !== "" ? { gst: line.gst } : {}),
+      });
+    });
+
+    const journal: ManualJournal = {
+      id: `m${Date.now().toString(36)}`,
+      date: draft.date,
+      narration: draft.narration.trim(),
+      lines,
+      ...(draft.adjusting === true ? { adjusting: true } : {}),
+    };
+    // The rules the journal is posted under, so this form cannot accept one the
+    // ledger would then refuse. Asked once the line-by-line checks have nothing
+    // to say: before that they only repeat them in other words.
+    if (problems.length === 0) {
+      for (const problem of checkManualJournal(journal)) problems.push(problem.message);
+    }
+    return { journal, problems };
+  }
+
+  function refresh(): void {
+    gstWarning.hidden = !draft.lines.some((l) => l.gst !== "");
+    const { problems } = assemble();
+    // From what is typed, not from the lines that are already complete: amounts
+    // usually go in before the accounts, and totals that ignored them read
+    // "balanced" over a journal that was nothing of the kind.
+    const typed = (text: string): Cents => Math.abs(parseAmount(text.trim(), booksCurrency()) ?? 0);
+    const debits = draft.lines.reduce((sum, l) => sum + typed(l.debit), 0);
+    const credits = draft.lines.reduce((sum, l) => sum + typed(l.credit), 0);
+    const difference = debits - credits;
+    const totals =
+      `Debits ${money(debits)} · Credits ${money(credits)}` +
+      (difference !== 0
+        ? ` · out by ${money(Math.abs(difference))}`
+        : debits === 0
+          ? ""
+          : " · balanced");
+    status.textContent = problems.length === 0 ? totals : `${totals}. Still to do: ${problems.join("; ")}.`;
+    status.className = problems.length === 0 ? "split-balance ok" : "split-balance off";
+    save.disabled = problems.length > 0;
+  }
+
+  function draw(): void {
+    rows.textContent = "";
+    readers = [];
+    draft.lines.forEach((line, index) => {
+      const row = document.createElement("div");
+      row.className = "journal-row";
+
+      const account = combobox(codes, line.code === "" ? null : line.code, "Search accounts…", () => {
+        line.code = account.value;
+        refresh();
+      });
+      readers.push(() => {
+        line.code = account.value;
+      });
+
+      const amountInput = (value: string, placeholder: string, set: (v: string) => void) => {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.inputMode = "decimal";
+        input.className = "split-amount";
+        input.placeholder = placeholder;
+        input.value = value;
+        input.addEventListener("input", () => {
+          set(input.value);
+          refresh();
+        });
+        return input;
+      };
+      const debit = amountInput(line.debit, "0.00", (v) => {
+        line.debit = v;
+      });
+      const credit = amountInput(line.credit, "0.00", (v) => {
+        line.credit = v;
+      });
+
+      const gst = document.createElement("select");
+      gst.className = "journal-gst";
+      gst.title = "GST on this line. Almost always No GST on a journal.";
+      for (const [value, label] of [
+        ["", "No GST"],
+        ["INPUT2", taxTypeLabel("15% GST on expenses")],
+        ["OUTPUT2", taxTypeLabel("15% GST on income")],
+      ] as const) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = label;
+        gst.append(option);
+      }
+      gst.value = line.gst;
+      gst.addEventListener("change", () => {
+        line.gst = gst.value as JournalDraftLine["gst"];
+        refresh();
+      });
+
+      const description = document.createElement("input");
+      description.type = "text";
+      description.value = line.description;
+      description.addEventListener("input", () => {
+        line.description = description.value;
+      });
+
+      const drop = document.createElement("button");
+      drop.type = "button";
+      drop.className = "link-button";
+      drop.textContent = "✕";
+      drop.title = "Remove this line";
+      drop.disabled = draft.lines.length <= 2;
+      drop.addEventListener("click", () => {
+        readRows();
+        draft.lines.splice(index, 1);
+        draw();
+      });
+
+      row.append(account.element, debit, credit, gst, description, drop);
+      rows.append(row);
+    });
+    refresh();
+  }
+
+  draw();
+  return wrap;
+}
+
+/** The journal being reversed on the page, and the date offered for it. */
+let reversing: { id: string; date: string } | null = null;
+
+/**
+ * The first day the locks leave open, or "" with no locks.
+ *
+ * Where a correction to a finished period belongs: a reversal dated inside a
+ * lock would be refused, and should be.
+ */
+function firstOpenDay(): string {
+  const locks = state.ledger.lockDates;
+  const last = [locks?.year ?? "", locks?.gst ?? ""].reduce((a, b) => (a > b ? a : b), "");
+  return last === "" ? "" : dayAfter(last);
+}
+
+/**
+ * Reverse, delete or restore one journal.
+ *
+ * Deleting keeps the journal, marked, rather than taking it off the list:
+ * somebody reviewing the books sees that it was there and was taken out. In a
+ * locked period neither deleting nor restoring gets past the lock; reversing,
+ * dated after it, is how a finished year is corrected.
+ */
+function journalActions(journal: ManualJournal, reversed: boolean): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "journal-actions";
+  const button = (label: string, act: () => void, className = "link-button"): HTMLButtonElement => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = className;
+    b.textContent = label;
+    b.addEventListener("click", act);
+    box.append(b);
+    return b;
+  };
+  const all = (): ManualJournal[] => state.ledger.manualJournals ?? [];
+
+  if (journal.deleted !== undefined) {
+    button("Restore", () => {
+      const back = all().map((j) => {
+        if (j.id !== journal.id) return j;
+        const { deleted: _gone, ...kept } = j;
+        return kept;
+      });
+      void saveManualJournals(back, `Restored journal: ${journal.narration}`);
+    });
+    return box;
+  }
+
+  if (reversing?.id === journal.id) {
+    const date = document.createElement("input");
+    date.type = "date";
+    date.value = reversing.date;
+    date.min = journal.date;
+    date.addEventListener("input", () => {
+      if (reversing !== null) reversing.date = date.value;
+    });
+    box.append("Reverse on ", date, " ");
+    button(
+      "Post reversal",
+      async () => {
+        const on = date.value;
+        if (on === "" || on < journal.date) {
+          await tellOnPage("Choose a date on or after the journal's own.");
+          return;
+        }
+        reversing = null;
+        const mirror = reversalOf(journal, on, `m${Date.now().toString(36)}`);
+        void saveManualJournals([...all(), mirror], `Reversed journal: ${journal.narration}`);
+      },
+      "primary",
+    );
+    button("Cancel", () => {
+      reversing = null;
+      redraw("reports");
+    });
+    return box;
+  }
+
+  button(journal.adjusting === true ? "Not an adjusting entry" : "Mark as adjusting", () => {
+    const marked = all().map((j) => {
+      if (j.id !== journal.id) return j;
+      const { adjusting: _was, ...rest } = j;
+      return journal.adjusting === true ? rest : { ...rest, adjusting: true };
+    });
+    void saveManualJournals(
+      marked,
+      `${journal.adjusting === true ? "No longer an adjusting entry" : "Marked as adjusting"}: ${journal.narration}`,
+    );
+  });
+  if (!reversed) {
+    button("Reverse…", () => {
+      const open = firstOpenDay();
+      const next = dayAfter(journal.date);
+      reversing = { id: journal.id, date: open > next ? open : next };
+      redraw("reports");
+    });
+  }
+  // Inside a lock, deleting would be refused: a finished year is corrected by
+  // reversing, so that is what is offered.
+  const lock = firstOpenDay();
+  if (lock !== "" && journal.date < lock) {
+    box.append(reversed ? "" : "In a locked year: reverse it to correct it.");
+    return box;
+  }
+  button("Delete", async () => {
+    if (
+      !await askOnPage(
+        `Delete this journal?
+
+${journal.date} — ${journal.narration}
+
+` +
+          "It stays on the list marked as deleted, and posts nothing. You can restore it.",
+      )
+    ) {
+      return;
+    }
+    const at = new Date().toISOString();
+    const by = state.who.trim() === "" ? "unattributed" : state.who.trim();
+    const marked = all().map((j) => (j.id === journal.id ? { ...j, deleted: { at, by } } : j));
+    void saveManualJournals(marked, `Deleted journal: ${journal.narration}`);
+  });
+  return box;
+}
+
+/** Read the manual journals out of an imported journal report. */
+async function importManualJournals(): Promise<void> {
+  const held = state.ledger.manualJournals ?? [];
+  const found = manualJournalsIn(state.ledger.journals ?? []).filter(
+    (j) => !held.some((existing) => existing.id === j.id),
+  );
+  if (found.length === 0) {
+    await askOnPage("No manual journals in the report that are not already held.", "OK", "Close");
+    return;
+  }
+  const many = found.length !== 1;
+  const listed = found
+    .map((j) => `${j.date}  ${j.narration.length > 80 ? `${j.narration.slice(0, 80)}…` : j.narration}`)
+    .join("\n");
+  const ok = await askOnPage(
+    `${found.length} manual journal${many ? "s" : ""} in the report ${many ? "are" : "is"} not in your books:\n\n` +
+      `${listed}\n\n` +
+      "These are year-end adjustments, and they change the profit and the balance sheet. Take them?",
+    many ? "Take them" : "Take it",
+    "Not now",
+  );
+  if (!ok) return;
+  await saveManualJournals([...held, ...found], `Read ${found.length} manual journals from the report`);
+}
+
+/**
+ * The shareholder current account schedule.
+ *
+ * In a closely held company this is usually the busiest account in the books,
+ * and it carries a question the balance sheet only hints at: does the company
+ * owe the shareholder, or the shareholder owe the company? Which way it points
+ * has tax consequences, so it gets its own page rather than one line among the
+ * liabilities.
+ */
+function renderShareholders(body: HTMLElement, year: number): void {
+  const schedule = shareholderSchedule({
+    from: taxYearStart(year),
+    to: taxYearEnd(year),
+    journals: postedJournals(),
+    ...(state.ledger.openingBalances ? { openingBalances: state.ledger.openingBalances } : {}),
+    chart: state.chart,
+  });
+
+  const heading = document.createElement("h3");
+  heading.textContent = `Shareholder current account, year ended ${taxYearEndSaid(year)}`;
+  body.append(heading);
+
+  const money = (cents: Cents): string =>
+    booksMoney(cents);
+
+  const warning = overdrawnWarning(schedule);
+  if (warning !== null) {
+    const flag = document.createElement("p");
+    flag.className = "journal-out";
+    flag.textContent = warning;
+    body.append(flag);
+  }
+
+  const table = document.createElement("table");
+  table.className = "report-table balance-sheet";
+  const head = document.createElement("thead");
+  head.innerHTML = "<tr><th></th><th>Amount</th></tr>";
+  const tbody = document.createElement("tbody");
+
+  const line = (label: string, amount: Cents, cls = ""): void => {
+    const row = document.createElement("tr");
+    if (cls !== "") row.className = cls;
+    row.append(nameCell(label));
+    row.append(amountCell(money(amount)));
+    tbody.append(row);
+  };
+
+  line(`Balance at ${taxYearStartSaid(year)}`, schedule.opening, "bs-total");
+  line("Funds introduced", schedule.introduced);
+  line("Drawings", -schedule.drawings);
+  line(`Balance at ${taxYearEndSaid(year)}`, schedule.closing, "bs-grand");
+
+  if (schedule.movements.length > 0) {
+    const header = document.createElement("tr");
+    header.className = "bs-section";
+    const cell = document.createElement("td");
+    cell.colSpan = 2;
+    cell.textContent = "Made up of";
+    header.append(cell);
+    tbody.append(header);
+    for (const movement of schedule.movements) {
+      if (movement.introduced !== 0) {
+        line(`${movement.code} ${movement.name} — in`, movement.introduced);
+      }
+      if (movement.drawings !== 0) {
+        line(`${movement.code} ${movement.name} — out`, -movement.drawings);
+      }
+    }
+  }
+
+  table.append(head, tbody);
+  body.append(table);
+
+  // Each shareholder's part, which is what the IR4 asks for (box 40E).
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const companies = model.entities.filter((e) => (e.shareholders ?? []).length > 0);
+  const company =
+    companies.find((e) => e.id === state.entityFilter) ?? (companies.length === 1 ? companies[0] : undefined);
+  if (company === undefined) {
+    body.append(
+      note(
+        "To split this between shareholders as the IR4 does, give the company its " +
+          "shareholders on Entities & accounts.",
+      ),
+    );
+  } else {
+    const parts = splitByShareholding(schedule, company.shareholders ?? []);
+    const split = document.createElement("table");
+    split.className = "report-table balance-sheet";
+    split.innerHTML =
+      "<thead><tr><th>Shareholder</th><th>Share</th><th>Opening</th><th>In</th><th>Out</th><th>Closing (IR4 box 40E)</th></tr></thead>";
+    const rows = document.createElement("tbody");
+    for (const part of parts) {
+      const tr = document.createElement("tr");
+      tr.append(
+        nameCell(part.name),
+        amountCell(`${part.percent}%`),
+        amountCell(money(part.opening)),
+        amountCell(money(part.introduced)),
+        amountCell(money(part.drawings === 0 ? 0 : -part.drawings)),
+        amountCell(money(part.closing)),
+      );
+      rows.append(tr);
+    }
+    split.append(rows);
+    body.append(split);
+    body.append(
+      note(
+        "Split by shareholding. If shareholders draw unequally, keep a current account for " +
+          "each so the IR4 shows what each owes or is owed.",
+      ),
+    );
+  }
+
+  body.append(
+    note(
+      schedule.overdrawn
+        ? "This account is overdrawn, as flagged above: Inland Revenue expects interest or " +
+          "fringe benefit tax on an overdrawn shareholder account."
+        : "A credit balance is money the company owes the shareholder and needs no action. An " +
+          "overdrawn balance would be flagged, as Inland Revenue expects interest or FBT on it.",
+    ),
+  );
+}
+
+/**
+ * The IR10, which Inland Revenue wants with a company's IR4.
+ *
+ * A summary of figures the books already hold, arranged into the form's own
+ * numbered boxes. It is not a tax computation: the form asks for profit before
+ * tax, and the adjustments that turn that into taxable income -- non-deductible
+ * entertainment added back, tax depreciation in place of accounting
+ * depreciation, losses brought forward -- belong to the IR4 and are not done
+ * here. That is said on the page, because a form that looks finished is exactly
+ * the sort of thing somebody files.
+ */
+/**
+ * The journals a position-on-the-day report is built from, for the basis chosen.
+ *
+ * On the imported basis, the other system's own answer: its journals over the
+ * same opening balances, with its bank lines keyed as this ledger keys them.
+ * Anywhere else, and on that basis with no journal report loaded, this
+ * ledger's postings. The balance sheet and the IR10 both used to build from the
+ * postings on every basis, under a heading that said the imported one was read
+ * from the file -- and the balance sheet was fixed while the IR10 was not. One
+ * function for both is what stops that happening again.
+ */
+function positionJournals(): {
+  journals: PostedJournal[];
+  basis: string;
+  fromImport: boolean;
+} {
+  const basis = $<HTMLSelectElement>("report-basis").value;
+  const imported = state.ledger.journals ?? [];
+  const fromImport = basis === "accrual" && imported.length > 0;
+  if (!fromImport) return { journals: reportPostings(), basis, fromImport };
+  const chartByName = new Map(state.chart.map((a) => [a.name.trim().toLowerCase(), a]));
+  return {
+    journals: postedFromImported(imported, (name) =>
+      ledgerAccountFor(name, chartByName.get(name.trim().toLowerCase())),
+    ),
+    basis,
+    fromImport,
+  };
+}
+
+const NO_JOURNAL_REPORT =
+  "No journal report is loaded, so this is built from your postings rather than read " +
+  "from the other system. Load one on the Coding reconciliation page to compare.";
+
+/**
+ * Whether these books are a company's.
+ *
+ * A company owes its shareholders what they lend it through their current
+ * accounts, so the IR10 and the balance sheet set those out as a liability; for
+ * anyone else the same accounts are the owner's equity. The entity records
+ * what kind of income it earns, not whether it is a company, so its name
+ * decides -- and with no entity, a company is the likelier answer.
+ */
+function companyBooks(): boolean {
+  const entity = reportingEntity();
+  // Said outright where the entity says what it is; its name only otherwise.
+  if (entity?.structure !== undefined) return entity.structure === "company";
+  if (entity !== undefined) return /\b(limited|ltd)\b/i.test(entity.name);
+  // All entities: a company's books where one of them is a company, or where
+  // none is set up yet. A person's own books and their rental are not.
+  const all = (state.ledger.entities ?? emptyEntityModel()).entities;
+  return (
+    all.length === 0 ||
+    all.some(
+      (e) =>
+        e.structure === "company" ||
+        (e.structure === undefined && (e.kind ?? "business") === "business" && /\b(limited|ltd)\b/i.test(e.name)),
+    )
+  );
+}
+
+/**
+ * The books' own IR10 for the year ending on a date, box by box, in cents.
+ *
+ * Worked out exactly as the IR10 on this page is, so a filed return is set
+ * beside the same figures somebody would read here.
+ */
+export function booksIr10(yearEnding: string): Record<number, Cents> {
+  const year = Number(yearEnding.slice(0, 4));
+  const { journals } = positionJournals();
+  const summary = ir10Summary({
+    yearEnding: taxYearEnd(year),
+    yearStarting: taxYearStart(year),
+    journals,
+    ...(state.ledger.openingBalances ? { openingBalances: state.ledger.openingBalances } : {}),
+    chart: state.chart,
+    assets: state.ledger.assets ?? [],
+    proceeds: assetProceedsInUse(),
+    currentAccountsAsLiabilities: companyBooks(),
+  });
+  return Object.fromEntries(Object.values(summary.boxes).map((b) => [b.box, b.amount]));
+}
+
+function renderIr10(body: HTMLElement, year: number): void {
+  const { journals, basis, fromImport } = positionJournals();
+  const entity = reportingEntity();
+  const company = companyBooks();
+  const summary = ir10Summary({
+    yearEnding: taxYearEnd(year),
+    yearStarting: taxYearStart(year),
+    journals,
+    ...(state.ledger.openingBalances ? { openingBalances: state.ledger.openingBalances } : {}),
+    chart: state.chart,
+    assets: state.ledger.assets ?? [],
+    proceeds: assetProceedsInUse(),
+    currentAccountsAsLiabilities: company,
+  });
+
+  // Set out as the form is printed: every box, in order, whole dollars, the
+  // totals in bold and a rule under each block -- so it can be laid beside a
+  // filed return and read down the two together.
+  const heading = document.createElement("h3");
+  heading.textContent = "Financial Statement - IR10";
+  body.append(heading);
+  body.append(
+    note(`${taxYearStartSaid(year)} to ${taxYearEndSaid(year)}${entity !== undefined ? ` · ${entity.name}` : ""}`),
+  );
+  if (basis === "accrual" && !fromImport) body.append(note(NO_JOURNAL_REPORT));
+
+  if (state.ledger.openingBalances === undefined) {
+    const warn = document.createElement("p");
+    warn.className = "journal-out";
+    warn.textContent =
+      "No opening balances, so boxes 30 to 51 are only the movement since the first " +
+      "transaction. The income and expense boxes are unaffected.";
+    body.append(warn);
+  }
+
+  const dollars = (cents: Cents): string => {
+    const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), {
+      minimumFractionDigits: moneyPlaces(),
+      maximumFractionDigits: moneyPlaces(),
+    });
+    return cents < 0 ? `(${text})` : text;
+  };
+
+  const table = document.createElement("table");
+  table.className = "report-table ir10-form";
+  const tbody = document.createElement("tbody");
+  for (const line of IR10_LAYOUT) {
+    const box = summary.boxes[line.box];
+    if (box === undefined) continue;
+    const row = document.createElement("tr");
+    if (line.total === true) row.classList.add("ir10-total");
+    if (line.ruleAfter === true) row.classList.add("ir10-rule");
+    const number = document.createElement("td");
+    number.className = "ir10-box";
+    number.textContent = String(line.box);
+    const title = document.createElement("td");
+    title.textContent = line.title;
+    const amount = document.createElement("td");
+    amount.className = "report-amount";
+    amount.textContent = box.text ?? dollars(box.amount);
+    row.append(number, title, amount);
+    tbody.append(row);
+  }
+  table.append(tbody);
+  body.append(table);
+
+  const check = document.createElement("p");
+  check.className = summary.imbalance === 0 ? "journal-balanced" : "journal-out";
+  check.textContent =
+    summary.imbalance === 0
+      ? "The books behind this balance, so owners equity (box 51) is what is left once the liabilities are met."
+      : `The books behind this are out by ${formatAmount(summary.imbalance)} before rounding, ` +
+        "and owners equity (box 51) is carrying that difference.";
+  body.append(check);
+
+  body.append(
+    note(
+      "Whole dollars, as filed; rounding is taken in other income and other expenses. " +
+        (company
+          ? "Shareholder current accounts are a current liability (box 47). "
+          : "Owner current accounts are counted in owners equity. ") +
+        "Box 28 adds back non-deductible expenses; box 52 treats tax depreciation as equal to " +
+        "accounting depreciation. Losses brought forward and tax are on the IR4.",
+    ),
+  );
+  if (company) body.append(companyTaxSection(year, summary.boxes[29]?.amount ?? 0));
+}
+
+/**
+ * A filed return held for these books, for the year ending on a date.
+ *
+ * A company's by the entity being reported on (or the only one); a person's
+ * by their name.
+ */
+function heldReturn(form: "IR4" | "IR3", balanceDate: string, owner?: string) {
+  const single = (state.ledger.entities?.entities.length ?? 0) <= 1;
+  const entityId = single ? undefined : reportingEntity()?.id;
+  return (state.ledger.incomeReturns ?? []).find(
+    (r) =>
+      r.form === form &&
+      r.balanceDate === balanceDate &&
+      (form === "IR3" ? r.owner === owner : (r.entityId ?? undefined) === entityId),
+  );
+}
+
+/**
+ * The company's income tax, below its IR10.
+ *
+ * The IR10 stops at profit before tax. The loss brought forward and last
+ * year's residual income tax are on last year's filed return, held once it
+ * has been read in -- so this says what is missing where it has not.
+ */
+function companyTaxSection(year: number, taxableProfit: Cents): HTMLElement {
+  const wrap = document.createElement("div");
+  const heading = document.createElement("h3");
+  heading.textContent = "Company income tax";
+  wrap.append(heading);
+  const last = heldReturn("IR4", taxYearEnd(year - 1));
+  const lastIr4 = last !== undefined && last.form === "IR4" ? last : undefined;
+
+  // Tax already paid on the year's income: resident withholding tax taken
+  // from interest, which the books hold where it was coded to an account of
+  // its own. Not non-resident withholding tax -- that is tax the company
+  // took from somebody else and owes on, not a credit of its own.
+  const rwtAccount = /resident withholding|withholding tax|\brwt\b/i;
+  const from = taxYearStart(year);
+  const to = taxYearEnd(year);
+  const rwtLines = positionJournals()
+    .journals.filter((j) => j.date >= from && j.date <= to)
+    .flatMap((j) => j.lines)
+    .filter((l) => rwtAccount.test(l.accountName) && !/non[- ]?resident/i.test(l.accountName));
+  const rwtNames = [...new Set(rwtLines.map((l) => l.accountName))];
+  const taxCredits = Math.max(0, rwtLines.reduce((sum, l) => sum + l.amount, 0)) as Cents;
+
+  const result = companyIncomeTax({
+    taxableProfit,
+    ...(rwtNames.length > 0 ? { taxCredits } : {}),
+    ...(lastIr4 !== undefined ? { lossBroughtForward: lastIr4.lossCarriedForward } : {}),
+    ...(lastIr4?.lowestEconomicInterest !== undefined ? { lowestEconomicInterest: lastIr4.lowestEconomicInterest } : {}),
+    ...(lastIr4 !== undefined ? { lastYearResidualIncomeTax: lastIr4.residualIncomeTax } : {}),
+  });
+  if (lastIr4 === undefined) {
+    wrap.append(
+      note(
+        `No return for the year to ${taxYearEndSaid(year - 1)} is held, so no loss is brought forward and ` +
+          "this year's provisional tax is not known. Read last year's IR4 in under Setup, Last " +
+          "year's income tax return.",
+      ),
+    );
+  }
+  const table = document.createElement("table");
+  table.className = "report-table";
+  const tbody = document.createElement("tbody");
+  const rows: [string, Cents][] = [
+    ["Current year taxable profit (IR10 box 29)", result.taxableProfit],
+    ...(result.lossBroughtForward > 0 ? ([["Loss brought forward", result.lossBroughtForward]] as [string, Cents][]) : []),
+    ...(result.lossClaimed > 0 ? ([["Loss claimed", -result.lossClaimed as Cents]] as [string, Cents][]) : []),
+    ["Taxable income", result.taxableIncome],
+    ["Income tax at 28%", result.tax],
+    ...(rwtNames.length > 0 ? ([["Tax credits (RWT)", -taxCredits as Cents]] as [string, Cents][]) : []),
+    ["Residual income tax", result.residualIncomeTax],
+    ["Loss to carry forward", result.lossCarriedForward],
+  ];
+  for (const [label, amount] of rows) {
+    const tr = document.createElement("tr");
+    tr.append(nameCell(label), amountCell(centsSaid(amount)));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  wrap.append(table);
+
+  const saidProvisional = (when: string, p: NonNullable<typeof result.provisionalThisYear>): string => {
+    if (p.basis === "not due") return `${when}: ${p.why}`;
+    const [a = 0, b = 0, c = 0] = p.instalments;
+    return (
+      `${when}: ${centsSaid(p.amount)} (${p.basis}), in instalments of ${centsSaid(a)}, ` +
+      `${centsSaid(b)} and ${centsSaid(c)}.`
+    );
+  };
+  if (result.provisionalThisYear !== null) {
+    wrap.append(note(saidProvisional(`Provisional tax for ${year}, from last year's return`, result.provisionalThisYear)));
+  }
+  wrap.append(note(saidProvisional(`Provisional tax for ${year + 1}`, result.provisionalNextYear)));
+  if (rwtNames.length > 0) {
+    wrap.append(note(`Tax credits are the year's movement on ${rwtNames.join(", ")}.`));
+  }
+  for (const text of result.notes) wrap.append(note(text));
+  return wrap;
+}
+
+/**
+ * The balance sheet: what the company owns and owes on a day.
+ *
+ * The one report here that cannot be produced from bank data alone. A profit
+ * figure is a year's movement and the transactions carry all of it, but a
+ * balance is a running total since the company started -- so a set of books
+ * that begins partway through needs the position it inherited, or every figure
+ * is only the movement since the first bank line. That is not a smaller balance
+ * sheet, it is a wrong one, and it is said rather than left to be discovered.
+ */
+function renderBalanceSheet(body: HTMLElement, year: number): void {
+  const asAt = reportRange(year).to;
+  const opening = state.ledger.openingBalances;
+  const { journals, basis, fromImport } = positionJournals();
+  // Set out as signed statements are: a company's shareholder current accounts
+  // as one current liability, and the year's profit inside retained earnings.
+  const company = companyBooks();
+  // Shareholder current accounts are New Zealand's way of setting a company's out.
+  const currentAccounts = company && booksCountry().id === "nz";
+  const sheetAt = (date: string) =>
+    computeBalanceSheet({
+      asAt: date,
+      ...(opening ? { openingBalances: opening } : {}),
+      journals,
+      chart: state.chart,
+      shareholderCurrentAccounts: currentAccounts,
+      profitInRetainedEarnings: company,
+    });
+  const sheet = sheetAt(asAt);
+  // The same day a year earlier, as a column of its own; the opening and
+  // movement columns make way for it.
+  const earlierAt = comparing() ? earlierRange(year).to : null;
+  const earlier = earlierAt === null ? null : sheetAt(earlierAt);
+  const earlierClosing = new Map<string, Cents>();
+  if (earlier !== null) {
+    for (const part of [earlier.currentAssets, earlier.nonCurrentAssets, earlier.currentLiabilities, earlier.nonCurrentLiabilities, earlier.equity]) {
+      for (const line of part.lines) earlierClosing.set(balanceSheetLabel(line), line.closing);
+    }
+  }
+
+  const heading = document.createElement("h3");
+  heading.textContent = `Balance sheet as at ${daySaid(asAt)}` + (earlierAt === null ? "" : `, beside ${daySaid(earlierAt)}`);
+  body.append(heading);
+
+  if (basis === "accrual" && !fromImport) body.append(note(NO_JOURNAL_REPORT));
+
+  const money = (cents: Cents): string =>
+    booksMoney(cents);
+
+  // A general ledger brought in from the start carries every balance itself.
+  const fromStart = ledgerFromStart();
+  if (opening === undefined && !fromStart) {
+    const warn = document.createElement("p");
+    warn.className = "journal-out";
+    warn.textContent =
+      "No opening balances, so this shows movement since the first transaction, not the " +
+      "full position. Enter bank balances, or import a trial balance, on the Opening balances page.";
+    body.append(warn);
+  }
+
+  // The proof, first, in the same words the journal report uses. A balance
+  // sheet that does not balance is not a figure to read past.
+  const proof = document.createElement("p");
+  proof.className = sheet.imbalance === 0 ? "journal-balanced" : "journal-out";
+  proof.textContent =
+    sheet.imbalance === 0
+      ? "Balanced. Net assets equal total equity."
+      : `Out of balance by ${money(sheet.imbalance)}. The opening balances or a journal do ` +
+        "not balance; report this as a fault.";
+  body.append(proof);
+
+  // Scope, said plainly. Opening balances are held for the ledger rather than
+  // per entity, so a balance sheet cannot honestly be filtered to one.
+  const entities = state.ledger.entities?.entities ?? [];
+  if (entities.length > 1) {
+    body.append(
+      note(
+        "This covers all entities: opening balances are held for the whole set of books.",
+      ),
+    );
+  }
+
+  const table = document.createElement("table");
+  table.className = "report-table balance-sheet";
+  const head = document.createElement("thead");
+  head.innerHTML =
+    earlier === null || earlierAt === null
+      ? `<tr><th>Account</th><th>Opening</th><th>Movement</th><th>As at ${escapeHtml(daySaid(asAt, true))}</th></tr>`
+      : `<tr><th>Account</th><th>As at ${escapeHtml(daySaid(asAt, true))}</th><th>As at ${escapeHtml(daySaid(earlierAt, true))}</th><th>Change</th></tr>`;
+  const tbody = document.createElement("tbody");
+
+  // A section's own total is left off where a grand total below says the same.
+  const section = (
+    title: string,
+    lines: readonly BalanceSheetLine[],
+    total: Cents,
+    withTotal = true,
+  ): void => {
+    if (lines.length === 0 && total === 0) return;
+    const header = document.createElement("tr");
+    header.className = "bs-section";
+    const cell = document.createElement("td");
+    cell.colSpan = 4;
+    cell.textContent = title;
+    header.append(cell);
+    tbody.append(header);
+
+    // With a year earlier beside: this date, that date and the change; an
+    // account only last year had still shows, at nothing now.
+    if (earlier !== null) {
+      const shown = new Set<string>();
+      const rowOf = (label: string, now: Cents, then: Cents): void => {
+        const row = document.createElement("tr");
+        row.append(nameCell(label));
+        row.append(amountCell(money(now)));
+        row.append(amountCell(money(then)));
+        row.append(amountCell(now === then ? "" : money((now - then) as Cents)));
+        tbody.append(row);
+      };
+      for (const line of lines) {
+        const label = balanceSheetLabel(line);
+        shown.add(label);
+        rowOf(label, line.closing, earlierClosing.get(label) ?? (0 as Cents));
+      }
+      const before = [earlier.currentAssets, earlier.nonCurrentAssets, earlier.currentLiabilities, earlier.nonCurrentLiabilities, earlier.equity].find(
+        (part) => part.title === title,
+      );
+      for (const line of before?.lines ?? []) {
+        const label = balanceSheetLabel(line);
+        if (!shown.has(label) && line.closing !== 0) rowOf(label, 0 as Cents, line.closing);
+      }
+      if (!withTotal) return;
+      const sum = document.createElement("tr");
+      sum.className = "bs-total";
+      const then = before?.total ?? (0 as Cents);
+      sum.append(nameCell(`Total ${title.toLowerCase()}`));
+      sum.append(amountCell(money(total)));
+      sum.append(amountCell(money(then)));
+      sum.append(amountCell(total === then ? "" : money((total - then) as Cents)));
+      tbody.append(sum);
+      return;
+    }
+
+    for (const line of lines) {
+      const row = document.createElement("tr");
+      row.append(nameCell(balanceSheetLabel(line)));
+      row.append(amountCell(line.opening === 0 ? "" : money(line.opening)));
+      row.append(amountCell(line.movement === 0 ? "" : money(line.movement)));
+      row.append(amountCell(money(line.closing)));
+      tbody.append(row);
+    }
+
+    if (!withTotal) return;
+    const sum = document.createElement("tr");
+    sum.className = "bs-total";
+    sum.append(nameCell(`Total ${title.toLowerCase()}`));
+    sum.append(amountCell(""));
+    sum.append(amountCell(""));
+    sum.append(amountCell(money(total)));
+    tbody.append(sum);
+  };
+
+  const grand = (label: string, amount: Cents, then?: Cents): void => {
+    const row = document.createElement("tr");
+    row.className = "bs-grand";
+    row.append(nameCell(label));
+    if (earlier !== null && then !== undefined) {
+      row.append(amountCell(money(amount)));
+      row.append(amountCell(money(then)));
+      row.append(amountCell(amount === then ? "" : money((amount - then) as Cents)));
+    } else {
+      row.append(amountCell(""));
+      row.append(amountCell(""));
+      row.append(amountCell(money(amount)));
+    }
+    tbody.append(row);
+  };
+
+  section(sheet.currentAssets.title, sheet.currentAssets.lines, sheet.currentAssets.total);
+  section(sheet.nonCurrentAssets.title, sheet.nonCurrentAssets.lines, sheet.nonCurrentAssets.total);
+  grand("Total assets", sheet.totalAssets, earlier?.totalAssets);
+  section(sheet.currentLiabilities.title, sheet.currentLiabilities.lines, sheet.currentLiabilities.total);
+  section(
+    sheet.nonCurrentLiabilities.title,
+    sheet.nonCurrentLiabilities.lines,
+    sheet.nonCurrentLiabilities.total,
+  );
+  grand("Total liabilities", sheet.totalLiabilities, earlier?.totalLiabilities);
+  grand("Net assets", sheet.netAssets, earlier?.netAssets);
+  section(sheet.equity.title, sheet.equity.lines, sheet.equity.total, false);
+  grand("Total equity", sheet.totalEquity, earlier?.totalEquity);
+
+  table.append(head, tbody);
+  body.append(table);
+
+  if (currentAccounts) {
+    body.append(
+      note(
+        "Shareholder current accounts are the director's loan, drawings and funds introduced as " +
+          "one balance, a current liability because the company owes it; retained earnings " +
+          "include the year's profit. This is how the signed statements set them out.",
+      ),
+    );
+  }
+
+  body.append(
+    note(
+      opening === undefined
+        ? fromStart
+          ? "No opening balances are needed: the general ledger brought in runs from the start."
+          : "Every figure is the movement on that account since the ledger begins."
+        : `Opening figures are as at ${opening.asAt}${opening.source ? ` — ${opening.source}` : ""}. ` +
+          "Movement is what the postings since then have done to each account.",
+    ),
+  );
+}
+
+function renderJournal(body: HTMLElement, year: number): void {
+  const { from, to } = reportRange(year);
+  const inEntity = journalInEntity();
+  const journals = reportPostings().filter((j) => {
+    if (j.date < from || j.date > to) return false;
+    return inEntity === null || inEntity(j);
+  });
+
+  const heading = document.createElement("h3");
+  heading.textContent = `Journal and trial balance, ${periodHeading(year)}`;
+  body.append(heading);
+
+  if (journals.length === 0) {
+    body.append(note("No transactions in this year for the chosen entity."));
+    return;
+  }
+
+  const balance = trialBalance(journals);
+  const tax = taxSummary(journals);
+  const money = (cents: number): string =>
+    booksMoney(cents);
+
+  // The imbalance is the whole point: a single-entry ledger cannot tell you it
+  // is complete, and this one can.
+  const proof = document.createElement("p");
+  proof.className = balance.imbalance === 0 ? "journal-balanced" : "journal-out";
+  proof.textContent =
+    balance.imbalance === 0
+      ? `Balanced. ${journals.length} journals, ` +
+        `${journals.reduce((n, j) => n + j.lines.length, 0)} lines, debits equal credits.`
+      : `Out of balance by ${money(balance.imbalance)} across ${journals.length} journals — ` +
+        `${balance.unbalanced.length} do not balance on their own. Report this as a fault.`;
+  body.append(proof);
+
+  const summary = document.createElement("div");
+  summary.className = "check-summary";
+  const country = booksCountry().id;
+  const figures: readonly (readonly [string, string])[] =
+    country === "nz"
+      ? [
+          [money(tax.box5), "Box 5 gross sales"],
+          [money(tax.box8), "Box 8 GST on sales"],
+          [money(tax.box11), "Box 11 gross purchases"],
+          [money(tax.box12), "Box 12 GST on purchases"],
+          [money(tax.box13), "Box 13 import GST"],
+        ]
+      : noSalesTax()
+        ? []
+        : country === "au"
+          ? [
+              // What these hold, by the BAS's own labels: taxable and GST-free
+              // sales (input taxed left out), and purchases with GST in them.
+              [money(tax.box5), "G1 less G4 (input taxed), GST in"],
+              [money(tax.box8), "1A GST on sales"],
+              [money(tax.box11), "G17 purchases with GST in them"],
+              [money(tax.box12 + tax.box13), "1B GST on purchases"],
+            ]
+          : [
+              [money(tax.box5), "Sales, tax in"],
+              [money(tax.box8), "Tax on sales"],
+              [money(tax.box11), "Purchases, tax in"],
+              [money(tax.box12 + tax.box13), "Tax on purchases"],
+            ];
+  for (const [value, label] of figures) {
+    const cell = document.createElement("div");
+    cell.className = "check-stat";
+    const big = document.createElement("span");
+    big.className = "check-value";
+    big.textContent = value;
+    const small = document.createElement("span");
+    small.className = "check-label";
+    small.textContent = label;
+    cell.append(big, small);
+    summary.append(cell);
+  }
+  if (figures.length > 0) {
+    body.append(summary);
+    body.append(
+      note(
+        "Taken from each line's GST treatment, not the GST account balance; a line posted to " +
+          "the GST account with no tax type reaches no " + (country === "au" ? "label." : "box."),
+      ),
+    );
+  }
+
+  const table = document.createElement("table");
+  table.className = "report-table owner-table";
+  const head = document.createElement("thead");
+  head.innerHTML =
+    "<tr><th>Code</th><th>Account</th><th>Lines</th><th>Debit</th><th>Credit</th></tr>";
+  const tbody = document.createElement("tbody");
+
+  for (const row of [...balance.rows].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance))) {
+    const tr = document.createElement("tr");
+    for (const [text, cls] of [
+      [/^[a-z][a-z-]*$/.test(row.accountCode) ? "" : row.accountCode, "report-name"],
+      [row.accountName, "report-name"],
+      [String(row.lines), "report-amount"],
+      [row.balance > 0 ? money(row.balance) : "", "report-amount"],
+      [row.balance < 0 ? money(-row.balance) : "", "report-amount"],
+    ] as const) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      td.className = cls;
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+
+  const total = document.createElement("tr");
+  total.className = "report-net";
+  const debits = balance.rows.reduce((n, r) => n + (r.balance > 0 ? r.balance : 0), 0);
+  const credits = balance.rows.reduce((n, r) => n + (r.balance < 0 ? -r.balance : 0), 0);
+  for (const [text, cls] of [
+    ["", "report-name"], ["Total", "report-name"], ["", "report-amount"],
+    [money(debits), "report-amount"], [money(credits), "report-amount"],
+  ] as const) {
+    const td = document.createElement("td");
+    td.textContent = text;
+    td.className = cls;
+    total.append(td);
+  }
+  tbody.append(total);
+
+  table.append(head, tbody);
+  body.append(table);
+}
+
+function renderDepreciation(body: HTMLElement, year: number): void {
+  const assets = state.ledger.assets ?? [];
+  if (assets.length === 0) {
+    body.append(
+      note(
+        "No fixed assets yet. Add them, or load a register, on the Fixed assets page.",
+      ),
+    );
+    return;
+  }
+
+  const schedule = depreciationSchedule(assets, {
+    from: taxYearStart(year),
+    to: taxYearEnd(year),
+  }, depreciationRules());
+
+  const heading = document.createElement("h3");
+  heading.textContent = `Depreciation schedule, FY${year}`;
+  body.append(heading);
+  body.append(
+    note(
+      booksCountry().id === "au"
+        ? "Each asset uses its own method (prime cost or diminishing value) for the days it was " +
+            "held in the year, from the day it was first used. An asset disposed of in the year " +
+            "is depreciated to the day it went; its book value then goes to the disposal."
+        : "Each asset uses its own method (straight line or diminishing value) with full-month " +
+            "averaging. An asset disposed of in the year has no depreciation that year; its book " +
+            "value goes to the disposal.",
+    ),
+  );
+
+  const money = (cents: number): string =>
+    booksMoney(cents);
+
+  const table = document.createElement("table");
+  table.className = "report-table owner-table depreciation-table";
+  const head = document.createElement("thead");
+  head.innerHTML =
+    "<tr><th>Asset</th><th>Purchased</th><th>Cost</th><th>Rate</th>" +
+    "<th>Opening</th><th>Depreciation</th><th>Closing</th></tr>";
+  const tbody = document.createElement("tbody");
+
+  const row = (cells: readonly (readonly [string, string])[], cls = ""): void => {
+    const tr = document.createElement("tr");
+    if (cls !== "") tr.className = cls;
+    for (const [text, klass] of cells) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      td.className = klass;
+      tr.append(td);
+    }
+    tbody.append(tr);
+  };
+
+  for (const group of schedule.byType) {
+    row([[group.type, "report-name"], ["", ""], ["", ""], ["", ""], ["", ""], ["", ""], ["", ""]],
+        "report-section");
+    for (const line of group.rows) {
+      const name =
+        line.asset.name + (line.disposedInPeriod ? ` — disposed ${line.asset.disposed ?? ""}` : "");
+      row([
+        [name, "report-name"],
+        [line.asset.purchased ?? "", "report-name"],
+        [money(line.asset.cost), "report-amount"],
+        [`${line.asset.rate}%`, "report-amount"],
+        [money(line.opening), "report-amount"],
+        [money(line.depreciation), "report-amount"],
+        [money(line.closing), "report-amount"],
+      ]);
+    }
+    row([
+      [`Total ${group.type}`, "report-name"], ["", ""], ["", ""], ["", ""], ["", ""],
+      [money(group.depreciation), "report-amount"], [money(group.closing), "report-amount"],
+    ], "report-total");
+  }
+
+  row([
+    ["Total", "report-name"], ["", ""],
+    [money(schedule.totalCost), "report-amount"], ["", ""],
+    [money(schedule.totalOpening), "report-amount"],
+    [money(schedule.totalDepreciation), "report-amount"],
+    [money(schedule.totalClosing), "report-amount"],
+  ], "report-net");
+
+  table.append(head, tbody);
+  body.append(table);
+
+  if (schedule.disposedBookValue !== 0) {
+    body.append(
+      note(
+        `Assets disposed of in the year carried ${money(schedule.disposedBookValue)} of book ` +
+          "value. Enter each sale price on the Fixed assets page to work out the " +
+          (booksCountry().id === "au" ? "balancing adjustment or capital gain." : "loss, depreciation recovered or capital gain."),
+      ),
+    );
+  }
+}
+
+/** A statement being entered or edited: amounts as typed, until it is saved. */
+interface AgentDraftLine {
+  code: string;
+  description: string;
+  amount: string;
+}
+
+interface AgentDraft {
+  id: string;
+  entity: string;
+  agent: string;
+  from: string;
+  to: string;
+  heldCode: string;
+  heldAtStart: string;
+  income: AgentDraftLine[];
+  expenses: AgentDraftLine[];
+  paidToOwner: string;
+  heldAtEnd: string;
+}
+
+let agentDraft: AgentDraft | null = null;
+
+function draftFromStatement(statement: AgentStatement): AgentDraft {
+  const text = (cents: Cents): string => (cents / 100).toFixed(2);
+  const lines = (list: readonly AgentStatementLine[]): AgentDraftLine[] =>
+    list.map((line) => ({ code: line.code, description: line.description, amount: text(line.amount) }));
+  return {
+    id: statement.id,
+    entity: statement.entity,
+    agent: statement.agent,
+    from: statement.from,
+    to: statement.to,
+    heldCode: statement.heldCode,
+    heldAtStart: text(statement.heldAtStart),
+    income: lines(statement.income),
+    expenses: lines(statement.expenses),
+    paidToOwner: text(statement.paidToOwner),
+    heldAtEnd: text(statement.heldAtEnd),
+  };
+}
+
+/**
+ * A statement an AI read, as a draft for the editor: each line on the
+ * property's own account for its kind (`450` becomes `450FA`), found among the
+ * accounts the editor offers, so the person checks figures rather than codes.
+ */
+function draftFromReading(read: ReadAgentStatement, entity: Entity | null): AgentDraft {
+  const rows = accountsForEditing();
+  const suffix = entity?.codeSuffix ?? "";
+  const label = (base: string): string =>
+    entity === null ? "" : (rows.find((r) => r.account.code.trim() === `${base}${suffix}`)?.label ?? "");
+  const text = (cents: Cents): string => (cents / 100).toFixed(2);
+  const lines = (list: readonly ReadAgentLine[]): AgentDraftLine[] =>
+    list.map((line) => ({ code: label(line.base), description: line.description, amount: text(line.amount) }));
+  return {
+    id: `a${Date.now().toString(36)}`,
+    entity: entity?.id ?? "",
+    agent: read.agent,
+    from: read.from,
+    to: read.to,
+    heldCode: label("615"),
+    heldAtStart: text(read.heldAtStart),
+    income: lines(read.income),
+    expenses: lines(read.expenses),
+    paidToOwner: text(read.paidToOwner),
+    heldAtEnd: text(read.heldAtEnd),
+  };
+}
+
+/** The statement a draft would save, and everything still stopping it. */
+function statementFromDraft(draft: AgentDraft): { statement: AgentStatement; problems: string[] } {
+  const problems: string[] = [];
+  const amount = (typed: string, what: string): Cents => {
+    if (typed.trim() === "") return 0;
+    const parsed = parseAmount(typed.trim(), booksCurrency());
+    if (parsed === null) {
+      problems.push(`${what}: that is not an amount`);
+      return 0;
+    }
+    return parsed;
+  };
+  const lines = (list: readonly AgentDraftLine[], kind: string): AgentStatementLine[] =>
+    list
+      .filter((l) => l.code.trim() !== "" || l.description.trim() !== "" || l.amount.trim() !== "")
+      .map((l, index) => ({
+        code: l.code.trim(),
+        description: l.description.trim(),
+        amount: amount(l.amount, `${kind} line ${index + 1}`),
+      }));
+  const statement: AgentStatement = {
+    id: draft.id,
+    entity: draft.entity,
+    agent: draft.agent.trim(),
+    from: draft.from,
+    to: draft.to,
+    heldCode: draft.heldCode.trim(),
+    heldAtStart: amount(draft.heldAtStart, "held at the start"),
+    income: lines(draft.income, "collected"),
+    expenses: lines(draft.expenses, "paid out"),
+    paidToOwner: amount(draft.paidToOwner, "paid to you"),
+    heldAtEnd: amount(draft.heldAtEnd, "held at the end"),
+  };
+  const known = new Set(accountsForEditing().map((a) => a.label));
+  for (const code of [statement.heldCode, ...statement.income.map((l) => l.code), ...statement.expenses.map((l) => l.code)]) {
+    if (code !== "" && !known.has(code)) problems.push(`"${code}" is not an account; choose one from the list`);
+  }
+  return { statement, problems: [...problems, ...agentStatementProblems(statement)] };
+}
+
+/**
+ * What the books hold in an account at the end of a day.
+ *
+ * Its opening balance, where one was entered, and everything posted to it from
+ * then on -- the same figure the balance sheet would show for it that day.
+ */
+function bookBalanceOn(code: string, date: string, journals: readonly PostedJournal[]): Cents {
+  const { code: digits, name } = splitAccountLabel(code);
+  const wanted = name.trim().toLowerCase();
+  const opening = state.ledger.openingBalances;
+  let balance = opening !== undefined && opening.asAt <= date ? (opening.accounts[digits] ?? 0) : 0;
+  for (const journal of journals) {
+    if (journal.date > date) continue;
+    if (opening !== undefined && journal.date < opening.asAt) continue;
+    for (const line of journal.lines) {
+      const same =
+        (digits !== "" && line.accountCode === digits) || line.accountName.trim().toLowerCase() === wanted;
+      if (same) balance += line.amount;
+    }
+  }
+  return balance;
+}
+
+/**
+ * Property manager statements: entered, posted, and checked against the bank.
+ *
+ * The check is the point. The statement says what the manager is holding; the
+ * property manager account says what the books think they are holding, once
+ * the statement's journal and the payments from the bank are both in it. A
+ * payment made on the last day and banked a few days later is the one ordinary
+ * difference, and it is named as that rather than left looking like an error.
+ */
+/** How the page showing the statements redraws: Reports, or Rental year end. */
+let agentRedraw: () => void = () => redraw("reports");
+
+/**
+ * The statements for a year: every rental's on Reports, or -- given `entity` --
+ * one property's, as Rental year end shows them under each property.
+ */
+export function renderAgentStatements(
+  body: HTMLElement,
+  year: number,
+  options: { entity?: string; redraw?: () => void } = {},
+): void {
+  agentRedraw = options.redraw ?? (() => redraw("reports"));
+  const from = taxYearStart(year);
+  const to = taxYearEnd(year);
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const rentals = model.entities.filter(isRental).filter((e) => options.entity === undefined || e.id === options.entity);
+  const inYear = (state.ledger.agentStatements ?? [])
+    .filter((s) => s.to >= from && s.to <= to)
+    .filter((s) => options.entity === undefined || s.entity === options.entity)
+    .sort((a, b) => a.to.localeCompare(b.to) || a.agent.localeCompare(b.agent));
+
+  const heading = document.createElement(options.entity === undefined ? "h3" : "h4");
+  heading.textContent =
+    options.entity === undefined
+      ? `Property manager statements, year ended ${taxYearEndSaid(year)}`
+      : "Property manager statements";
+  body.append(heading);
+  body.append(
+    note(
+      "Code the property manager's payments to a property manager account (a current asset " +
+        "of the property), then enter each statement here. It posts the rent collected and the " +
+        "costs paid from it, and the account then shows what the manager holds.",
+    ),
+  );
+
+  if (rentals.length === 0) {
+    body.append(
+      note("No rental properties yet. On Entities & accounts, give each property an entity of its own."),
+    );
+    return;
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "page-actions";
+  const add = document.createElement("button");
+  add.type = "button";
+  add.textContent = "Enter a statement";
+  add.disabled = agentDraft !== null;
+  add.addEventListener("click", () => {
+    agentDraft = {
+      id: `a${Date.now().toString(36)}`,
+      entity: rentals.length === 1 ? (rentals[0]?.id ?? "") : "",
+      agent: "",
+      from,
+      to,
+      heldCode: "",
+      heldAtStart: "",
+      income: [{ code: "", description: "Rent", amount: "" }],
+      expenses: [{ code: "", description: "Management fees", amount: "" }],
+      paidToOwner: "",
+      heldAtEnd: "",
+    };
+    agentRedraw();
+  });
+  actions.append(add);
+  body.append(actions);
+  if (agentDraft === null) {
+    body.append(
+      agentReaderPanel(
+        rentals,
+        (read, entity) => {
+          agentDraft = draftFromReading(read, entity);
+          agentRedraw();
+        },
+        () => agentRedraw(),
+      ),
+    );
+  }
+  if (agentDraft !== null) body.append(agentEditor(agentDraft, rentals));
+
+  if (inYear.length === 0) {
+    body.append(note("None entered for this year."));
+    return;
+  }
+  const journals = postedJournals();
+  const engine = reportEngine();
+  for (const statement of inYear) body.append(agentCard(statement, model, journals, engine));
+}
+
+function agentCard(
+  statement: AgentStatement,
+  model: EntityModel,
+  journals: readonly PostedJournal[],
+  engine: CodingEngine | null,
+): HTMLElement {
+  const card = document.createElement("div");
+  const problems = agentStatementProblems(statement);
+  card.className = problems.length > 0 ? "journal-card journal-broken" : "journal-card";
+
+  const property = model.entities.find((e) => e.id === statement.entity)?.name ?? statement.entity;
+  const title = document.createElement("p");
+  title.className = "journal-narration";
+  title.textContent = `${statement.agent} — ${property}, ${statement.from} to ${statement.to}`;
+  card.append(title);
+
+  if (problems.length > 0) {
+    const bad = document.createElement("p");
+    bad.className = "journal-out";
+    bad.textContent = `Not posted: ${problems.join("; ")}.`;
+    card.append(bad);
+  }
+
+  const totals = agentStatementTotals(statement);
+  const table = document.createElement("table");
+  table.className = "report-table opening-table";
+  const tbody = document.createElement("tbody");
+  const row = (label: string, amount: Cents, className = ""): void => {
+    const tr = document.createElement("tr");
+    if (className !== "") tr.className = className;
+    tr.append(nameCell(label), amountCell(centsSaid(amount)));
+    tbody.append(tr);
+  };
+  row("Held for you at the start", statement.heldAtStart);
+  for (const line of statement.income) row(`${line.description} — ${scheduleName(line.code)}`, line.amount);
+  row("Collected", totals.income, "report-total");
+  for (const line of statement.expenses) row(`${line.description} — ${scheduleName(line.code)}`, line.amount);
+  row("Paid out", totals.expenses, "report-total");
+  row("Paid to you", statement.paidToOwner);
+  row("Held for you at the end", statement.heldAtEnd, "bs-grand");
+  table.append(tbody);
+  card.append(table);
+
+  if (problems.length === 0) {
+    const books = bookBalanceOn(statement.heldCode, statement.to, journals);
+    const lateReceipts =
+      engine === null
+        ? 0
+        : engine.transactions
+            .filter(
+              (t) =>
+                t.date > statement.to &&
+                (Date.parse(t.date) - Date.parse(statement.to)) / 86_400_000 <= 14 &&
+                engine.codeOf(t) === statement.heldCode,
+            )
+            .reduce((sum, t) => sum + t.amount, 0);
+    const account = scheduleName(statement.heldCode);
+    const difference = books - statement.heldAtEnd;
+    const check = document.createElement("p");
+    if (difference === 0) {
+      check.className = "journal-balanced";
+      check.textContent = `${account} holds ${centsSaid(books)} at ${statement.to}, as the statement says.`;
+    } else if (difference === lateReceipts) {
+      check.className = "journal-balanced";
+      check.textContent =
+        `${account} holds ${centsSaid(books)} at ${statement.to} and the statement says ` +
+        `${centsSaid(statement.heldAtEnd)}. The ${centsSaid(difference)} between them reached your ` +
+        "bank within two weeks of the period end.";
+    } else {
+      check.className = "journal-out";
+      check.textContent =
+        `${account} holds ${centsSaid(books)} at ${statement.to}, but the statement says ` +
+        `${centsSaid(statement.heldAtEnd)} (${centsSaid(difference)} apart). Check that every ` +
+        "payment from this manager is coded to this account, its opening balance is what the " +
+        "manager held, and earlier statements are entered.";
+    }
+    card.append(check);
+  }
+
+  const buttons = document.createElement("div");
+  const edit = document.createElement("button");
+  edit.type = "button";
+  edit.className = "link-button";
+  edit.textContent = "edit";
+  edit.disabled = agentDraft !== null;
+  edit.addEventListener("click", () => {
+    agentDraft = draftFromStatement(statement);
+    agentRedraw();
+  });
+  const remove = document.createElement("button");
+  remove.type = "button";
+  remove.className = "link-button";
+  remove.textContent = "Remove";
+  remove.addEventListener("click", () => void removeAgentStatement(statement));
+  buttons.append(edit, remove);
+  card.append(buttons);
+  return card;
+}
+
+/** The form for one statement, checked as it is typed. */
+function agentEditor(draft: AgentDraft, rentals: readonly Entity[]): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "split-editor journal-editor";
+  const title = document.createElement("h4");
+  title.textContent = "A property manager's statement";
+  wrap.append(title);
+
+  const codes = accountsForEditing().map((a) => a.label);
+  const status = document.createElement("p");
+  status.className = "split-balance";
+  const gstNote = note(
+    "This rental is GST registered. Enter amounts excluding GST, and record the GST on the " +
+      "manager's fees with a manual journal.",
+  );
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "primary";
+  save.textContent = "Save statement";
+
+  const input = (value: string, placeholder: string, set: (v: string) => void, type = "text"): HTMLInputElement => {
+    const element = document.createElement("input");
+    element.type = type;
+    element.value = value;
+    element.placeholder = placeholder;
+    element.addEventListener("input", () => {
+      set(element.value);
+      refresh();
+    });
+    return element;
+  };
+  const money = (value: string, set: (v: string) => void): HTMLInputElement => {
+    const element = input(value, "0.00", set);
+    element.inputMode = "decimal";
+    element.className = "split-amount";
+    return element;
+  };
+  const fieldsIn = (container: HTMLElement) => (label: string, control: HTMLElement): void => {
+    const wrapper = document.createElement("label");
+    wrapper.append(label, control);
+    container.append(wrapper);
+  };
+
+  const opening = document.createElement("div");
+  opening.className = "agent-fields";
+  const field = fieldsIn(opening);
+  const property = document.createElement("select");
+  if (draft.entity === "") {
+    const blank = document.createElement("option");
+    blank.value = "";
+    blank.textContent = "— choose the property —";
+    property.append(blank);
+  }
+  for (const entity of rentals) {
+    const option = document.createElement("option");
+    option.value = entity.id;
+    option.textContent = entity.name;
+    option.selected = entity.id === draft.entity;
+    property.append(option);
+  }
+  property.addEventListener("change", () => {
+    draft.entity = property.value;
+    refresh();
+  });
+  field("Property", property);
+  field("Property manager", input(draft.agent, "e.g. Kowhai Property Management", (v) => { draft.agent = v; }));
+  field("From", input(draft.from, "", (v) => { draft.from = v; }, "date"));
+  field("To", input(draft.to, "", (v) => { draft.to = v; }, "date"));
+  const heldPicker = combobox(codes, draft.heldCode === "" ? null : draft.heldCode, "Search accounts…", () => {
+    draft.heldCode = heldPicker.value;
+    refresh();
+  });
+  field("Their payments to you are coded to", heldPicker.element);
+  field("Held for you at the start", money(draft.heldAtStart, (v) => { draft.heldAtStart = v; }));
+  wrap.append(opening);
+
+  const section = (heading: string, lines: AgentDraftLine[], placeholder: string): void => {
+    const label = document.createElement("p");
+    label.className = "agent-section";
+    label.textContent = heading;
+    const rows = document.createElement("div");
+    const draw = (): void => {
+      rows.textContent = "";
+      lines.forEach((line, index) => {
+        const row = document.createElement("div");
+        row.className = "agent-row";
+        const account = combobox(codes, line.code === "" ? null : line.code, "Search accounts…", () => {
+          line.code = account.value;
+          refresh();
+        });
+        const drop = document.createElement("button");
+        drop.type = "button";
+        drop.textContent = "✕";
+        drop.title = "Remove this line";
+        drop.addEventListener("click", () => {
+          lines.splice(index, 1);
+          draw();
+          refresh();
+        });
+        row.append(
+          input(line.description, placeholder, (v) => { line.description = v; }),
+          account.element,
+          money(line.amount, (v) => { line.amount = v; }),
+          drop,
+        );
+        rows.append(row);
+      });
+    };
+    const more = document.createElement("button");
+    more.type = "button";
+    more.textContent = "Add a line";
+    more.addEventListener("click", () => {
+      lines.push({ code: "", description: "", amount: "" });
+      draw();
+    });
+    draw();
+    wrap.append(label, rows, more);
+  };
+  section("Collected from the tenant", draft.income, "e.g. Rent");
+  section("Paid out of it", draft.expenses, "e.g. Management fees");
+
+  const closing = document.createElement("div");
+  closing.className = "agent-fields";
+  const closingField = fieldsIn(closing);
+  closingField("Paid to you", money(draft.paidToOwner, (v) => { draft.paidToOwner = v; }));
+  closingField("Held for you at the end", money(draft.heldAtEnd, (v) => { draft.heldAtEnd = v; }));
+  wrap.append(closing, gstNote);
+
+  save.addEventListener("click", () => {
+    const { statement, problems } = statementFromDraft(draft);
+    if (problems.length > 0) return;
+    agentDraft = null;
+    void saveAgentStatement(statement);
+  });
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.textContent = "Cancel";
+  cancel.addEventListener("click", () => {
+    agentDraft = null;
+    agentRedraw();
+  });
+  const buttons = document.createElement("div");
+  buttons.className = "page-actions";
+  buttons.append(save, cancel);
+  wrap.append(status, buttons);
+
+  function refresh(): void {
+    const { statement, problems } = statementFromDraft(draft);
+    const totals = agentStatementTotals(statement);
+    const said =
+      `Collected ${centsSaid(totals.income)} · paid out ${centsSaid(totals.expenses)} · ` +
+      `held at the end should be ${centsSaid(totals.expectedHeldAtEnd)}`;
+    status.textContent = problems.length === 0 ? `${said} · adds up` : `${said}. Still to do: ${problems.join("; ")}.`;
+    status.className = problems.length === 0 ? "split-balance ok" : "split-balance off";
+    save.disabled = problems.length > 0;
+    const entity = rentals.find((e) => e.id === draft.entity);
+    gstNote.hidden = entity === undefined || entity.gstRegistered === false;
+  }
+  refresh();
+  return wrap;
+}
+
+async function saveAgentStatement(statement: AgentStatement): Promise<void> {
+  const before = state.ledger.agentStatements ?? [];
+  const agentStatements = [...before.filter((s) => s.id !== statement.id), statement];
+  state.ledger = { ...state.ledger, agentStatements };
+  state.persistent = await savePart(state.ledger);
+  await record(
+    "agentStatements",
+    `${statement.agent}: statement for ${statement.from} to ${statement.to}`,
+    before,
+    agentStatements,
+  );
+  agentRedraw();
+}
+
+async function removeAgentStatement(statement: AgentStatement): Promise<void> {
+  if (!await askOnPage(`Remove the ${statement.agent} statement for ${statement.from} to ${statement.to}? Its journal goes with it.`)) {
+    return;
+  }
+  const before = state.ledger.agentStatements ?? [];
+  const agentStatements = before.filter((s) => s.id !== statement.id);
+  state.ledger = { ...state.ledger, agentStatements };
+  state.persistent = await savePart(state.ledger);
+  await record(
+    "agentStatements",
+    `${statement.agent}: statement for ${statement.from} to ${statement.to} removed`,
+    before,
+    agentStatements,
+  );
+  agentRedraw();
+}
+
+/** Which GST return period is open, and which half of it is showing. */
+let gstPeriodChoice = "";
+let gstReturnTab: "return" | "transactions" = "return";
+/** When a box was clicked, which lines the Transactions tab narrows to. */
+let gstBoxFocus: "sales" | "purchases" | "late" | null = null;
+
+/** Every return a financial year holds, from the coding, at the filing frequency. */
+function gstReturnsFor(year: number): GstReturnResult[] {
+  try {
+    return computeOurReturns(varianceInput(), taxYearStart(year), taxYearEnd(year)).filter(
+      (r) => r.period.to >= taxYearStart(year) && r.period.to <= taxYearEnd(year),
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** The return the page is set to, or the latest one that has ended. */
+function chosenGstReturn(year: number): GstReturnResult | undefined {
+  const returns = gstReturnsFor(year);
+  const chosen = returns.find((r) => r.period.to === gstPeriodChoice);
+  if (chosen !== undefined) return chosen;
+  const today = new Date().toISOString().slice(0, 10);
+  return [...returns].reverse().find((r) => r.period.to < today) ?? returns[returns.length - 1];
+}
+
+/**
+ * A GST return, laid out as the form is and as Xero shows one.
+ *
+ * Nothing here is stored: the return is worked out from the coding each time,
+ * by the same calculation the reconciliation compares with a filed return. What
+ * can be stored is the decision that it was filed, which keeps the return as it
+ * stands that day.
+ */
+function renderGstReturn(body: HTMLElement, year: number): void {
+  const returns = gstReturnsFor(year);
+  if (returns.length === 0) {
+    body.append(note("No GST periods in this year hold any transactions."));
+    return;
+  }
+  const result = chosenGstReturn(year) ?? returns[returns.length - 1];
+  if (result === undefined) return;
+  gstPeriodChoice = result.period.to;
+  const today = new Date().toISOString().slice(0, 10);
+  const entity = reportingEntity();
+  const filed = state.filed.find((f) => f.periodEnd === result.period.to);
+  const money = (cents: Cents): string =>
+    booksMoney(cents);
+
+  // --- period and tabs ---
+  const controls = document.createElement("div");
+  controls.className = "page-actions";
+  const period = document.createElement("select");
+  for (const one of [...returns].reverse()) {
+    const option = document.createElement("option");
+    option.value = one.period.to;
+    option.textContent = `${one.period.from} to ${one.period.to}`;
+    option.selected = one.period.to === result.period.to;
+    period.append(option);
+  }
+  period.addEventListener("change", () => {
+    gstPeriodChoice = period.value;
+    gstBoxFocus = null;
+    redraw("reports");
+  });
+  controls.append(period);
+  for (const [tab, caption] of [["return", "GST return"], ["transactions", "Transactions"]] as const) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = caption;
+    button.className = gstReturnTab === tab ? "primary" : "";
+    button.addEventListener("click", () => {
+      gstReturnTab = tab;
+      if (tab === "return") gstBoxFocus = null;
+      redraw("reports");
+    });
+    controls.append(button);
+  }
+  body.append(controls);
+
+  // --- the heading: whose, which period, when, and which way the money goes ---
+  const status = document.createElement("p");
+  status.className = "gst-return-status";
+  status.textContent =
+    filed !== undefined
+      ? /^filed$/i.test(filed.status.trim())
+        ? "Filed"
+        : `Filed (${filed.status})`
+      : result.period.from <= today && today <= result.period.to
+        ? "Current period"
+        : result.period.to < today
+          ? "Not recorded as filed"
+          : "Future period";
+  body.append(status);
+
+  const heading = document.createElement("div");
+  heading.className = "gst-return-head";
+  const who = document.createElement("div");
+  const name = document.createElement("h3");
+  name.textContent = `${entity?.name ?? "GST return"} · ${result.period.from} to ${result.period.to}`;
+  const sub = document.createElement("p");
+  sub.className = "gst-return-sub";
+  sub.textContent =
+    (entity?.gstNumber ? `GST number ${entity.gstNumber} · ` : "") +
+    // The date the law names, and the working day it can still be done on
+    // where that date is a weekend or a public holiday.
+    (result.period.payBy !== undefined && result.period.payBy !== result.period.due
+      ? `Due ${result.period.due}, a weekend or public holiday, so file and pay by ${result.period.payBy}`
+      : `File by ${result.period.due}`);
+  who.append(name, sub);
+  const owed = document.createElement("div");
+  owed.className = "gst-return-owed";
+  const figure = document.createElement("strong");
+  figure.textContent = money(result.boxes.box15);
+  const said = document.createElement("span");
+  said.textContent = gstOutcomeLabel(result);
+  owed.append(figure, said);
+  heading.append(who, owed);
+  body.append(heading);
+
+  // --- anything the figures are guessing at ---
+  const assumed = result.lines.filter((line) => line.classification.assumed === true);
+  if (assumed.length > 0) {
+    const warn = document.createElement("p");
+    warn.className = "journal-out";
+    const tax = assumed.reduce((sum, line) => sum + Math.abs(gstWithin(line.amount, line.classification)), 0);
+    warn.textContent =
+      `${assumed.length} line${assumed.length === 1 ? " has" : "s have"} no coding and no GST treatment, ` +
+      `so ${assumed.length === 1 ? "it was" : "they were"} assumed standard-rated: ${money(tax)} of GST ` +
+      "on an assumption. Code them before filing.";
+    body.append(warn);
+  }
+  if (result.missingTaxPoint.length > 0) {
+    body.append(
+      note(
+        `${result.missingTaxPoint.length} transaction${result.missingTaxPoint.length === 1 ? " has" : "s have"} ` +
+          "no tax point, so they were placed by payment date.",
+      ),
+    );
+  }
+
+  if (gstReturnTab === "transactions") {
+    renderGstTransactions(body, result, money);
+  } else {
+    renderGstBoxes(body, result, money);
+    // Printed with the return: worked out again from the books, a different
+    // one means a figure has changed since.
+    const print = note(
+      `Fingerprint ${gstReturnFingerprint(result)}. The same figures always give the same fingerprint: ` +
+        "a printed or downloaded copy showing another has had a figure change since.",
+    );
+    print.classList.add("return-fingerprint");
+    body.append(print);
+  }
+
+  // --- filing ---
+  if (filed === undefined && result.period.to < today) {
+    const actions = document.createElement("div");
+    actions.className = "page-actions";
+    const mark = document.createElement("button");
+    mark.type = "button";
+    mark.className = "primary";
+    mark.textContent = "Mark as filed";
+    mark.title = "Keep this return as it stands today, to compare the books against later.";
+    mark.addEventListener("click", async () => {
+      const owedText =
+        result.boxes.outcome === "refund"
+          ? `a refund of ${money(result.boxes.box15)}`
+          : `${money(result.boxes.box15)} to pay`;
+      if (
+        !await askOnPage(
+          `Record the return for ${result.period.from} to ${result.period.to} as filed, with ${owedText}? ` +
+            "It is kept as these books show it now, and the GST reconciliation compares against it.",
+        )
+      ) {
+        return;
+      }
+      void recordFiledReturn(filedReturnFromOurs(result)).then(() => redraw("reports"));
+    });
+    actions.append(mark);
+    body.append(actions);
+  } else if (filed !== undefined) {
+    const difference = result.boxes.box8 - result.boxes.box12 - filed.core;
+    body.append(
+      note(
+        difference === 0
+          ? "Filed, and the books still agree with the return as filed."
+          : `Filed. The books now differ from it by ${money(difference)} (Box 8 less Box 12); ` +
+              "the GST reconciliation shows the lines behind that.",
+      ),
+    );
+  }
+}
+
+function renderGstBoxes(body: HTMLElement, result: GstReturnResult, money: (cents: Cents) => string): void {
+  const details = document.createElement("table");
+  details.className = "report-table gst-return-details";
+  const detailBody = document.createElement("tbody");
+  const late = result.lateClaims.reduce((sum, line) => sum + Math.abs(line.amount), 0);
+  for (const [label, value] of [
+    ["Tax basis", `${result.basis.charAt(0).toUpperCase()}${result.basis.slice(1)} basis`],
+    ["Late claims included", result.lateClaims.length === 0 ? "None" : `${result.lateClaims.length}, ${money(late)}`],
+  ] as const) {
+    const tr = document.createElement("tr");
+    tr.append(nameCell(label), amountCell(value));
+    detailBody.append(tr);
+  }
+  details.append(detailBody);
+  body.append(details);
+
+  const focusFor: Record<string, "sales" | "purchases" | "late"> = {
+    "Box 5": "sales",
+    "Box 6": "sales",
+    "Box 8": "sales",
+    "Box 9": "late",
+    "Box 11": "purchases",
+    "Box 12": "purchases",
+    "Box 13": "late",
+  };
+  for (const [section, title] of [["sales", "Sales and Income"], ["purchases", "Purchases and Expenses"]] as const) {
+    const heading = document.createElement("h4");
+    heading.textContent = title;
+    body.append(heading);
+    const table = document.createElement("table");
+    table.className = "report-table ir10-form gst-return-form";
+    const tbody = document.createElement("tbody");
+    for (const row of gstReturnBoxRows(result).filter((r) => r.section === section)) {
+      const tr = document.createElement("tr");
+      if (row.box === "Box 10" || row.box === "Box 14" || row.box === "Box 15") tr.classList.add("ir10-total");
+      const number = document.createElement("td");
+      number.className = "ir10-box";
+      number.textContent = row.box;
+      const label = document.createElement("td");
+      const focus = focusFor[row.box];
+      if (focus !== undefined && (focus !== "late" || result.lateClaims.length > 0)) {
+        const link = document.createElement("button");
+        link.type = "button";
+        link.className = "link-button";
+        link.textContent = row.label;
+        link.title = "Show the transactions behind this box";
+        link.addEventListener("click", () => {
+          gstReturnTab = "transactions";
+          gstBoxFocus = focus;
+          redraw("reports");
+        });
+        label.append(link);
+      } else {
+        label.textContent = row.label;
+      }
+      const amount = document.createElement("td");
+      amount.className = "report-amount";
+      amount.textContent = money(row.amount);
+      tr.append(number, label, amount);
+      tbody.append(tr);
+    }
+    table.append(tbody);
+    body.append(table);
+  }
+
+  // Box 8 and Box 12 add up the GST on each line, rounded to the cent, as the
+  // accounting systems do; Box 7 and Box 11 are then worked back from them. So
+  // they can sit a few cents from Box 5 less Box 6, or from the lines' total.
+  // Said only when it shows, because a figure that does not add up with no
+  // reason given reads as an error.
+  const b = result.boxes;
+  const purchasesGross =
+    result.lines
+      .filter((l) => l.classification.side === "purchases")
+      .reduce((sum, l) => sum - l.amount, 0) +
+    result.otherPurchases.reduce((sum, o) => sum + o.gross, 0);
+  if (b.box7 !== b.box5 - b.box6 || (b.box11 !== purchasesGross && Math.abs(b.box11 - purchasesGross) < 100)) {
+    body.append(
+      note(
+        `Box 8 and Box 12 total the GST on each line, rounded to the cent${moduleOn("xero") ? ", so they agree with returns filed from Xero" : ""}. Box 7 ` +
+          "and Box 11 are worked back from them, so they can differ by a few cents.",
+      ),
+    );
+  }
+}
+
+function renderGstTransactions(body: HTMLElement, result: GstReturnResult, money: (cents: Cents) => string): void {
+  if (gstBoxFocus !== null) {
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.className = "link-button";
+    clear.textContent =
+      gstBoxFocus === "sales" ? "Showing sales and income · show all" :
+        gstBoxFocus === "purchases" ? "Showing purchases and expenses · show all" : "Showing late claims · show all";
+    clear.addEventListener("click", () => {
+      gstBoxFocus = null;
+      redraw("reports");
+    });
+    body.append(clear);
+  }
+  const sections: { heading: string; lines: GstReturnResult["lines"] }[] = [];
+  const onSide = (side: string) => result.lines.filter((l) => l.classification.side === side || (side === "purchases" && l.classification.side === "imports"));
+  if (gstBoxFocus === null) sections.push({ heading: "", lines: result.lines });
+  if (gstBoxFocus === "sales") sections.push({ heading: "", lines: onSide("sales") });
+  if (gstBoxFocus === "purchases") sections.push({ heading: "", lines: onSide("purchases") });
+  if ((gstBoxFocus === null || gstBoxFocus === "late") && result.lateClaims.length > 0) {
+    sections.push({ heading: "Late claims", lines: result.lateClaims });
+  }
+
+  let shown = 0;
+  for (const section of sections) {
+    for (const group of gstTransactionGroups(section.lines)) {
+      shown += group.rows.length;
+      const heading = document.createElement("h4");
+      heading.textContent = section.heading === "" ? group.group : `${section.heading}: ${group.group}`;
+      body.append(heading);
+      const table = document.createElement("table");
+      table.className = "report-table";
+      table.innerHTML =
+        "<thead><tr><th>Date</th><th>Contact</th><th>Description</th><th>Gross</th><th>GST</th><th>Net</th></tr></thead>";
+      const tbody = document.createElement("tbody");
+      for (const row of group.rows) {
+        const tr = document.createElement("tr");
+        tr.append(nameCell(row.date), nameCell(row.contact), nameCell(row.description));
+        tr.append(amountCell(money(row.gross)), amountCell(money(row.gst)), amountCell(money(row.net)));
+        tbody.append(tr);
+      }
+      const total = document.createElement("tr");
+      total.className = "report-total";
+      total.append(nameCell("Total"), nameCell(""), nameCell(""));
+      total.append(amountCell(money(group.gross)), amountCell(money(group.gst)), amountCell(money(group.net)));
+      tbody.append(total);
+      table.append(tbody);
+      body.append(table);
+    }
+  }
+  // Bills paid by a shareholder or on an unloaded card are in Box 11 with no
+  // bank line behind them, and manual journals given GST in Box 5 or Box 11.
+  // Listed, or the boxes would not add up to the lines.
+  for (const [side, list, caption] of [
+    ["purchases", result.otherPurchases, "Purchases with no bank line: bills paid elsewhere, and manual journals"],
+    ["sales", result.otherSales, "Sales with no bank line: receipts and invoices paid in cash, and manual journals"],
+  ] as const) {
+    if ((gstBoxFocus !== null && gstBoxFocus !== side) || list.length === 0) continue;
+    const heading = document.createElement("h4");
+    heading.textContent = caption;
+    body.append(heading);
+    const table = document.createElement("table");
+    table.className = "report-table";
+    table.innerHTML = "<thead><tr><th>Date</th><th>What</th><th>Gross</th><th>GST</th><th>Net</th></tr></thead>";
+    const tbody = document.createElement("tbody");
+    let gross = 0;
+    let gst = 0;
+    for (const other of list) {
+      const tr = document.createElement("tr");
+      tr.append(nameCell(other.date ?? ""), nameCell(other.label ?? ""));
+      tr.append(amountCell(money(other.gross)), amountCell(money(other.gst)), amountCell(money(other.gross - other.gst)));
+      tbody.append(tr);
+      gross += other.gross;
+      gst += other.gst;
+      shown += 1;
+    }
+    const total = document.createElement("tr");
+    total.className = "report-total";
+    total.append(nameCell("Total"), nameCell(""));
+    total.append(amountCell(money(gross)), amountCell(money(gst)), amountCell(money(gross - gst)));
+    tbody.append(total);
+    table.append(tbody);
+    body.append(table);
+  }
+  if (shown === 0) body.append(note("No transactions in this part of the return."));
+  if (shown > 0) {
+    body.append(
+      note(
+        "Totals here add up the lines; the return's Box 7 and Box 11 can differ by a few cents.",
+      ),
+    );
+  }
+  if (gstBoxFocus === null && result.excluded.length > 0) {
+    body.append(
+      note(
+        `${result.excluded.length} transaction${result.excluded.length === 1 ? " was" : "s were"} left out ` +
+          "of the return: transfers, drawings and anything with no GST to account for.",
+      ),
+    );
+  }
+}
+
+/** A financial year as a date range, labelled by the year it ends in. */
+function yearPeriod(year: number): DateRange {
+  return { from: taxYearStart(year), to: taxYearEnd(year) };
+}
+
+/**
+ * One entity's profit and loss, on the basis the page is set to.
+ *
+ * The same three sources the profit and loss reads, narrowed to the accounts
+ * the entity holds, so a rental schedule and the profit and loss filtered to
+ * the same property cannot disagree. The journals are gathered once and the
+ * returned function reused for every property and year.
+ */
+function entityReporter(): (entity: Entity, period: DateRange) => ProfitAndLoss | null {
+  const { entityOfCode, sectionOf } = reportLookups();
+  const basis = $<HTMLSelectElement>("report-basis").value;
+  const labelOf = reportLabeller();
+  const imported = state.ledger.journals ?? [];
+  const journals =
+    basis === "posted" ? ourAccrualJournals() : basis === "accrual" && imported.length > 0 ? imported : null;
+  const engine = journals === null ? reportEngine() : null;
+  return (entity, period) => {
+    const includeCode = (code: string): boolean => entityOfCode.get(code) === entity.id;
+    if (journals !== null) return accrualProfitAndLoss(journals, { period, sectionOf, labelOf, includeCode });
+    if (!engine) return null;
+    return profitAndLoss(engine.transactions, {
+      period,
+      codeOf: engine.codeOf,
+      classify: engine.classify,
+      sectionOf,
+      includeCode,
+    });
+  };
+}
+
+/** One entity's profit and loss for a year, on the basis the page is set to. */
+export function entityYearReport(entity: Entity, year: number): ProfitAndLoss | null {
+  return entityReporter()(entity, yearPeriod(year));
+}
+
+/** One entity's profit and loss for any stretch of days -- a BAS quarter, say. */
+export function entityPeriodReport(entity: Entity, period: DateRange): ProfitAndLoss | null {
+  return entityReporter()(entity, period);
+}
+
+/** An account as a schedule names it: without the code on the end. */
+export function scheduleName(code: string): string {
+  const { name } = splitAccountLabel(code);
+  return name.trim() === "" ? code : name;
+}
+
+/**
+ * Each rental's income, expenses and net for the year ending on a date, whole
+ * property, with its entity -- for setting a filed IR3R beside the books.
+ */
+export function booksRentals(
+  yearEnding: string,
+): { entity: Entity; income: Cents; expenses: Cents; net: Cents }[] {
+  return rentalSchedulesFor(Number(yearEnding.slice(0, 4)), false).map(({ entity, now }) => ({
+    entity,
+    income: now.totalIncome,
+    expenses: now.totalExpenses,
+    net: now.net,
+  }));
+}
+
+/** Every rental's schedule for a year, and for the year before where asked. */
+export function rentalSchedulesFor(
+  year: number,
+  withPrior = true,
+): { entity: Entity; now: RentalSchedule; before: RentalSchedule | null }[] {
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const reportOf = entityReporter();
+  const out: { entity: Entity; now: RentalSchedule; before: RentalSchedule | null }[] = [];
+  for (const entity of model.entities.filter(isRental)) {
+    const now = reportOf(entity, yearPeriod(year));
+    if (now === null) continue;
+    const before = withPrior ? reportOf(entity, yearPeriod(year - 1)) : null;
+    out.push({
+      entity,
+      now: rentalSchedule(entity, now, scheduleName),
+      before: before === null ? null : rentalSchedule(entity, before, scheduleName),
+    });
+  }
+  return out;
+}
+
+interface ScheduleRow {
+  name: string;
+  now: Cents;
+  before: Cents;
+}
+
+/** This year's lines beside last year's, one row per account name. */
+function pairLines(now: readonly RentalLine[], before: readonly RentalLine[]): ScheduleRow[] {
+  const rows = new Map<string, ScheduleRow>();
+  const at = (name: string): ScheduleRow => {
+    const found = rows.get(name) ?? { name, now: 0, before: 0 };
+    rows.set(name, found);
+    return found;
+  };
+  for (const line of now) at(line.name).now += line.amount;
+  for (const line of before) at(line.name).before += line.amount;
+  return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+/** Whole dollars, a dash for nothing, a loss in brackets -- as schedules print. */
+function wholeDollars(cents: Cents): string {
+  const dollars = Math.round(cents / 100);
+  if (dollars === 0) return "-";
+  const text = Math.abs(dollars).toLocaleString(booksLocale());
+  return dollars < 0 ? `(${text})` : text;
+}
+
+/** Dollars and cents, a negative in brackets -- as a return prints. */
+function centsSaid(cents: Cents): string {
+  const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), {
+    minimumFractionDigits: moneyPlaces(),
+    maximumFractionDigits: moneyPlaces(),
+  });
+  return cents < 0 ? `(${text})` : text;
+}
+
+function scheduleTable(
+  year: number,
+  sections: readonly { title: string; lines: readonly ScheduleRow[]; total: readonly [string, Cents, Cents] }[],
+  bottom: readonly [string, Cents, Cents],
+): HTMLTableElement {
+  const table = document.createElement("table");
+  table.className = "report-table rental-schedule";
+  const head = document.createElement("thead");
+  head.innerHTML = `<tr><th></th><th>${year}</th><th>${year - 1}</th></tr>`;
+  const tbody = document.createElement("tbody");
+  const row = (cells: readonly string[], className = ""): void => {
+    const tr = document.createElement("tr");
+    if (className !== "") tr.className = className;
+    cells.forEach((text, index) => {
+      const td = document.createElement("td");
+      td.textContent = text;
+      td.className = index === 0 ? "report-name" : "report-amount";
+      tr.append(td);
+    });
+    tbody.append(tr);
+  };
+  for (const section of sections) {
+    row([section.title, "", ""], "bs-section");
+    for (const line of section.lines) row([line.name, wholeDollars(line.now), wholeDollars(line.before)]);
+    row([section.total[0], wholeDollars(section.total[1]), wholeDollars(section.total[2])], "report-total");
+  }
+  row([bottom[0], wholeDollars(bottom[1]), wholeDollars(bottom[2])], "bs-grand");
+  table.append(head, tbody);
+  return table;
+}
+
+/**
+ * Rental schedules: one per property, then all of them as one statement.
+ *
+ * Set out as a practitioner's rental summaries are -- whole dollars, last year
+ * beside this one, income, expenses and what is left -- so the two can be read
+ * side by side a line at a time.
+ */
+function renderRentalSchedules(body: HTMLElement, year: number): void {
+  const built = rentalSchedulesFor(year);
+  if (built.length === 0) {
+    body.append(
+      note(
+        "No rental properties yet. On Entities & accounts, add each property as a Residential " +
+          "or Commercial rental, with its owners and accounts.",
+      ),
+    );
+    return;
+  }
+
+  for (const { entity, now, before } of built) {
+    const heading = document.createElement("h3");
+    heading.textContent = `Rental schedule — ${entity.name}`;
+    body.append(heading);
+    const owners = (entity.owners ?? []).map((o) => `${o.name} ${o.percent}%`).join(", ");
+    body.append(
+      note(
+        `${entity.kind === "residential" ? "Residential" : "Commercial"} rental` +
+          (owners !== "" ? `, owned ${owners}` : ", with no owners set") +
+          ". " +
+          (entity.gstRegistered === false
+            ? "Not registered for GST, so the figures include it."
+            : "Registered for GST, so the figures exclude it."),
+      ),
+    );
+    body.append(
+      scheduleTable(
+        year,
+        [
+          {
+            title: "Income",
+            lines: pairLines(now.income, before?.income ?? []),
+            total: ["Total Income", now.totalIncome, before?.totalIncome ?? 0],
+          },
+          {
+            title: "Expenses",
+            lines: pairLines(now.expenses, before?.expenses ?? []),
+            total: ["Total Expenses", now.totalExpenses, before?.totalExpenses ?? 0],
+          },
+        ],
+        ["Net Rental Income", now.net, before?.net ?? 0],
+      ),
+    );
+  }
+
+  if (built.length > 1) {
+    const heading = document.createElement("h3");
+    heading.textContent = "Statement of profit or loss — all rentals";
+    body.append(heading);
+    const sum = (pick: (s: RentalSchedule) => Cents, prior: boolean): Cents =>
+      built.reduce((total, b) => total + (prior ? (b.before ? pick(b.before) : 0) : pick(b.now)), 0);
+    const merged = (pick: (s: RentalSchedule) => readonly RentalLine[]): ScheduleRow[] =>
+      pairLines(
+        built.flatMap((b) => pick(b.now)),
+        built.flatMap((b) => (b.before ? pick(b.before) : [])),
+      );
+    body.append(
+      scheduleTable(
+        year,
+        [
+          {
+            title: "Trading Income",
+            lines: merged((s) => s.income),
+            total: ["Total Trading Income", sum((s) => s.totalIncome, false), sum((s) => s.totalIncome, true)],
+          },
+          {
+            title: "Expenses",
+            lines: merged((s) => s.expenses),
+            total: ["Total Expenses", sum((s) => s.totalExpenses, false), sum((s) => s.totalExpenses, true)],
+          },
+        ],
+        ["Net Profit (Loss) for the Year", sum((s) => s.net, false), sum((s) => s.net, true)],
+      ),
+    );
+  }
+}
+
+/** One owner's return for a year, from the books and what was entered for it. */
+export function ir3For(owner: string, year: number): ReturnType<typeof ir3Return> {
+  const shares: OwnerRentalSchedule[] = [];
+  for (const { now } of rentalSchedulesFor(year, false)) {
+    // The year goes with it, so a residential interest limit is applied as
+    // that year's rules say.
+    const share = ownerRentalSchedule(now, owner, year);
+    if (share !== null) shares.push(share);
+  }
+  const details = (state.ledger.ir3Details ?? []).find((d) => d.owner === owner && d.year === year);
+  // Last year's ring-fenced rental losses, from last year's filed IR3 where
+  // one is held and nobody has typed the figure in for this year.
+  const lastIr3 = heldReturn("IR3", taxYearEnd(year - 1), owner);
+  const fencedFromReturn =
+    lastIr3 !== undefined && lastIr3.form === "IR3"
+      ? lastIr3.rentals.reduce((sum, r) => sum + (r.ringFencedLossCarriedForward ?? 0), 0)
+      : undefined;
+  const broughtForward = details?.residentialBroughtForward ?? fencedFromReturn;
+  // Typed in wins; otherwise what the income tax account says was paid.
+  const provisionalTaxPaid = details?.provisionalTaxPaid ?? provisionalPaidFromIrd(owner, year)?.paid;
+  // A sole trader's business is the owner's own: its net profit is box 24.
+  const selfEmployed = (state.ledger.entities ?? emptyEntityModel()).entities
+    .filter((e) => (e.kind ?? "business") === "business" && e.structure === "sole-trader")
+    .flatMap((e) => {
+      const percent = (e.owners ?? []).find((o) => o.name === owner)?.percent ?? 0;
+      const report = percent > 0 ? entityYearReport(e, year) : null;
+      return report === null ? [] : [{ business: e.name, net: Math.round((report.netProfit * percent) / 100) as Cents }];
+    });
+  return ir3Return({
+    owner,
+    year,
+    ...(selfEmployed.length > 0 ? { selfEmployed } : {}),
+    extras: state.ledger.taxExtras ?? [],
+    rentals: shares,
+    ...(provisionalTaxPaid !== undefined ? { provisionalTaxPaid } : {}),
+    ...(details?.ietcEligible !== undefined ? { ietcEligible: details.ietcEligible } : {}),
+    ...(details?.ietcMonthsOut !== undefined ? { ietcMonthsOut: details.ietcMonthsOut } : {}),
+    ...(broughtForward !== undefined && broughtForward > 0
+      ? { residentialBroughtForward: broughtForward as Cents }
+      : {}),
+  });
+}
+
+/** One owner's share of one property, under the headings the IR3 schedule uses. */
+function ownerScheduleTable(schedule: OwnerRentalSchedule): HTMLElement {
+  const wrap = document.createElement("div");
+  const title = document.createElement("h4");
+  title.textContent = `${schedule.property} — ${schedule.percent}% share`;
+  wrap.append(title);
+  const table = document.createElement("table");
+  table.className = "report-table owner-schedule";
+  const tbody = document.createElement("tbody");
+  const row = (label: string, amount: Cents | null, className = ""): void => {
+    const tr = document.createElement("tr");
+    if (className !== "") tr.className = className;
+    const name = document.createElement("td");
+    name.className = "report-name";
+    name.textContent = label;
+    const value = document.createElement("td");
+    value.className = "report-amount";
+    value.textContent = amount === null ? "" : centsSaid(amount);
+    tr.append(name, value);
+    tbody.append(tr);
+  };
+  const residential = schedule.residential;
+  row("Income", null, "bs-section");
+  row(residential ? "Gross residential rental income" : "Total rents", schedule.rents);
+  row(residential ? "Other residential income" : "Other income", schedule.otherIncome);
+  row("Total income", schedule.totalIncome, "report-total");
+  row("Expenses", null, "bs-section");
+  for (const heading of schedule.headings) {
+    if (heading.heading !== "other") {
+      row(heading.heading === "interest" && residential ? "Total interest" : heading.label, heading.amount);
+      continue;
+    }
+    if (schedule.other.length === 0) row("Other", 0);
+    for (const item of schedule.other) row(`Other: ${item.name}`, item.amount);
+  }
+  row("Total expenses", schedule.totalExpenses, "report-total");
+  row("Net rents", schedule.netRents, "bs-grand");
+  table.append(tbody);
+  wrap.append(table);
+  return wrap;
+}
+
+/**
+ * An owner's IR3, box by box, with the schedules behind it.
+ *
+ * Box numbers are the 2026 form's. The rental figures are this owner's share,
+ * line by line, of each property's schedule on the basis the page is set to;
+ * everything else is what was entered below.
+ */
+function renderIr3(body: HTMLElement, owner: string, year: number): void {
+  const result = ir3For(owner, year);
+
+  const heading = document.createElement("h3");
+  heading.textContent = `${owner} — Individual income tax return (IR3), ${taxYearStartSaid(year)} to ${taxYearEndSaid(year)}`;
+  body.append(heading);
+  for (const said of result.notes) body.append(note(said));
+
+  const table = document.createElement("table");
+  table.className = "report-table ir10-form";
+  const tbody = document.createElement("tbody");
+  for (const line of result.boxes) {
+    const tr = document.createElement("tr");
+    if (line.total === true) tr.classList.add("ir10-total");
+    const number = document.createElement("td");
+    number.className = "ir10-box";
+    number.textContent = line.box;
+    const title = document.createElement("td");
+    title.textContent = line.title;
+    const amount = document.createElement("td");
+    amount.className = "report-amount";
+    amount.textContent = line.text ?? centsSaid(line.amount ?? 0);
+    tr.append(number, title, amount);
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  body.append(table);
+
+  // This year's provisional tax: set by last year's residual income tax, which
+  // last year's filed return gives where it is held.
+  const lastIr3 = heldReturn("IR3", taxYearEnd(year - 1), owner);
+  if (lastIr3 !== undefined) {
+    const due = provisionalStandardOption({ lastYear: lastIr3.residualIncomeTax });
+    const [a = 0, b = 0, c = 0] = due.instalments;
+    body.append(
+      note(
+        due.basis === "not due"
+          ? `${year} provisional tax, from last year's return: ${due.why}`
+          : `${year} provisional tax, from last year's return: ${centsSaid(due.amount)} (${due.basis}), ` +
+              `in instalments of ${centsSaid(a)}, ${centsSaid(b)} and ${centsSaid(c)}.`,
+      ),
+    );
+    const fenced = lastIr3.form === "IR3"
+      ? lastIr3.rentals.reduce((sum, r) => sum + (r.ringFencedLossCarriedForward ?? 0), 0)
+      : 0;
+    if (fenced > 0 && (state.ledger.ir3Details ?? []).find((d) => d.owner === owner && d.year === year)?.residentialBroughtForward === undefined) {
+      body.append(note(`Residential deductions of ${centsSaid(fenced as Cents)} are brought forward from last year's return.`));
+    }
+  }
+  if (result.nextYearProvisional !== null) {
+    const [first = 0, second = 0, third = 0] = result.instalments;
+    body.append(
+      note(
+        `${year + 1} provisional tax of ${centsSaid(result.nextYearProvisional)} on the standard ` +
+          `option (this year's residual income tax plus 5%), in instalments of ` +
+          `${centsSaid(first)}, ${centsSaid(second)} and ${centsSaid(third)}.`,
+      ),
+    );
+  }
+  if (result.refundOrToPay === null && result.residualIncomeTax !== null) {
+    body.append(note("Enter the provisional tax paid for the year below to see the refund or the tax to pay."));
+  }
+
+  if (result.residential.properties.length > 0) {
+    const title = document.createElement("h3");
+    title.textContent = "Residential property income schedules";
+    body.append(title);
+    for (const property of result.residential.properties) body.append(ownerScheduleTable(property));
+    if (result.residential.carriedForward > 0) {
+      body.append(
+        note(
+          `Residential deductions of ${centsSaid(result.residential.carriedForward)} are more than ` +
+            "the residential income. They are ring-fenced and carried forward, not set against " +
+            "other income.",
+        ),
+      );
+    }
+  }
+  if (result.otherRentals.length > 0) {
+    const title = document.createElement("h3");
+    title.textContent = "Rental income schedules";
+    body.append(title);
+    for (const property of result.otherRentals) body.append(ownerScheduleTable(property));
+  }
+
+  renderIr3Details(body, owner, year);
+  renderTaxExtras(body, owner, year);
+}
+
+/**
+ * What a person's books show as income tax paid in the year, or null when
+ * they have no such account.
+ *
+ * Confirmed lines only: a suggestion is not a payment anybody has said is
+ * theirs. And their own personal entity only -- one owned wholly by them -- since a
+ * payment from a joint account is not obviously either person's.
+ */
+function incomeTaxCoded(owner: string, year: number): Cents | null {
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const mine = new Set(
+    model.entities
+      .filter(
+        (e) =>
+          e.kind === "personal" &&
+          (e.owners ?? []).length === 1 &&
+          (e.owners ?? [])[0]?.name === owner,
+      )
+      .map((e) => e.id),
+  );
+  const labels = new Set(
+    state.chart
+      .filter(
+        (a) =>
+          /income tax paid/i.test(a.name) && mine.has(model.accounts[accountEntityKey(a)] ?? ""),
+      )
+      .map((a) => a.code.trim()),
+  );
+  if (labels.size === 0) return null;
+  const from = taxYearStart(year);
+  const to = taxYearEnd(year);
+  return allLines()
+    .filter(
+      (one) =>
+        one.code !== null &&
+        one.confirmed &&
+        labels.has(splitAccountLabel(one.code).code) &&
+        one.transaction.date >= from &&
+        one.transaction.date <= to,
+    )
+    .reduce((sum, one) => sum - one.transaction.amount, 0);
+}
+
+/** The return's facts from outside the books, entered by hand. */
+export function renderIr3Details(body: HTMLElement, owner: string, year: number): void {
+  const heading = document.createElement("h3");
+  heading.textContent = "From Inland Revenue and last year's return";
+  body.append(heading);
+  const details = (state.ledger.ir3Details ?? []).find((d) => d.owner === owner && d.year === year);
+
+  const form = document.createElement("div");
+  form.className = "extra-add ir3-details";
+  const field = (placeholder: string, value: Cents | undefined, title: string): HTMLInputElement => {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.placeholder = placeholder;
+    input.title = title;
+    input.value = value === undefined ? "" : (value / 100).toFixed(2);
+    return input;
+  };
+  const paid = field(
+    "Provisional tax paid",
+    details?.provisionalTaxPaid,
+    "Provisional tax paid for the year, as shown in the Inland Revenue account, including any transfers in.",
+  );
+  const carried = field(
+    "Residential deductions brought forward",
+    details?.residentialBroughtForward,
+    "Excess residential rental deductions carried forward on last year's return.",
+  );
+  const ietc = document.createElement("select");
+  const chosen = details?.ietcEligible === undefined ? "" : details.ietcEligible ? "yes" : "no";
+  for (const [value, caption] of [
+    ["", "IETC: assume eligible"],
+    ["yes", "IETC: eligible"],
+    ["no", "IETC: not eligible"],
+  ] as const) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = caption;
+    option.selected = value === chosen;
+    ietc.append(option);
+  }
+  ietc.title =
+    "The independent earner tax credit is ruled out by New Zealand Super, a main benefit or Working for Families.";
+
+  // Part of a year, which a yes-or-no could not say: the credit is worked out
+  // on whole months, and only the months with one of those payments are lost.
+  const monthsOut = document.createElement("input");
+  monthsOut.type = "number";
+  monthsOut.min = "0";
+  monthsOut.max = "12";
+  monthsOut.step = "1";
+  monthsOut.placeholder = "IETC months ruled out (0-12)";
+  monthsOut.title =
+    "Months in which you received Working for Families, NZ Super, a main benefit or a " +
+    "veteran's pension, even for a day. Each loses that month's credit; the rest are kept.";
+  monthsOut.value = details?.ietcMonthsOut === undefined ? "" : String(details.ietcMonthsOut);
+
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "primary";
+  save.textContent = "Save";
+  save.addEventListener("click", async () => {
+    const next: Ir3Details = { owner, year };
+    for (const [input, key, what] of [
+      [paid, "provisionalTaxPaid", "Provisional tax paid"],
+      [carried, "residentialBroughtForward", "Deductions brought forward"],
+    ] as const) {
+      if (input.value.trim() === "") continue;
+      const amount = parseAmount(input.value, booksCurrency());
+      if (amount === null) {
+        await tellOnPage(`${what} needs to be an amount.`);
+        return;
+      }
+      next[key] = amount;
+    }
+    if (ietc.value !== "") next.ietcEligible = ietc.value === "yes";
+    if (monthsOut.value.trim() !== "") {
+      const months = Number(monthsOut.value);
+      if (!Number.isInteger(months) || months < 0 || months > 12) {
+        await tellOnPage("Months ruled out needs to be a whole number from 0 to 12.");
+        return;
+      }
+      next.ietcMonthsOut = months;
+    }
+    void saveIr3Details(next);
+  });
+
+  form.append(paid, carried, ietc, monthsOut, save);
+  body.append(form);
+
+  // What the books hold, beside the figure the return wants. Shown rather
+  // than filled in: a year's last instalment is paid in May, after the year
+  // ends, so the bank lines in the year are not the tax paid for it.
+  const coded = incomeTaxCoded(owner, year);
+  if (coded !== null) {
+    body.append(
+      note(
+        `Coded to Income tax paid between ${taxYearStartSaid(year)} and ${taxYearEndSaid(year)}: ` +
+          `$${centsSaid(coded)}. Provisional tax for a year can be paid after it ends, ` +
+          "so check the figure against the Inland Revenue account.",
+      ),
+    );
+  }
+}
+
+async function saveIr3Details(details: Ir3Details): Promise<void> {
+  const before = state.ledger.ir3Details ?? [];
+  const ir3Details = [
+    ...before.filter((d) => !(d.owner === details.owner && d.year === details.year)),
+    details,
+  ];
+  state.ledger = { ...state.ledger, ir3Details };
+  state.persistent = await savePart(state.ledger);
+  await record("ir3Details", `${details.owner} FY${details.year}: details for the IR3`, before, ir3Details);
+  redraw("reports");
+  redraw("personalYear");
+}
+
+function csvOf(rows: readonly (readonly string[])[]): string {
+  return (
+    rows
+      .map((row) => row.map(spreadsheetCell).join(","))
+      .join("\r\n") + "\r\n"
+  );
+}
+
+function rentalSchedulesCsv(year: number): string {
+  const dollars = (cents: Cents): string => (cents / 100).toFixed(2);
+  const rows: string[][] = [[`Rental schedules, FY${year}`], []];
+  for (const { entity, now, before } of rentalSchedulesFor(year)) {
+    rows.push([entity.name, String(year), String(year - 1)]);
+    rows.push(["Income"]);
+    for (const line of pairLines(now.income, before?.income ?? [])) {
+      rows.push([line.name, dollars(line.now), dollars(line.before)]);
+    }
+    rows.push(["Total Income", dollars(now.totalIncome), dollars(before?.totalIncome ?? 0)]);
+    rows.push(["Expenses"]);
+    for (const line of pairLines(now.expenses, before?.expenses ?? [])) {
+      rows.push([line.name, dollars(line.now), dollars(line.before)]);
+    }
+    rows.push(["Total Expenses", dollars(now.totalExpenses), dollars(before?.totalExpenses ?? 0)]);
+    rows.push(["Net Rental Income", dollars(now.net), dollars(before?.net ?? 0)]);
+    rows.push([]);
+  }
+  return csvOf(rows);
+}
+
+export function ir3Csv(owner: string, year: number): string {
+  const result = ir3For(owner, year);
+  const rows: string[][] = [[`${owner} — IR3, FY${year}`], ["Box", "Description", "Amount"]];
+  for (const box of result.boxes) {
+    rows.push([box.box, box.title, box.text ?? ((box.amount ?? 0) / 100).toFixed(2)]);
+  }
+  for (const said of result.notes) rows.push(["", said, ""]);
+  return csvOf(rows);
+}
+
+function renderOwnerReport(body: HTMLElement, owner: string, year: number): void {
+  const summary = ownerSummaryFor(owner, year);
+
+  const heading = document.createElement("h3");
+  heading.textContent = `${owner} — rental income, FY${year}`;
+  body.append(heading);
+
+  if (summary.shares.length === 0) {
+    body.append(
+      note(
+        `${owner} owns no entity. Set owners against an entity on Entities & accounts, ` +
+          "e.g. “Ana Whitcombe 50%; Tom Whitcombe 50%”.",
+      ),
+    );
+    return;
+  }
+
+  const money = (cents: number): string =>
+    booksMoney(cents);
+
+  const table = document.createElement("table");
+  table.className = "report-table owner-table";
+  const head = document.createElement("thead");
+  head.innerHTML =
+    "<tr><th>Property</th><th>Kind</th><th>Share</th><th>Income</th><th>Expenses</th><th>Net</th></tr>";
+  const tbody = document.createElement("tbody");
+
+  for (const share of summary.shares) {
+    const tr = document.createElement("tr");
+    for (const [text, cls] of [
+      [share.entity, "report-name"],
+      [share.kind, "report-name"],
+      [`${share.percent}%`, "report-amount"],
+      [money(share.income), "report-amount"],
+      [money(share.expenses), "report-amount"],
+      [money(share.net), "report-amount"],
+    ] as const) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      td.className = cls;
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+
+  // Residential is kept apart because New Zealand ring-fences its losses: they
+  // cannot offset other income, so the two totals are not interchangeable.
+  const total = (label: string, income: number, expenses: number, net: number): void => {
+    const tr = document.createElement("tr");
+    tr.className = "report-total";
+    for (const [text, cls] of [
+      [label, "report-name"], ["", "report-name"], ["", "report-amount"],
+      [money(income), "report-amount"], [money(expenses), "report-amount"],
+      [money(net), "report-amount"],
+    ] as const) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      td.className = cls;
+      tr.append(td);
+    }
+    tbody.append(tr);
+  };
+  total("Residential (ring-fenced)", summary.residentialIncome, summary.residentialExpenses, summary.residentialNet);
+  total("Other rents and business", summary.otherIncome, summary.otherExpenses, summary.otherNet);
+
+  table.append(head, tbody);
+  body.append(table);
+  body.append(
+    note(
+      "Shares apply to income and expenses separately, as the return asks for both and " +
+        "residential losses carry forward as deductions.",
+    ),
+  );
+
+  renderTaxExtras(body, owner, year);
+}
+
+/**
+ * Income that never reaches these bank accounts.
+ *
+ * Interest, dividends and PIE income from KiwiSaver and share platforms are
+ * taxed at source and often reinvested without ever arriving, so nothing in a
+ * bank feed will ever show them. They still belong on a return, so they are
+ * typed in — and kept in their own table, clearly separate from everything the
+ * app worked out for itself.
+ */
+export function renderTaxExtras(body: HTMLElement, owner: string, year: number): void {
+  const heading = document.createElement("h3");
+  heading.textContent = "Other income for the return";
+  body.append(heading);
+  body.append(
+    note(
+      "Income that does not pass through these accounts, entered by hand: bank interest, " +
+        "dividends, and PIE income from KiwiSaver or managed funds.",
+    ),
+  );
+
+  const extras = (state.ledger.taxExtras ?? []).filter(
+    (e) => e.owner === owner && e.year === year,
+  );
+
+  const money = (cents: number): string =>
+    booksMoney(cents);
+
+  const table = document.createElement("table");
+  table.className = "report-table owner-table";
+  const head = document.createElement("thead");
+  head.innerHTML = INCOME_HEAD;
+  const tbody = document.createElement("tbody");
+
+  // A payer to a row, its dated amounts folded beneath, the tax named.
+  incomeRows(tbody, extras, (line) => {
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "danger";
+    remove.textContent = "Delete";
+    remove.addEventListener("click", () => void removeExtra(line as TaxExtra));
+    return remove;
+  });
+
+  const totals = totalExtras(state.ledger.taxExtras ?? [], owner, year);
+  const imputationTotal = extras.reduce((sum, e) => sum + (e.imputation ?? 0), 0);
+  const totalRow = document.createElement("tr");
+  totalRow.className = "report-total";
+  for (const [text, cls] of [
+    ["Total other income", "report-name"], ["", "report-name"],
+    [money(totals.gross), "report-amount"], [money(totals.credits), "report-amount"],
+    [imputationTotal === 0 ? "" : money(imputationTotal), "report-amount"],
+    ["", ""],
+  ] as const) {
+    const td = document.createElement("td");
+    td.textContent = text;
+    td.className = cls;
+    totalRow.append(td);
+  }
+  tbody.append(totalRow);
+
+  table.append(head, tbody);
+  body.append(table);
+
+  // --- add one ---
+  const form = document.createElement("div");
+  form.className = "extra-add";
+
+  const category = document.createElement("select");
+  for (const option of TAX_EXTRA_CATEGORIES) {
+    const element = document.createElement("option");
+    element.value = option.value;
+    element.textContent = option.label;
+    category.append(element);
+  }
+  const payer = document.createElement("input");
+  payer.type = "text";
+  payer.placeholder = "Payer, e.g. BANK OF NEW ZEALAND";
+  const gross = document.createElement("input");
+  gross.type = "text";
+  gross.placeholder = "Gross";
+  const credits = document.createElement("input");
+  credits.type = "text";
+  credits.placeholder = "Tax credits (PAYE, RWT, PIE tax)";
+  // Only a dividend carries two kinds of credit, and the return keeps them
+  // apart: RWT is tax paid, imputation is company tax that only reduces tax owed.
+  const imputation = document.createElement("input");
+  imputation.type = "text";
+  imputation.placeholder = "Imputation credits";
+  imputation.hidden = category.value !== "dividends";
+  category.addEventListener("change", () => {
+    imputation.hidden = category.value !== "dividends";
+  });
+
+  const add = document.createElement("button");
+  add.type = "button";
+  add.className = "primary";
+  add.textContent = "Add";
+  add.addEventListener("click", async () => {
+    const amount = parseAmount(gross.value, booksCurrency());
+    if (amount === null) {
+      await tellOnPage("Give a gross amount.");
+      return;
+    }
+    void addExtra({
+      owner,
+      year,
+      category: category.value as TaxExtraCategory,
+      payer: payer.value.trim(),
+      gross: amount,
+      credits: parseAmount(credits.value, booksCurrency()) ?? 0,
+      ...(category.value === "dividends" && parseAmount(imputation.value, booksCurrency()) !== null
+        ? { imputation: parseAmount(imputation.value, booksCurrency()) as number }
+        : {}),
+    });
+  });
+
+  form.append(category, payer, gross, credits, imputation, add);
+  body.append(form);
+}
+
+async function addExtra(extra: TaxExtra): Promise<void> {
+  const before = state.ledger.taxExtras ?? [];
+  const taxExtras = [...before, extra];
+  state.ledger = { ...state.ledger, taxExtras };
+  state.persistent = await savePart(state.ledger, "taxExtras");
+  await record(
+    "taxExtras",
+    `${extra.owner} FY${extra.year}: ${extra.category} ${extra.payer} ${formatAmount(extra.gross)}`,
+    before,
+    taxExtras,
+  );
+  redraw("reports");
+  redraw("personalYear");
+}
+
+async function removeExtra(extra: TaxExtra): Promise<void> {
+  const before = state.ledger.taxExtras ?? [];
+  const taxExtras = before.filter((e) => e !== extra);
+  state.ledger = { ...state.ledger, taxExtras };
+  state.persistent = await savePart(state.ledger, "taxExtras");
+  await record(
+    "taxExtras",
+    `Removed ${extra.owner} FY${extra.year}: ${extra.payer} ${formatAmount(extra.gross)}`,
+    before,
+    taxExtras,
+  );
+  redraw("reports");
+  redraw("personalYear");
+}
+
+/**
+ * What the figures on screen were actually built from.
+ *
+ * The page had one fixed sentence describing the cash basis, shown whichever
+ * basis was chosen -- so on both accrual reports it described something else.
+ * Three sources, three different things worth knowing about them.
+ */
+const FAVOURITES_KEY = "nzosa:report-favourites";
+const DEFAULT_FAVOURITES = ["pl", "balancesheet", "ir10"];
+
+/** What each report is for, in a line, for the list of reports. */
+const REPORT_DESCRIPTIONS: Record<string, string> = {
+  pl: "Income and expenses for the year, set out as an accountant reads them.",
+  balancesheet: "What the business owns and owes at year end.",
+  cashflow: "Where the cash came from and went: operating, investing and financing, month by month if you like.",
+  depreciation: "Each asset's depreciation for the year, and its book value.",
+  shareholders: "What each shareholder has put in and taken out.",
+  ir10: "Inland Revenue's financial statement, box by box, as it is filed.",
+  gstreturn: "A GST return for any period, box by box, with the transactions behind every box.",
+  rentals: "Each rental property's income and expenses, and all of them together.",
+  ir3: "One owner's individual return: their rental schedules, other income and the tax.",
+  yearend: "Private use of a vehicle and prepayments, posted as journals at balance date.",
+  journal: "Every posting for the year, and the trial balance they prove.",
+  general: "Every line in the ledger, account by account.",
+  manual: "Year-end and correcting journals written by hand.",
+  extract: "The transactions behind an account, ready to export.",
+  bankreconcile: "Each day's bank balance here against the statement, the bank feed and your previous system.",
+  owner: "Income and expenses by owner, for property held jointly.",
+  agedpayables: "What is owed to each supplier on a day, by how late, agreed to Accounts Payable.",
+  bycustomer: "What each customer was invoiced in the period, before GST, less credit notes.",
+  byitem: "What each product or service sold for in the period, and how many, from the invoice lines.",
+  agedreceivables: "What each customer owes on a day, by how late, agreed to Accounts Receivable.",
+  charts: "The year's income and spending, month by month.",
+  schedulee: "Each rental property on Schedule E's lines, from its own accounts.",
+  schedulec: "The business on Schedule C's lines, with the estimated tax dates.",
+  contractors: "Who was paid for contract labor, and whether a 1099-NEC is due.",
+  ustax: "Self-employment tax on the business, federal income tax, and the four estimated payments.",
+  salestax: "Sales tax collected and paid, by the account it sits in, and what is still owed.",
+  payrolltax: "Wages and the payroll taxes withheld, by quarter, read from the payroll accounts, for checking a 941.",
+  byclass: "Income and expense for the year, a column for each class and one for what has none.",
+  byjob: "Income and expense for the year, a column for each job and one for what has none.",
+  budget: "Each account's budget for the year beside what the books hold, and the year to date.",
+  aurental: "Each rental on the ATO's rental property schedule labels.",
+  bas: "GST for each quarter as the BAS asks for it: G1, 1A and 1B.",
+  krbusiness: "The business on the standard income statement headings (표준손익계산서).",
+  krrental: "Each rental's income and expenses (부동산임대업).",
+  krvat: "VAT for each half year (부가가치세 확정신고), and the income tax due date.",
+  autax: "Each owner's share of the books' income, with resident tax and the Medicare levy.",
+  krtax: "Each owner's share of the books' income, with comprehensive and local income tax.",
+};
+
+/** The reports this viewer has starred, kept in the browser rather than the books. */
+function readFavourites(): string[] {
+  try {
+    const held = localStorage.getItem(FAVOURITES_KEY);
+    const parsed: unknown = held === null ? DEFAULT_FAVOURITES : JSON.parse(held);
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === "string")
+      : [...DEFAULT_FAVOURITES];
+  } catch {
+    return [...DEFAULT_FAVOURITES];
+  }
+}
+
+function writeFavourites(list: readonly string[]): void {
+  try {
+    localStorage.setItem(FAVOURITES_KEY, JSON.stringify(list));
+  } catch {
+    // Nothing to do: without storage the stars simply are not remembered.
+  }
+}
+
+interface ReportEntry {
+  value: string;
+  name: string;
+}
+
+/**
+ * Every report, grouped the way an accounting package groups them, with the
+ * ones used most at the top.
+ *
+ * One long list stopped being findable once it passed a handful of reports.
+ * The groups are read from the report picker itself, so the list and the
+ * picker cannot disagree about what exists or what it is called.
+ */
+function renderReportsHome(body: HTMLElement): void {
+  const select = $<HTMLSelectElement>("report-kind");
+  const groups = [...select.querySelectorAll("optgroup")].map((group) => ({
+    label: group.label,
+    // A report belonging to a module that is off is not offered.
+    reports: [...group.querySelectorAll("option")]
+      .filter((option) => option.dataset["module"] === undefined || anyModuleOn(option.dataset["module"]))
+      .map(
+      (option): ReportEntry => ({ value: option.value, name: option.textContent ?? option.value }),
+    ),
+  }));
+  const all = groups.flatMap((group) => group.reports);
+  const favourites = readFavourites().filter((value) => all.some((r) => r.value === value));
+
+  const allYears = bookYears();
+  const years = allYears.length > 0 ? allYears : [new Date().getFullYear()];
+
+  const open = (value: string): void => {
+    select.value = value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
+  const item = (report: ReportEntry): HTMLElement => {
+    const row = document.createElement("div");
+    row.className = "reports-home-item";
+    const starred = favourites.includes(report.value);
+    const star = document.createElement("button");
+    star.type = "button";
+    star.className = "link-button reports-star";
+    star.textContent = starred ? "★" : "☆";
+    star.title = starred ? "Remove from favourites" : "Add to favourites";
+    star.setAttribute("aria-pressed", String(starred));
+    star.addEventListener("click", () => {
+      writeFavourites(
+        starred ? favourites.filter((value) => value !== report.value) : [...favourites, report.value],
+      );
+      redraw("reports");
+    });
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "link-button reports-open";
+    link.textContent = report.name;
+    link.addEventListener("click", () => open(report.value));
+    const about = document.createElement("span");
+    about.className = "reports-about";
+    about.textContent = REPORT_DESCRIPTIONS[report.value] ?? "";
+    row.append(star, link, about);
+    return row;
+  };
+
+  const section = (title: string, rows: readonly HTMLElement[]): void => {
+    if (rows.length === 0) return;
+    const group = document.createElement("div");
+    group.className = "reports-home-group";
+    const heading = document.createElement("h3");
+    heading.textContent = title;
+    const list = document.createElement("div");
+    list.className = "reports-home-list";
+    list.append(...rows);
+    group.append(heading, list);
+    body.append(group);
+  };
+
+  section(
+    "Favourites",
+    favourites
+      .map((value) => all.find((report) => report.value === value))
+      .filter((report): report is ReportEntry => report !== undefined)
+      .map(item),
+  );
+
+  // Reports that are pages of their own, because they are also where the work
+  // is done. They belong in this list all the same: this is where somebody looks
+  // for a report, and a report that can only be found from the menu is one they
+  // do not know exists.
+  const allElsewhere: readonly { group: string; name: string; page: string; about: string }[] = [
+    {
+      group: "Financial statements",
+      name: "Fixed asset register",
+      page: "assets",
+      about: "Every asset with this year's depreciation and book value, and what was disposed of.",
+    },
+    {
+      group: "Taxes and balances",
+      name: "GST reconciliation",
+      page: "gst",
+      about: "Each filed GST return beside what the books say now, with the lines behind any difference.",
+    },
+    {
+      group: "Taxes and balances",
+      name: "Opening balances by year",
+      page: "opening",
+      about: "What every account stood at at each year end, and the position the books open from.",
+    },
+    {
+      group: "Transactions",
+      name: "Invoices",
+      page: "invoices",
+      about: "Invoices raised, what has been paid and what is still owed.",
+    },
+    {
+      group: "Transactions",
+      name: "Bank balance check",
+      page: "import",
+      about: "The bank's own balances against the transactions, proving nothing is missing. On Bank import.",
+    },
+    {
+      group: "Checks and history",
+      name: "Coding reconciliation",
+      page: "check",
+      about: "Your coding beside your previous system's, line by line.",
+    },
+    {
+      group: "Checks and history",
+      name: "History and Undo",
+      page: "history",
+      about: "Every change to the books, who made it and when, with undo.",
+    },
+  ];
+  // Not a page whose module is off: it is hidden from the menu too.
+  const pageOn = (page: string): boolean => {
+    const module = document.querySelector<HTMLElement>(`.sidebar-nav button[data-page="${page}"]`)?.dataset["module"];
+    return module === undefined || anyModuleOn(module);
+  };
+  const elsewhere = allElsewhere.filter((entry) => pageOn(entry.page));
+  const pageItem = (entry: (typeof elsewhere)[number]): HTMLElement => {
+    const row = document.createElement("div");
+    row.className = "reports-home-item";
+    const spacer = document.createElement("span");
+    const link = document.createElement("button");
+    link.type = "button";
+    link.className = "link-button reports-open";
+    link.textContent = entry.name;
+    link.title = "Opens its own page";
+    link.addEventListener("click", () => showPage(entry.page));
+    const about = document.createElement("span");
+    about.className = "reports-about";
+    about.textContent = entry.about;
+    row.append(spacer, link, about);
+    return row;
+  };
+
+  /**
+   * Everything at once, for a spreadsheet.
+   *
+   * Not a report to read on screen: every report and every underlying table in
+   * one workbook, which is what an accountant asks for when they would rather
+   * work in Excel than click through a year. It sits at the end, under the
+   * checks, because that is where the whole-file outputs belong.
+   */
+  const excelExtractItem = (): HTMLElement => {
+    const row = document.createElement("div");
+    row.className = "reports-home-item";
+    const spacer = document.createElement("span");
+
+    const name = document.createElement("span");
+    name.className = "reports-open";
+    name.textContent = "Excel detailed extract";
+
+    const about = document.createElement("span");
+    about.className = "reports-about";
+    about.textContent =
+      "One workbook with the general ledger, bank coding, revenue and expenses, unusual " +
+      `transactions, depreciation schedule, trial balance, ${noSalesTax() ? "" : "GST returns "}and all underlying tables.`;
+
+    const controls = document.createElement("div");
+    controls.className = "excel-extract-controls";
+
+    const yearSelect = document.createElement("select");
+    yearSelect.id = "excel-export-year-select";
+    yearSelect.setAttribute("aria-label", "Which year to put in the workbook");
+    const allOpt = document.createElement("option");
+    allOpt.value = "all";
+    allOpt.textContent = "Every year";
+    yearSelect.append(allOpt);
+    for (const y of years) {
+      const opt = document.createElement("option");
+      opt.value = String(y);
+      opt.textContent = `FY${y} (year to ${taxYearEndShort(y)})`;
+      yearSelect.append(opt);
+    }
+
+    const exportBtn = document.createElement("button");
+    exportBtn.type = "button";
+    exportBtn.textContent = "Download (.xlsx)";
+    exportBtn.addEventListener("click", () => {
+      downloadExcelReport(yearSelect.value === "all" ? "all" : Number(yearSelect.value));
+    });
+
+    controls.append(yearSelect, exportBtn);
+    about.append(controls);
+    row.append(spacer, name, about);
+    return row;
+  };
+
+  // Everything an accountant asks for at the year end, in one file.
+  const packageItem = (): HTMLElement => {
+    const row = document.createElement("div");
+    row.className = "reports-home-item";
+    const spacer = document.createElement("span");
+    const name = document.createElement("span");
+    name.className = "reports-open";
+    name.textContent = "Accountant's package";
+    const about = document.createElement("span");
+    about.className = "reports-about";
+    about.textContent =
+      "One zip for a year: profit and loss, balance sheet, trial balance, general ledger, manual journals, " +
+      `aged receivables and payables, bank reconciliation, assets and depreciation, ${noSalesTax() ? "" : "GST returns, "}` +
+      "the chart of accounts, and any changes made in a locked period.";
+    const controls = document.createElement("div");
+    controls.className = "excel-extract-controls";
+    const yearSelect = document.createElement("select");
+    yearSelect.setAttribute("aria-label", "Which year the package is for");
+    for (const y of years) {
+      const opt = document.createElement("option");
+      opt.value = String(y);
+      opt.textContent = `FY${y} (year to ${taxYearEndShort(y)})`;
+      yearSelect.append(opt);
+    }
+    const go = document.createElement("button");
+    go.type = "button";
+    go.textContent = "Download (.zip)";
+    go.addEventListener("click", () => {
+      const year = Number(yearSelect.value);
+      if (!Number.isFinite(year)) return;
+      const files = accountantPackage(year);
+      downloadBytes(createZip(files), `accountants-package-fy${year}.zip`, "application/zip");
+    });
+    controls.append(yearSelect, go);
+    about.append(controls);
+    row.append(spacer, name, about);
+    return row;
+  };
+
+  const placed = new Set<string>();
+  for (const group of groups) {
+    const rows = group.reports.map(item);
+    for (const entry of elsewhere.filter((e) => e.group === group.label)) {
+      rows.push(pageItem(entry));
+      placed.add(entry.name);
+    }
+    section(group.label, rows);
+  }
+  // Groups the report picker has no reports in, listed after the rest.
+  for (const label of [...new Set(elsewhere.filter((e) => !placed.has(e.name)).map((e) => e.group))]) {
+    const rows = elsewhere.filter((e) => e.group === label && !placed.has(e.name)).map(pageItem);
+    if (label === "Checks and history") rows.push(excelExtractItem(), packageItem());
+    section(label, rows);
+  }
+}
+
+function reportsHint(basis: string, kind: string): string {
+  if (kind === "agedpayables" || kind === "agedreceivables") {
+    return (
+      "What was owing on the day chosen, aged by due date. Payments made after that day still count " +
+      "as owing on it. The total is checked against the ledger's balance for the same day."
+    );
+  }
+  if (kind === "gstreturn") {
+    return (
+      "Built from your coding on the payments basis, the same way the GST reconciliation " +
+      "compares with a filed return. Choose a period; click a box for the lines behind it."
+    );
+  }
+  if (kind === "rentals") {
+    return (
+      "Each property's own schedule, from the accounts given to it on Entities & accounts, " +
+      "with last year beside it. A rental registered for GST is shown net of GST; one that " +
+      "is not includes it, because it cannot claim it back."
+    );
+  }
+  if (kind === "yearend") {
+    return (
+      "The adjustments an accountant makes at balance date: the private share of a vehicle, and " +
+      "the unused part of anything paid in advance. Each posts a journal on 31 March."
+    );
+  }
+  if (kind === "agents") {
+    return (
+      "A property manager passes on the rent less what they paid out of it, so the bank shows " +
+      "neither the rent nor the fees. Each statement entered here posts both."
+    );
+  }
+  if (kind === "ir3") {
+    return (
+      "One owner's return. Their share of each rental comes from the books; salary, " +
+      "interest, dividends and PIE income are entered below, from the income summary " +
+      "and the certificates."
+    );
+  }
+  if (kind === "depreciation") {
+    return (
+      "Depreciation for the year, worked out from the asset register rather " +
+      "than from any transaction. This is the one figure bank data can never " +
+      "produce."
+    );
+  }
+  if (kind === "bankreconcile") {
+    return (
+      "Each day's balance on a bank account, against the bank statement's closing balance, the bank " +
+      `feed's and ${previousSystem()}'s, where they are loaded. Shows the days they part, and by how much.`
+    );
+  }
+  if (kind === "journal") {
+    return (
+      "Every posting behind the accrual figures, and the proof that they " +
+      "balance. The tax boxes come from the tag on each line, not from the " +
+      "balance of the GST account."
+    );
+  }
+  if (kind === "balancesheet" && basis === "cash") {
+    return (
+      "A balance sheet has no cash basis: it is what the business owns and owes " +
+      "on the day. So on this basis it is built from your postings, as it is on " +
+      "the postings basis."
+    );
+  }
+  if (basis === "accrual") {
+    return (
+      "Read from the general ledger file you loaded, with your account names, " +
+      "for comparison with these books."
+    );
+  }
+  if (basis === "posted") {
+    return (
+      "Built from your coding: bank lines posted as double entry, invoices when " +
+      "raised, and depreciation from the asset register. Differences from the " +
+      "imported file are what is still to be accounted for."
+    );
+  }
+  return (
+    "Built from the bank data on a cash basis, excluding GST. It has no " +
+    "depreciation, accruals or year-end journals, so it will not equal a signed " +
+    "statement; the gap is listed."
+  );
+}
+
+/**
+ * The entity a report is being run for, when there is one.
+ *
+ * The chosen one, or the only one there is: books with a single entity are
+ * always reporting on it whether or not anybody picked it from a list.
+ * Nothing when several exist and none is chosen, because "all entities" is
+ * not an entity and cannot have a registration.
+ */
+function reportingEntity(): Entity | undefined {
+  const entities = state.ledger.entities?.entities ?? [];
+  if (state.entityFilter !== "") return entities.find((e) => e.id === state.entityFilter);
+  return entities.length === 1 ? entities[0] : undefined;
+}
+
+/**
+ * Lines in the year coded only by a suggestion nobody has confirmed, and
+ * the note saying the figures that include them are provisional.
+ *
+ * For the chosen entity when there is one: a suggestion belongs to the
+ * entity whose account it names.
+ */
+function provisionalNote(year: number): HTMLElement | null {
+  const from = taxYearStart(year);
+  const to = taxYearEnd(year);
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const entity = state.entityFilter;
+  const transfers = state.ledger.transfers ?? {};
+  const waiting = allLines().filter(
+    (one) =>
+      !one.confirmed &&
+      one.code !== null &&
+      one.code !== "" &&
+      transfers[one.transaction.id] === undefined &&
+      one.transaction.date >= from &&
+      one.transaction.date <= to &&
+      (entity === "" ||
+        model.accounts[accountEntityKey(splitAccountLabel(one.code))] === entity),
+  );
+  if (waiting.length === 0) return null;
+  const total = waiting.reduce((sum, one) => sum + Math.abs(one.transaction.amount), 0);
+  const box = document.createElement("div");
+  box.className = "provisional-note";
+  const text = document.createElement("p");
+  text.textContent =
+    `Provisional: ${waiting.length} line${waiting.length === 1 ? "" : "s"} in FY${year}, ` +
+    `$${centsSaid(total)} in all, ${waiting.length === 1 ? "is" : "are"} coded by a suggestion ` +
+    "nobody has confirmed yet. They are included in these figures.";
+  const review = document.createElement("button");
+  review.type = "button";
+  review.textContent = "Review them";
+  review.addEventListener("click", () => {
+    state.reconcileFilter = "suggested";
+    showPage("reconcile");
+  });
+  box.append(text, review);
+  return box;
+}
+
+export function renderReportsPage(): void {
+  const body = $("reports-body");
+  body.textContent = "";
+
+  // The list of every report, before any one is chosen. The controls belong to
+  // a report, so they wait for one.
+  const kindSelect = $<HTMLSelectElement>("report-kind");
+  const home = kindSelect.value === "home";
+  $("report-download").hidden = !hasDownload(kindSelect.value);
+  kindSelect.parentElement?.classList.toggle("reports-home", home);
+  if (home) {
+    $("reports-hint").textContent =
+      "Choose a report. Star the ones you use most and they stay at the top.";
+    renderReportsHome(body);
+    return;
+  }
+
+  // The way back to the list, where it can be seen. It was the first entry of
+  // the report picker and nowhere else, and choosing Reports in the menu keeps
+  // the report that was open -- so once a report was chosen, the list of them
+  // looked as though it had gone.
+  const back = document.createElement("button");
+  back.type = "button";
+  back.className = "reports-back";
+  back.textContent = "← All reports";
+  back.addEventListener("click", () => {
+    kindSelect.value = "home";
+    redraw("reports");
+  });
+  body.append(back);
+
+  const basisNow = $<HTMLSelectElement>("report-basis").value;
+  const kindNow = $<HTMLSelectElement>("report-kind").value;
+
+  // Only the profit and loss has a GST choice to make, and only where the
+  // gross can be recovered. A ledger read from a file cannot say what a line
+  // was before GST, so the control goes rather than sitting there lying.
+  const gstSelect = $<HTMLSelectElement>("report-gst");
+  // No sales tax, nothing to include or exclude.
+  gstSelect.hidden = kindNow !== "pl" || basisNow === "accrual" || noSalesTax();
+  $("report-columns").hidden = kindNow !== "pl";
+
+  // Registration decides this, so the control follows the entity rather than
+  // waiting to be set: a registered entity reports net, an unregistered one
+  // reports what it actually paid. Still a control, because a person may want
+  // to see the other one, and only reset when the entity itself changes.
+  const scope = reportingEntity();
+  const follows = scope === undefined ? "" : `${scope.id}:${reportsNetOfGst(scope)}`;
+  if (follows !== gstFollowing) {
+    gstFollowing = follows;
+    if (scope !== undefined) gstSelect.value = reportsNetOfGst(scope) ? "net" : "gross";
+  }
+  gstSelect.title =
+    scope === undefined
+      ? "Whether the figures include GST"
+      : reportsNetOfGst(scope)
+        ? `${scope.name} is GST registered, so its figures are net of GST.`
+        : `${scope.name} is not GST registered, so the GST it paid is part of what things cost.`;
+
+  // Offered where there are adjusting entries to leave out, on the reports
+  // built from our own postings.
+  const unadjustedWrap = $("report-unadjusted-wrap");
+  unadjustedWrap.hidden =
+    !ADJUSTABLE_REPORTS.has(kindNow) || basisNow !== "posted" || !postedJournals().some((j) => j.adjusting === true);
+  if (beforeAdjusting()) {
+    const left = postedJournals().filter((j) => j.adjusting === true).length;
+    body.append(
+      note(
+        `Before adjusting entries: ${left} left out, being the year-end adjustments and the journals ` +
+          "marked as adjusting.",
+      ),
+    );
+  }
+
+  $("reports-hint").textContent =
+    reportsHint(basisNow, kindNow) +
+    (kindNow === "pl" && !noSalesTax()
+      ? basisNow === "accrual"
+        ? " Figures exclude GST."
+        : gstSelect.value === "gross"
+          ? " Figures include GST."
+          : " Figures exclude GST, as filed on a return."
+      : "");
+
+  const years = bookYears();
+  const yearSelect = $<HTMLSelectElement>("report-year");
+  const chosenYear = yearSelect.value;
+  yearSelect.textContent = "";
+  for (const year of years) {
+    const option = document.createElement("option");
+    option.value = String(year);
+    option.textContent = `FY${year} (year to ${taxYearEndShort(year)})`;
+    option.selected = String(year) === chosenYear;
+    yearSelect.append(option);
+  }
+
+  // The owner list comes from the entities, so it only has people in it once
+  // ownership has been set against one.
+  const kind = $<HTMLSelectElement>("report-kind").value;
+  const ownerSelect = $<HTMLSelectElement>("report-owner");
+  const owners = ownersOf(state.ledger.entities ?? emptyEntityModel());
+  const chosenOwner = ownerSelect.value;
+  ownerSelect.textContent = "";
+  for (const owner of owners) {
+    const option = document.createElement("option");
+    option.value = owner;
+    option.textContent = owner;
+    option.selected = owner === chosenOwner;
+    ownerSelect.append(option);
+  }
+  ownerSelect.hidden = kind !== "owner" && kind !== "ir3";
+
+  const chosenYearNow = Number($<HTMLSelectElement>("report-year").value) || years[0];
+  drawPeriodControls(chosenYearNow, kind);
+
+  // Built from the coding, so said plainly when some of it is still only a
+  // suggestion. Not held back: the figures are more useful with the likely
+  // answer in them than without it, as long as nobody mistakes them for final.
+  const entryPage = kind === "manual" || kind === "agents" || kind === "yearend";
+  if (basisNow !== "accrual" && chosenYearNow !== undefined && !entryPage) {
+    const provisional = provisionalNote(chosenYearNow);
+    if (provisional) body.append(provisional);
+  }
+
+  if (kind === "balancesheet") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderBalanceSheet(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "cashflow") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderCashFlow(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "agedpayables" || kind === "agedreceivables") {
+    ownerSelect.hidden = true;
+    renderAged(body, kind === "agedpayables" ? "purchase" : "sales", chosenYearNow ?? new Date().getFullYear());
+    return;
+  }
+
+  if (kind === "gstreturn") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderGstReturn(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "ir10") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderIr10(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "shareholders") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderShareholders(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "manual") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderManualJournals(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "journal") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderJournal(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "depreciation") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderDepreciation(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "extract") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderExtract(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "bankreconcile") {
+    ownerSelect.hidden = true;
+    renderBankReconcile(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "charts") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderCharts(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "general") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderGeneralLedger(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "rentals") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderRentalSchedules(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "yearend") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderYearEnd(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "agents") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderAgentStatements(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "bycustomer" || kind === "byitem") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderSalesBy(body, chosenYearNow, kind === "bycustomer" ? "customer" : "item");
+    return;
+  }
+
+  // Other countries' forms (country-reports.ts).
+  const countryReport: Record<string, (body: HTMLElement, year: number) => void> = {
+    schedulee: renderScheduleE,
+    schedulec: renderScheduleC,
+    contractors: renderContractors,
+    ustax: renderUsTax,
+    salestax: renderSalesTax,
+    payrolltax: renderPayrollTax,
+    budget: renderBudgetVsActual,
+    byclass: renderProfitByClass,
+    byjob: renderProfitByJob,
+    aurental: renderAuRentalSchedule,
+    bas: renderBas,
+    krbusiness: renderKrBusiness,
+    krrental: renderKrRental,
+    krvat: renderKrVat,
+    autax: renderAuTax,
+    krtax: renderKrTax,
+  };
+  const countryRender = countryReport[kind];
+  if (countryRender !== undefined) {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) countryRender(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "ir3") {
+    if (owners.length === 0) {
+      body.append(
+        note(
+          "No owners set. On Entities & accounts, give each rental its owners — " +
+            "for example “Ana Whitcombe 50%; Tom Whitcombe 50%”.",
+        ),
+      );
+      return;
+    }
+    const owner = ownerSelect.value || owners[0];
+    if (owner !== undefined && chosenYearNow !== undefined) renderIr3(body, owner, chosenYearNow);
+    return;
+  }
+
+  if (kind === "between") {
+    if (chosenYearNow !== undefined) renderBetweenReport(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "owner") {
+    if (owners.length === 0) {
+      body.append(
+        note(
+          "No owners set. On Entities & accounts, give an entity its owners — " +
+            "for example “Ana Whitcombe 50%; Tom Whitcombe 50%”.",
+        ),
+      );
+      return;
+    }
+    const owner = ownerSelect.value || owners[0];
+    if (owner !== undefined && chosenYearNow !== undefined) {
+      renderOwnerReport(body, owner, chosenYearNow);
+    }
+    return;
+  }
+
+  const built = currentReport();
+  if (!built) {
+    body.append(note("No transactions yet. Import a bank file first."));
+    return;
+  }
+  const { report, title, year } = built;
+
+  const heading = document.createElement("h3");
+  const basisChoice = $<HTMLSelectElement>("report-basis").value;
+  const usingAccrual =
+    basisChoice === "posted" ||
+    (basisChoice === "accrual" && (state.ledger.journals ?? []).length > 0);
+  const how =
+    basisChoice === "posted"
+      ? "accrual, from our own postings"
+      : usingAccrual
+        ? "accrual, from the imported ledger"
+        : "cash";
+  const columnsBy = $<HTMLSelectElement>("report-columns").value as "" | "month" | "quarter";
+  heading.textContent =
+    `${title} — Profit and Loss, ${periodHeading(year)} (${how})` +
+    (columnsBy !== "" ? `, by ${columnsBy}` : comparing() ? ", beside a year earlier" : "");
+  body.append(heading);
+  if (columnsBy !== "") {
+    renderPlColumns(body, year, columnsBy);
+    return;
+  }
+  if (!usingAccrual && basisChoice === "accrual") {
+    body.append(
+      note(
+        "No general ledger loaded, so this shows cash from bank data. For accrual, load a " +
+          (moduleOn("xero") ? "Xero Journal Report" : "general ledger (journal report)") +
+          " with the button above.",
+      ),
+    );
+  }
+
+  const table = document.createElement("table");
+  table.className = "report-table";
+  const tbody = document.createElement("tbody");
+
+  const money = (cents: number): string =>
+    booksMoney(cents);
+
+  // The same period a year earlier, when asked for: built the same way, on
+  // the same basis, entity and GST choice, so the two columns are alike.
+  const prior = comparing() ? currentReport(earlierRange(year)) : null;
+  const priorGrouped = prior === null ? null : groupProfitAndLoss(prior.report, reportLookups().classOf);
+  if (prior !== null) {
+    const head = document.createElement("thead");
+    const was = earlierRange(year);
+    head.innerHTML =
+      `<tr><th>Account</th><th></th><th>${escapeHtml(periodHeading(year))}</th>` +
+      `<th>${escapeHtml(periodSaid(was))}</th><th>Change</th></tr>`;
+    table.append(head);
+  }
+
+  const addRow = (
+    label: string,
+    value: string,
+    cls = "",
+    count = "",
+    line?: ReportLine,
+    then?: { value: string; change: string },
+  ): void => {
+    const tr = document.createElement("tr");
+    if (cls !== "") tr.className = cls;
+    const name = document.createElement("td");
+    name.className = "report-name";
+    const n = document.createElement("td");
+    n.textContent = count;
+    n.className = "report-count";
+    const amount = document.createElement("td");
+    amount.textContent = value;
+    amount.className = "report-amount";
+
+    // A figure is only checkable if you can see what is in it. The account
+    // lines open; the section headings and totals have nothing of their own
+    // behind them, so they stay plain rather than offering an empty panel.
+    if (line !== undefined && line.transactionIds.length > 0) {
+      const open = document.createElement("button");
+      open.type = "button";
+      open.className = "link-button";
+      open.textContent = label;
+      open.title = `Show the ${line.transactionIds.length} entries behind this figure`;
+      let shown: HTMLTableRowElement | null = null;
+      open.addEventListener("click", () => {
+        if (shown) {
+          shown.remove();
+          shown = null;
+          tr.classList.remove("report-open");
+          return;
+        }
+        shown = behindRow(line, money, line.net === line.gross && line.gst !== 0);
+        tr.classList.add("report-open");
+        tr.after(shown);
+      });
+      name.append(open);
+    } else {
+      name.textContent = label;
+    }
+
+    tr.append(name, n, amount);
+    if (prior !== null) {
+      const before = document.createElement("td");
+      before.className = "report-amount";
+      before.textContent = then?.value ?? "";
+      const change = document.createElement("td");
+      change.className = "report-amount";
+      change.textContent = then?.change ?? "";
+      tr.append(before, change);
+    }
+    tbody.append(tr);
+  };
+
+  // Set out the way an accountant reads one: trading income less the cost of
+  // sales is the gross profit, and other income is kept apart so it cannot
+  // flatter it. The grouping is a partition of the same lines, so the net
+  // profit below is the report's own.
+  const grouped = groupProfitAndLoss(report, reportLookups().classOf);
+  // A year earlier's figure and the change, for a row: blank where there is
+  // no comparison.
+  const against = (now: number, then: number | undefined): { value: string; change: string } | undefined =>
+    prior === null ? undefined : { value: money(then ?? 0), change: now === (then ?? 0) ? "" : money(now - (then ?? 0)) };
+  const priorGroup = (key: "trading" | "costOfSales" | "otherIncome" | "operatingExpenses"): PlGroup | undefined =>
+    priorGrouped === null ? undefined : priorGrouped[key];
+  const showGroup = (group: PlGroup, income: boolean, key: "trading" | "costOfSales" | "otherIncome" | "operatingExpenses"): void => {
+    const before = priorGroup(key);
+    if (group.lines.length === 0 && (before === undefined || before.lines.length === 0)) return;
+    addRow(group.title, "", "report-section");
+    const sign = (line: { net: number }): number => (income ? line.net : -line.net);
+    const priorByCode = new Map((before?.lines ?? []).map((line) => [line.code, sign(line)]));
+    const priorAll = new Map(priorByCode);
+    // Sub-accounts under their parent, with the group's total after them.
+    const codeOf = (line: { code: string }): string => splitAccountLabel(line.code).code || line.code;
+    for (const row of nestSubAccounts(group.lines, codeOf, subAccountParent)) {
+      if (row.kind === "heading") {
+        addRow(chartLabelOf(row.code), "", "report-sub-heading");
+        continue;
+      }
+      if (row.kind === "total") {
+        const now = row.items.reduce((sum, line) => sum + sign(line), 0);
+        const then = row.items.reduce((sum, line) => sum + (priorAll.get(line.code) ?? 0), 0);
+        addRow(`Total ${chartLabelOf(row.code)}`, money(now), "report-sub-total", "", undefined, against(now, then));
+        continue;
+      }
+      const line = row.item;
+      addRow(line.code, money(sign(line)), row.sub ? "report-sub" : "", String(line.count), line, against(sign(line), priorByCode.get(line.code)));
+      priorByCode.delete(line.code);
+    }
+    // Accounts only the year before had: shown, at nothing now.
+    for (const [code, then] of priorByCode) {
+      if (then !== 0) addRow(code, money(0), "", "", undefined, against(0, then));
+    }
+    addRow(`Total ${group.title}`, money(group.total), "report-total", "", undefined, against(group.total, before?.total));
+  };
+
+  showGroup(grouped.trading, true, "trading");
+  showGroup(grouped.costOfSales, false, "costOfSales");
+  addRow("Gross Profit", money(grouped.grossProfit), "report-total", "", undefined, against(grouped.grossProfit, priorGrouped?.grossProfit));
+  showGroup(grouped.otherIncome, true, "otherIncome");
+  showGroup(grouped.operatingExpenses, false, "operatingExpenses");
+  addRow("Net Profit", money(grouped.netProfit), "report-net", "", undefined, against(grouped.netProfit, priorGrouped?.netProfit));
+  table.append(tbody);
+  body.append(table);
+
+  if (report.unclassified.length > 0) {
+    const h = document.createElement("h3");
+    h.textContent = `Not in the profit figure (${report.unclassified.length})`;
+    body.append(h);
+    body.append(
+      note(
+        "Balance sheet accounts, showing the year's movement. Set a type on Entities & accounts " +
+          "for any marked \"No account type set\".",
+      ),
+    );
+    const other = document.createElement("table");
+    other.className = "report-table";
+    const otherBody = document.createElement("tbody");
+    const roleOf = lineRoles();
+    for (const line of report.unclassified) {
+      const tr = document.createElement("tr");
+      const name = document.createElement("td");
+      // A bank account comes as its id and its name ("csvdata CSVData"): named once.
+      const [first = "", ...rest] = line.code.split(" ");
+      name.textContent = rest.length > 0 ? balanceSheetLabel({ code: first, name: rest.join(" ") }) : line.code;
+      name.className = "report-name";
+      const role = document.createElement("td");
+      role.textContent = roleOf(line.code);
+      role.className = "report-name";
+      const n = document.createElement("td");
+      n.textContent = String(line.count);
+      n.className = "report-count";
+      const amount = document.createElement("td");
+      amount.textContent = money(line.net);
+      amount.className = "report-amount";
+      tr.append(name, role, n, amount);
+      otherBody.append(tr);
+    }
+    other.append(otherBody);
+    body.append(other);
+  }
+
+  if (report.uncoded.count > 0) {
+    body.append(
+      note(
+        `${report.uncoded.count} transactions in ${periodHeading(year)} are not coded at all, ` +
+          `totalling ${money(report.uncoded.gross)}. They are in no figure above.`,
+      ),
+    );
+  }
+}
+
+/**
+ * Every coded line for the year, in the shape an accounting system exports.
+ *
+ * The report an accountant asks for by name. Handing somebody a ledger means
+ * handing them something they can already read, and every one of them can read
+ * this: date, who, what it was coded to, and what GST was on it, one row per
+ * line of the bank statement.
+ *
+ * The same file this app reads back, which is what stops the format drifting
+ * into something only this app understands. Export a year, load it on the
+ * Check page, and every line agrees with itself.
+ */
+/**
+ * The lines Account transactions lists for a year, and how to describe them.
+ * Null with no transactions at all.
+ */
+function extractFor(year: number) {
+  const engine = reportEngine();
+  if (engine === null) return null;
+
+  const { from, to } = reportRange(year);
+  // Bank accounts picked: those accounts. An entity chosen and none picked:
+  // its own accounts' lines, and lines coded to it from anybody's.
+  const scope = accountsFor(state.varianceAccounts);
+  const byCoding = state.entityFilter !== "" && state.varianceAccounts.length === 0;
+  const entityOf = entityOfCoding();
+  const rows = engine.transactions.filter((t) => {
+    if (t.date < from || t.date > to) return false;
+    if (byCoding) {
+      const code = engine.codeOf(t) ?? "";
+      const whose = code === "" ? undefined : entityOf(code);
+      if (whose !== undefined) return whose === state.entityFilter;
+    }
+    return scope.length === 0 || scope.includes(t.account);
+  });
+
+  const entity = reportingEntity();
+  const labels = banks().labels;
+  const invoices = new Map((state.ledger.invoices ?? []).map((i) => [i.number, i]));
+  const settled = state.ledger.invoiceMatches ?? {};
+
+  const options = {
+    ...(entity !== undefined ? { entity: entity.name } : {}),
+    period: { from, to },
+    codeOf: (t: Transaction) => engine.codeOf(t) ?? "",
+    classify: engine.classify,
+    accountName: (id: string) => labels.get(id) ?? id,
+    invoiceOf: (t: Transaction) => {
+      const number = settled[t.id];
+      return number === undefined ? "" : (invoices.get(number)?.number ?? number);
+    },
+  };
+  return { engine, rows, options, scope, to };
+}
+
+/** Account transactions for a year as a file, or null when there are none. */
+function accountTransactionsCsv(year: number): { text: string; name: string } | null {
+  const extract = extractFor(year);
+  if (extract === null || extract.rows.length === 0) return null;
+  return {
+    text: formatAccountTransactions(extract.rows, extract.options),
+    name: `account-transactions-${periodFileName(year)}.csv`,
+  };
+}
+
+function renderExtract(body: HTMLElement, year: number): void {
+  const extract = extractFor(year);
+  if (extract === null) {
+    body.append(note("No transactions yet. Import some bank data first."));
+    return;
+  }
+  const { engine, rows, options, scope } = extract;
+
+  const built = accountTransactionRows(rows, options);
+  const byId = new Map(rows.map((t) => [t.id, t]));
+  const uncoded = built.filter((r) => r.relatedAccount === "(not coded)").length;
+
+  body.append(
+    note(
+      `${built.length} line${built.length === 1 ? "" : "s"} for ${periodHeading(year)}` +
+        (scope.length > 0 ? `, on ${scope.length} account${scope.length === 1 ? "" : "s"}` : "") +
+        (uncoded > 0
+          ? `. ${uncoded} have no coding and show as "(not coded)".`
+          : ". All are coded."),
+    ),
+  );
+
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "primary";
+  save.textContent = `Export ${built.length} lines as CSV`;
+  save.disabled = built.length === 0;
+  save.addEventListener("click", () => {
+    const csv = accountTransactionsCsv(year);
+    if (csv !== null) download(csv.text, csv.name, "text/csv");
+  });
+  body.append(save);
+
+  if (built.length === 0) return;
+
+  // Shown before it is saved, because a file downloaded and opened elsewhere
+  // is a slow way to find out the coding was not what you thought.
+  const table = document.createElement("table");
+  table.className = "extract-table";
+  table.innerHTML =
+    "<thead><tr><th>Date</th><th>Source</th><th>Contact</th><th>Description</th>" +
+    "<th>Gross</th><th>GST</th><th>Rate</th><th>Account</th><th>Coded to</th><th>Between entities</th></tr></thead>";
+  const tbody = document.createElement("tbody");
+  for (const row of built.slice(0, 200)) {
+    const tr = document.createElement("tr");
+    tr.append(nameCell(row.date), nameCell(row.source), nameCell(row.contact));
+    tr.append(nameCell(row.description));
+    tr.append(amountCell(formatAmount(row.gross)), amountCell(formatAmount(row.gst)));
+    tr.append(nameCell(taxTypeLabel(row.gstRateName)), nameCell(row.account));
+    const coded = nameCell(row.relatedAccount);
+    if (row.relatedAccount === "(not coded)") coded.className = "match-off";
+    tr.append(coded);
+    const line = byId.get(row.transactionId);
+    const tag = line === undefined ? null : betweenTagFor(line, engine.codeOf(line) ?? null);
+    const cell = nameCell(tag?.label ?? "");
+    if (tag !== null) {
+      cell.title = tag.title;
+      cell.className = "code-between-cell";
+    }
+    tr.append(cell);
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  body.append(table);
+  if (built.length > 200) {
+    body.append(note(`Showing the first 200 of ${built.length}. The export holds them all.`));
+  }
+}
+
+/** The sales the two reports total, for the period and entity chosen. */
+function salesFor(year: number, by: "customer" | "item"): ReturnType<typeof salesBy> {
+  const period = reportRange(year);
+  const chosen = state.entityFilter;
+  const invoices = invoicesInPlay().filter((i) => chosen === "" || i.entityId === undefined || i.entityId === chosen);
+  const items = state.ledger.items ?? [];
+  const nameOf = (code: string): string | undefined => items.find((i) => i.id === code || i.name.trim().toLowerCase() === code.trim().toLowerCase())?.name;
+  return salesBy(invoices, period, by, nameOf);
+}
+
+/** Either report as a file, or null when there is nothing in it. */
+function salesByCsv(year: number, by: "customer" | "item"): { text: string; name: string } | null {
+  const result = salesFor(year, by);
+  if (result.rows.length === 0) return null;
+  const head = [by === "customer" ? "Customer" : "Product or service", by === "customer" ? "Invoices" : "Quantity", "Before tax", "Tax"];
+  const rows = result.rows.map((r) => [r.name, String(by === "customer" ? r.count : r.quantity), formatAmount(r.net), formatAmount(r.tax)]);
+  return {
+    text: [head, ...rows].map((r) => r.map(spreadsheetCell).join(",")).join("\r\n") + "\r\n",
+    name: `${by === "customer" ? "income-by-customer" : "sales-by-item"}-${periodFileName(year)}.csv`,
+  };
+}
+
+/**
+ * Sales totalled by customer or by what was sold, for the period chosen, from
+ * the sales invoices in the books less their credit notes.
+ */
+function renderSalesBy(body: HTMLElement, year: number, by: "customer" | "item"): void {
+  const result = salesFor(year, by);
+  const heading = document.createElement("h3");
+  heading.textContent = `${by === "customer" ? "Income by customer" : "Sales by product or service"}, ${periodHeading(year)}`;
+  body.append(heading);
+  if (result.rows.length === 0) {
+    body.append(note("No sales invoices in this period."));
+    return;
+  }
+  const tax = !noSalesTax();
+  const table = document.createElement("table");
+  table.className = "report-table";
+  table.innerHTML =
+    `<thead><tr><th>${by === "customer" ? "Customer" : "Product or service"}</th>` +
+    `<th style="text-align:right">${by === "customer" ? "Invoices" : "Quantity"}</th>` +
+    `<th style="text-align:right">${tax ? "Before tax" : "Amount"}</th>` +
+    (tax ? '<th style="text-align:right">Tax</th>' : "") +
+    '<th style="text-align:right">Share</th></tr></thead>';
+  const tbody = document.createElement("tbody");
+  const share = (net: number): string => (result.net === 0 ? "" : `${Math.round((net / result.net) * 1000) / 10}%`);
+  for (const row of result.rows) {
+    const tr = document.createElement("tr");
+    tr.append(nameCell(row.name));
+    tr.append(amountCell(by === "customer" ? String(row.count) : row.quantity === 0 ? "" : String(Math.round(row.quantity * 100) / 100)));
+    tr.append(amountCell(booksMoney(row.net)));
+    if (tax) tr.append(amountCell(booksMoney(row.tax)));
+    tr.append(amountCell(share(row.net)));
+    tbody.append(tr);
+  }
+  const total = document.createElement("tr");
+  total.className = "report-total";
+  total.append(nameCell("Total"), amountCell(""), amountCell(booksMoney(result.net)));
+  if (tax) total.append(amountCell(booksMoney(result.tax)));
+  total.append(amountCell(""));
+  tbody.append(total);
+  table.append(tbody);
+  body.append(table);
+}
+
+/** The twelve months of a financial year, from its first: April to March in New Zealand. */
+/**
+ * The profit and loss with a column for each month or quarter of the period
+ * chosen, and a total: built by the same builder, once for each column, so
+ * the total is the report's own. A month where a usual cost is missing, or
+ * doubled, stands out across the row.
+ */
+function renderPlColumns(body: HTMLElement, year: number, by: "month" | "quarter"): void {
+  const range = reportRange(year);
+  const months = monthsOfYear(year)
+    .filter((m) => m.to >= range.from && m.from <= range.to)
+    .map((m) => ({ label: m.label, from: m.from < range.from ? range.from : m.from, to: m.to > range.to ? range.to : m.to }));
+  const spans =
+    by === "month"
+      ? months
+      : months.reduce<{ label: string; from: string; to: string }[]>((out, m, i) => {
+          if (i % 3 === 0) out.push({ label: m.label, from: m.from, to: m.to });
+          else {
+            const last = out[out.length - 1]!;
+            last.to = m.to;
+            last.label = `${last.label.split("–")[0]}–${m.label}`;
+          }
+          return out;
+        }, []);
+  const columns = spans.map((s) => {
+    const built = currentReport({ from: s.from, to: s.to });
+    return { span: s, grouped: built === null ? null : groupProfitAndLoss(built.report, reportLookups().classOf) };
+  });
+  const money = (cents: number): string => booksMoney(cents);
+  const table = document.createElement("table");
+  table.className = "report-table pl-columns";
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const text of ["Account", ...spans.map((s) => s.label), "Total"]) {
+    const th = document.createElement("th");
+    th.textContent = text;
+    headRow.append(th);
+  }
+  head.append(headRow);
+  const tbody = document.createElement("tbody");
+  const row = (label: string, figures: number[], cls = ""): void => {
+    const tr = document.createElement("tr");
+    if (cls !== "") tr.className = cls;
+    tr.append(nameCell(label));
+    for (const figure of [...figures, figures.reduce((s, f) => s + f, 0)]) tr.append(amountCell(figure === 0 && cls === "" ? "" : money(figure)));
+    tbody.append(tr);
+  };
+  const keys = ["trading", "costOfSales", "otherIncome", "operatingExpenses"] as const;
+  const totals: Record<(typeof keys)[number], number[]> = {
+    trading: columns.map(() => 0),
+    costOfSales: columns.map(() => 0),
+    otherIncome: columns.map(() => 0),
+    operatingExpenses: columns.map(() => 0),
+  };
+  for (const key of keys) {
+    const income = key === "trading" || key === "otherIncome";
+    const codes: string[] = [];
+    let title = "";
+    for (const c of columns) {
+      const group = c.grouped?.[key];
+      if (group === undefined) continue;
+      title = group.title;
+      for (const line of group.lines) if (!codes.includes(line.code)) codes.push(line.code);
+    }
+    if (codes.length === 0) continue;
+    row(title, [], "report-section");
+    for (const code of codes) {
+      const figures = columns.map((c) => {
+        const line = c.grouped?.[key].lines.find((l) => l.code === code);
+        return line === undefined ? 0 : income ? line.net : -line.net;
+      });
+      row(code, figures);
+    }
+    columns.forEach((c, i) => (totals[key][i] = c.grouped?.[key].total ?? 0));
+    row(`Total ${title}`, totals[key], "report-total");
+    if (key === "costOfSales") row("Gross Profit", columns.map((c) => c.grouped?.grossProfit ?? 0), "report-total");
+  }
+  row("Net Profit", columns.map((c) => c.grouped?.netProfit ?? 0), "report-net");
+  // The section heading rows carry no figures.
+  for (const tr of tbody.querySelectorAll("tr.report-section")) {
+    for (const td of [...tr.querySelectorAll("td")].slice(1)) td.textContent = "";
+  }
+  table.append(head, tbody);
+  body.append(wideTable(table));
+}
+
+function monthsOfYear(year: number): { label: string; from: string; to: string }[] {
+  return monthsOfTaxYear(year, "en-US");
+}
+
+/**
+ * The year in two pictures.
+ *
+ * Every figure here comes from the same builder the profit and loss uses, run
+ * once for each month rather than totalled again here, so whatever basis,
+ * entity and GST setting the page is on applies to both and a bar can never
+ * disagree with the report above it. Slower than summing the transactions, and
+ * twelve of these is nothing at this size; a chart that quietly means
+ * something else than the report it sits beside is worth far more than the
+ * milliseconds.
+ */
+function renderCharts(body: HTMLElement, year: number): void {
+  const whole = currentReport();
+  if (whole === null) {
+    body.append(note("No transactions yet. Import some bank data first."));
+    return;
+  }
+
+  const months = monthsOfYear(year).map((month) => {
+    const built = currentReport({ from: month.from, to: month.to });
+    return {
+      label: month.label,
+      income: built?.report.totalIncome ?? 0,
+      expenses: built?.report.totalExpenses ?? 0,
+    };
+  });
+
+  body.append(
+    statTiles([
+      { label: "Money in", value: whole.report.totalIncome },
+      { label: "Money out", value: Math.abs(whole.report.totalExpenses) },
+      {
+        label: whole.report.netProfit >= 0 ? "Net profit" : "Net loss",
+        value: whole.report.netProfit,
+        note: `${whole.title}, FY${year}`,
+      },
+    ]),
+  );
+
+  // Nothing coded at all is the first thing a new set of books looks like, and
+  // three zeroes with no explanation is the worst possible answer to it: the
+  // charts look broken when they are merely early. Said whatever basis the
+  // page is on, because the accrual side does not count uncoded lines and the
+  // person who has just imported a statement is exactly who sees this.
+  const nothingYet =
+    whole.report.totalIncome === 0 &&
+    whole.report.totalExpenses === 0 &&
+    state.ledger.transactions.some(
+      (line) => line.date >= taxYearStart(year) && line.date <= taxYearEnd(year),
+    );
+  if (nothingYet) {
+    const empty = document.createElement("p");
+    empty.className = "variance-note warn";
+    empty.textContent =
+      "Nothing in this year is coded yet. Code transactions on the Reconcile page to fill " +
+      "these charts.";
+    body.append(empty);
+  }
+
+  // Said before the pictures, not under them: a shape read from figures that
+  // are a third guesswork is a shape somebody will remember and act on.
+  if (!nothingYet && whole.report.uncoded.count > 0) {
+    const warn = document.createElement("p");
+    warn.className = "variance-note warn";
+    warn.textContent =
+      `${whole.report.uncoded.count} transactions this year have no code, worth ` +
+      `${formatAmount(Math.abs(whole.report.uncoded.gross))}, and are not in the charts below.`;
+    body.append(warn);
+  }
+
+  if (!nothingYet) body.append(healthTiles(whole.report, year));
+
+  const monthly = document.createElement("h3");
+  monthly.className = "chart-heading";
+  monthly.textContent = `Month by month, FY${year}`;
+  body.append(monthly, monthlyColumns(months));
+
+  // Where the bank is heading, from today: with the year we are in, or the
+  // latest the books hold.
+  const today = new Date().toLocaleDateString("en-CA");
+  if ((today >= taxYearStart(year) && today <= taxYearEnd(year)) || year === bookYears()[0]) body.append(cashForecastSection(today));
+
+  const biggest = [...whole.report.expenses]
+    .sort((a, b) => Math.abs(b.net) - Math.abs(a.net))
+    .slice(0, 10)
+    .map((line) => ({ label: line.code, value: line.net }));
+
+  if (biggest.length > 0) {
+    const where = document.createElement("h3");
+    where.className = "chart-heading";
+    where.textContent =
+      biggest.length === whole.report.expenses.length
+        ? `Where it went, FY${year}`
+        : `Where it went: the ten biggest of ${whole.report.expenses.length} accounts, FY${year}`;
+    body.append(where, rankedBars(biggest));
+  }
+
+  // The numbers behind the pictures, for anybody the pictures do not serve.
+  const table = document.createElement("table");
+  table.className = "extract-table";
+  table.innerHTML = "<thead><tr><th>Month</th><th>In</th><th>Out</th><th>Net</th></tr></thead>";
+  const tbody = document.createElement("tbody");
+  for (const month of months) {
+    const tr = document.createElement("tr");
+    tr.append(nameCell(month.label));
+    tr.append(amountCell(formatAmount(month.income)));
+    tr.append(amountCell(formatAmount(Math.abs(month.expenses))));
+    tr.append(amountCell(formatAmount(month.income - Math.abs(month.expenses))));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  const details = document.createElement("details");
+  const summary = document.createElement("summary");
+  summary.textContent = "The figures behind these charts";
+  details.append(summary, table);
+  body.append(details);
+}
+
+/**
+ * Margins, how long customers take to pay, and income against the year
+ * before: figures, not pictures, as the tiles above are.
+ */
+function healthTiles(report: ProfitAndLoss, year: number): HTMLElement {
+  const grouped = groupProfitAndLoss(report, reportLookups().classOf);
+  const today = new Date().toLocaleDateString("en-CA");
+  const { from, to: end } = reportRange(year);
+  const to = today < end ? today : end;
+  const days = Math.max(1, Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1);
+  const percent = (share: number | null): string => (share === null ? "—" : `${Math.round(share * 1000) / 10}%`);
+  const tiles: { label: string; value: string; note: string }[] = [];
+  if (grouped.trading.total !== 0 && grouped.costOfSales.total !== 0) {
+    tiles.push({
+      label: "Gross margin",
+      value: percent(grouped.grossProfit / grouped.trading.total),
+      note: "Trading income less cost of sales",
+    });
+  }
+  tiles.push({
+    label: "Net margin",
+    value: percent(report.totalIncome === 0 ? null : report.netProfit / report.totalIncome),
+    note: "Net profit as a share of income",
+  });
+  if ((state.ledger.invoices ?? []).some((i) => i.kind === "sales")) {
+    const dso = daysSalesOutstanding(agedTotal("sales", to), report.totalIncome, days);
+    tiles.push({
+      label: "Days to be paid",
+      value: dso === null ? "—" : `${dso} days`,
+      note: `Owed by customers on ${to}, as days of sales`,
+    });
+  }
+  const before = currentReport(earlierRange(year));
+  const trend = before === null ? null : changeShare(before.report.totalIncome, report.totalIncome);
+  if (trend !== null) {
+    tiles.push({
+      label: "Income on a year earlier",
+      value: `${trend >= 0 ? "+" : ""}${percent(trend)}`,
+      note: `Against ${periodSaid(earlierRange(year))}`,
+    });
+  }
+  const row = document.createElement("div");
+  row.className = "chart-tiles";
+  for (const tile of tiles) {
+    const box = document.createElement("div");
+    box.className = "chart-tile";
+    const label = document.createElement("span");
+    label.className = "chart-tile-label";
+    label.textContent = tile.label;
+    const value = document.createElement("strong");
+    value.className = "chart-tile-value";
+    value.textContent = tile.value;
+    const said = document.createElement("span");
+    said.className = "chart-tile-note";
+    said.textContent = tile.note;
+    box.append(label, value, said);
+    row.append(box);
+  }
+  return row;
+}
+
+/**
+ * The next ninety days of cash: the bank today, what customers owe coming in
+ * on its due date, what is owed to suppliers going out on its own. Repeating
+ * invoices and bank lines not yet written are not in it.
+ */
+function cashForecastSection(today: string): HTMLElement {
+  const box = document.createElement("div");
+  const heading = document.createElement("h3");
+  heading.className = "chart-heading";
+  heading.textContent = "The next 90 days";
+  box.append(heading);
+
+  const { bank, buckets } = cashForecastFigures(today);
+
+  const table = document.createElement("table");
+  table.className = "report-table";
+  table.innerHTML = "<thead><tr><th>Days</th><th>From customers</th><th>To suppliers</th><th>Bank at the end</th></tr></thead>";
+  const tbody = document.createElement("tbody");
+  const start = document.createElement("tr");
+  start.append(nameCell("Today"), amountCell(""), amountCell(""), amountCell(booksMoney(bank)));
+  tbody.append(start);
+  buckets.forEach((b, i) => {
+    const tr = document.createElement("tr");
+    const end = amountCell(booksMoney(b.closing));
+    if (b.closing < 0) end.classList.add("match-off");
+    tr.append(nameCell(`${i * 30 + 1} to ${i * 30 + 30} (${b.from} to ${b.to})`), amountCell(booksMoney(b.in)), amountCell(booksMoney(b.out)), end);
+    tbody.append(tr);
+  });
+  table.append(tbody);
+  box.append(
+    table,
+    note(
+      "Invoices and bills still owing, each on its due date (or 30 days after its date where it has none); " +
+        "anything overdue is counted in the first 30 days. Wages, tax, repeating invoices and everyday spending " +
+        "are not in it.",
+    ),
+  );
+  return box;
+}
+
+/** The bank today, and the next ninety days of what is owing, thirty at a time. */
+function cashForecastFigures(today: string): { bank: number; buckets: ReturnType<typeof cashForecast> } {
+  // The bank today: every bank account's balance on the balance sheet.
+  const ids = new Set(banks().accounts);
+  const bankCodes = new Set(state.chart.filter((a) => a.type.trim().toLowerCase() === "bank").map((a) => a.code.trim()));
+  const opening = state.ledger.openingBalances;
+  const sheet = computeBalanceSheet({
+    asAt: today,
+    ...(opening ? { openingBalances: opening } : {}),
+    journals: postedJournals(),
+    chart: state.chart,
+  });
+  let bank = 0;
+  for (const part of [sheet.currentAssets, sheet.currentLiabilities]) {
+    for (const line of part.lines) {
+      if (ids.has(line.code) || bankCodes.has(line.code.trim())) bank += part === sheet.currentAssets ? line.closing : -line.closing;
+    }
+  }
+
+  const owing: OwingDocument[] = [];
+  for (const balance of invoiceBalanceMap().values()) {
+    const doc = balance.invoice;
+    if (!isPosted(doc) || isCreditNote(doc) || doc.receipt === true || balance.remaining <= 0) continue;
+    const expected = doc.due ?? new Date(Date.parse(`${doc.issued}T00:00:00Z`) + 30 * 86_400_000).toISOString().slice(0, 10);
+    owing.push({ kind: doc.kind === "purchase" ? "purchase" : "sales", expected, remaining: balance.remaining });
+  }
+  return { bank, buckets: cashForecast(bank, today, owing) };
+}
+
+/** The analyses offered beside an AI conversation, one click each. */
+export const ANALYSES = [
+  ["profit", "Explain this year's profit"],
+  ["unusual", "What looks unusual"],
+  ["chase", "Who to chase for money"],
+  ["cash", "The next 90 days of cash"],
+] as const;
+
+export type AnalysisKind = (typeof ANALYSES)[number][0];
+
+/**
+ * A ready question for any AI assistant, with the figures it is about: the
+ * latest year's profit and loss (and the year before), what customers owe, or
+ * the cash forecast. Built from the same reports the pages show.
+ */
+export function analysisPrompt(kind: AnalysisKind): string {
+  const year = bookYears()[0];
+  const today = new Date().toLocaleDateString("en-CA");
+  const kindSelect = $<HTMLSelectElement>("report-kind");
+  const basisSelect = $<HTMLSelectElement>("report-basis");
+  const yearSelect = $<HTMLSelectElement>("report-year");
+  const held = { kind: kindSelect.value, basis: basisSelect.value, year: yearSelect.value };
+  kindSelect.value = "home";
+  basisSelect.value = "posted";
+  if (year !== undefined) {
+    if (![...yearSelect.options].some((o) => o.value === String(year))) {
+      const option = document.createElement("option");
+      option.value = String(year);
+      yearSelect.append(option);
+    }
+    yearSelect.value = String(year);
+  }
+  const lines: string[] = [];
+  const say = (...text: string[]): void => {
+    lines.push(...text);
+  };
+  const money = (cents: number): string => formatAmount(cents);
+  const plLines = (report: ProfitAndLoss): string[] => [
+    "Income:",
+    ...report.income.map((l) => `  ${l.code}: ${money(l.net)}`),
+    `  Total income: ${money(report.totalIncome)}`,
+    "Expenses:",
+    ...report.expenses.map((l) => `  ${l.code}: ${money(-l.net)}`),
+    `  Total expenses: ${money(Math.abs(report.totalExpenses))}`,
+    `Net profit: ${money(report.netProfit)}`,
+  ];
+  try {
+    const country = booksCountry().name;
+    say(
+      `I keep the books of a small business in ${country}. Amounts are in ${booksCurrency()}` +
+        `${noSalesTax() ? "" : ", net of GST"}. Answer in plain words, briefly, for the owner. ` +
+        "Do not give tax or investment advice; say what to look into or ask an accountant about.",
+      "",
+    );
+    if (kind === "profit" || kind === "unusual") {
+      if (year === undefined) return "";
+      const now = currentReport({ from: taxYearStart(year), to: taxYearEnd(year) });
+      if (now === null) return "";
+      const before = currentReport(earlierRange(year));
+      say(`Profit and loss for ${taxYearStart(year)} to ${taxYearEnd(year)}:`, ...plLines(now.report), "");
+      if (before !== null && (before.report.totalIncome !== 0 || before.report.totalExpenses !== 0)) {
+        say(`The same span a year earlier:`, ...plLines(before.report), "");
+      }
+      say(
+        kind === "profit"
+          ? "Explain what made this profit: the main sources of income, the biggest costs, and what changed from the year before. " +
+              "Then list two or three questions the owner should ask about it."
+          : "What in these figures looks unusual: an account far bigger or smaller than the year before, " +
+              "a cost that seems out of proportion to income, or anything that may be coded to the wrong account? " +
+              "List each with the figure and why it stands out, most important first.",
+      );
+    } else if (kind === "chase") {
+      const aged = agedFor("sales", today);
+      say(`What customers owed on ${today}, by how far past due:`);
+      for (const c of [...aged.contacts].sort((a, b) => b.total - a.total)) {
+        const parts = Object.entries(c.buckets)
+          .filter(([, v]) => v !== 0)
+          .map(([k, v]) => `${k === "current" ? "not yet due" : k === "older" ? "over 90 days" : `${k} days`}: ${money(v)}`);
+        say(`  ${c.contact}: ${money(c.total)} (${parts.join(", ")})`);
+      }
+      say(
+        `  Total: ${money(aged.total)}`,
+        "",
+        "Who should I chase first, and how? Put them in order with the reason, and suggest a short, polite " +
+          "reminder for the most overdue.",
+      );
+    } else {
+      const { bank, buckets } = cashForecastFigures(today);
+      say(`The bank on ${today}: ${money(bank)}.`, "Invoices and bills owing over the next 90 days, on their due dates:");
+      for (const b of buckets) say(`  ${b.from} to ${b.to}: in ${money(b.in)}, out ${money(b.out)}, bank at the end ${money(b.closing)}`);
+      say(
+        "Wages, tax, repeating invoices and everyday spending are not in this.",
+        "",
+        "What does this say about cash over the next three months, what should I watch, and what could I do " +
+          "now if it looks tight?",
+      );
+    }
+  } finally {
+    kindSelect.value = held.kind;
+    basisSelect.value = held.basis;
+    yearSelect.value = held.year;
+  }
+  return lines.join("\n");
+}
+
+/**
+ * Every line the books are made of, for a year.
+ *
+ * The account transactions extract answers "what happened on this bank
+ * account". This answers the question asked when a figure looks wrong: what is
+ * this total actually made of. One row per posting line -- so an accountant's
+ * fee is three rows, the money out, the cost and the GST, and they come to
+ * nothing because that is what a balanced entry does.
+ *
+ * Built from the same journals the profit and loss, the trial balance and the
+ * GST return are built from, rather than from a second pass over the
+ * transactions. If this disagrees with them the report is wrong and not the
+ * books, which is the only way a listing like this is worth reading.
+ */
+/** The year's entries for the chosen entity, as the journal reports list them. */
+function journalsForYear(year: number): ReturnType<typeof postedJournals> {
+  const { from, to } = reportRange(year);
+  // The entity's journals: those through its own bank accounts, and those
+  // posting to its accounts from anybody's.
+  const inEntity = journalInEntity();
+  return reportPostings().filter((journal) => {
+    if (journal.date < from || journal.date > to) return false;
+    return inEntity === null || inEntity(journal);
+  });
+}
+
+function generalLedgerOptions(year: number): { entity?: string; period: { from: string; to: string } } {
+  const entity = reportingEntity();
+  return {
+    ...(entity !== undefined ? { entity: entity.name } : {}),
+    period: reportRange(year),
+  };
+}
+
+/** The general ledger for a year as a file, or null when nothing was posted. */
+function generalLedgerCsv(year: number): { text: string; name: string } | null {
+  const journals = journalsForYear(year);
+  if (journals.length === 0) return null;
+  return { text: formatGeneralLedger(journals, generalLedgerOptions(year)), name: `general-ledger-${periodFileName(year)}.csv` };
+}
+
+function renderGeneralLedger(body: HTMLElement, year: number): void {
+  const journals = journalsForYear(year);
+
+  if (journals.length === 0) {
+    body.append(note("Nothing posted in this year for the chosen entity."));
+    return;
+  }
+
+  const rows = generalLedgerRows(journals);
+  const totals = generalLedgerTotals(rows);
+
+  body.append(
+    note(
+      `${rows.length} lines from ${journals.length} entries, ` +
+        `${formatAmount(totals.debit)} debits against ${formatAmount(totals.credit)} credits.`,
+    ),
+  );
+
+  // Said before the listing rather than under it. A set of books that does not
+  // balance is the one fact worth knowing before reading anything else in it.
+  if (totals.difference !== 0) {
+    const off = document.createElement("p");
+    off.className = "variance-note warn";
+    off.textContent =
+      `These entries do not balance: debits exceed credits by ` +
+      `${formatAmount(totals.difference)}. This is a fault in the books, not rounding.`;
+    body.append(off);
+  }
+
+  const save = document.createElement("button");
+  save.type = "button";
+  save.className = "primary";
+  save.textContent = `Export ${rows.length} lines as CSV`;
+  save.addEventListener("click", () => {
+    const csv = generalLedgerCsv(year);
+    if (csv !== null) download(csv.text, csv.name, "text/csv");
+  });
+  body.append(save);
+
+  const table = document.createElement("table");
+  table.className = "extract-table";
+  table.innerHTML =
+    "<thead><tr><th>Date</th><th>Entry</th><th>Account</th><th>Description</th>" +
+    "<th>Debit</th><th>Credit</th><th>Tax</th></tr></thead>";
+  const tbody = document.createElement("tbody");
+
+  let last = "";
+  for (const row of rows.slice(0, 300)) {
+    const tr = document.createElement("tr");
+    // The entry is named once and its other lines are indented under it, so
+    // three rows read as one thing rather than as three coincidences.
+    const first = row.journal !== last;
+    last = row.journal;
+    if (first) tr.classList.add("entry-start");
+    tr.append(nameCell(first ? row.date : ""));
+    tr.append(nameCell(first ? row.narration : ""));
+    tr.append(nameCell(row.accountCode ? balanceSheetLabel({ code: row.accountCode, name: row.accountName }) : row.accountName));
+    tr.append(nameCell(row.description));
+    tr.append(amountCell(row.debit === 0 ? "" : formatAmount(row.debit)));
+    tr.append(amountCell(row.credit === 0 ? "" : formatAmount(row.credit)));
+    tr.append(nameCell(ledgerTaxWords(row.taxType)));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  body.append(table);
+
+  if (rows.length > 300) {
+    body.append(note(`Showing the first 300 of ${rows.length}. The export holds them all.`));
+  }
+}
+
+/**
+ * A posting's tax type as the general ledger shows it: Xero's own codes in New
+ * Zealand books, where people know them (INPUT2, OUTPUT2), and words
+ * elsewhere, where INPUT2 means nothing; nothing at all without a sales tax.
+ */
+function ledgerTaxWords(code: string): string {
+  if (code === "NONE" || code === "") return "";
+  if (booksCountry().id === "nz") return code;
+  if (noSalesTax()) return "";
+  if (/^OUTPUT/i.test(code)) return taxTypeLabel("15% GST on Income");
+  if (/^INPUT/i.test(code)) return taxTypeLabel("15% GST on Expenses");
+  if (/^EXEMPT/i.test(code)) return taxTypeLabel("Exempt");
+  if (/^ZERO/i.test(code)) return taxTypeLabel("Zero Rated");
+  if (/^GSTONIMPORTS|IMPORT/i.test(code)) return "GST on imports";
+  return code;
+}
+
+/** Said where the report is, when a download has nothing to hold. */
+function nothingToDownload(): void {
+  const body = $("reports-body");
+  body.querySelector(".report-nothing")?.remove();
+  const said = note("Nothing to download for this year.");
+  said.classList.add("report-nothing");
+  said.setAttribute("role", "status");
+  body.prepend(said);
+}
+
+export function downloadReport(): void {
+  const years = bookYears();
+  const year = Number($<HTMLSelectElement>("report-year").value) || years[0];
+  const kind = $<HTMLSelectElement>("report-kind").value;
+  if (!hasDownload(kind)) return;
+
+  // Every kind with a download, and nothing else: a kind added to the table
+  // without one here does not compile.
+  const downloads: Record<DownloadKind, () => void> = {
+    pl: () => downloadProfitAndLoss(),
+    journal: () => downloadGeneralLedger(year),
+    general: () => downloadGeneralLedger(year),
+    extract: () => {
+      const csv = year === undefined ? null : accountTransactionsCsv(year);
+      if (csv === null) return nothingToDownload();
+      download(csv.text, csv.name, "text/csv");
+    },
+    depreciation: () => {
+      const assets = state.ledger.assets ?? [];
+      if (assets.length === 0 || year === undefined) return nothingToDownload();
+      const schedule = depreciationSchedule(assets, { from: taxYearStart(year), to: taxYearEnd(year) }, depreciationRules());
+      if (schedule.rows.length === 0) return nothingToDownload();
+      download(
+        formatDepreciationSchedule(schedule, `Depreciation schedule, FY${year}`),
+        `depreciation-schedule-fy${year}.csv`,
+        "text/csv",
+      );
+    },
+    agedpayables: () => {
+      const csv = agedCsv("purchase", year ?? new Date().getFullYear());
+      download(csv.text, csv.name, "text/csv");
+    },
+    agedreceivables: () => {
+      const csv = agedCsv("sales", year ?? new Date().getFullYear());
+      download(csv.text, csv.name, "text/csv");
+    },
+    bankreconcile: () => {
+      const csv = bankReconcileCsv(year);
+      download(csv.text, csv.name, "text/csv");
+    },
+    gstreturn: () => {
+      if (year === undefined) return;
+      const chosen = chosenGstReturn(year);
+      if (chosen === undefined) return;
+      download(
+        formatGstReturn(chosen, `${reportingEntity()?.name ?? "GST"} — GST return`),
+        `gst-return-${chosen.period.to}.csv`,
+        "text/csv",
+      );
+    },
+    rentals: () => {
+      if (year === undefined) return;
+      download(rentalSchedulesCsv(year), `rental-schedules-fy${year}.csv`, "text/csv");
+    },
+    ir3: () => {
+      const owner = $<HTMLSelectElement>("report-owner").value;
+      if (owner === "" || year === undefined) return nothingToDownload();
+      download(
+        ir3Csv(owner, year),
+        `ir3-${owner.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-fy${year}.csv`,
+        "text/csv",
+      );
+    },
+    bycustomer: () => {
+      const csv = year === undefined ? null : salesByCsv(year, "customer");
+      if (csv === null) return nothingToDownload();
+      download(csv.text, csv.name, "text/csv");
+    },
+    byitem: () => {
+      const csv = year === undefined ? null : salesByCsv(year, "item");
+      if (csv === null) return nothingToDownload();
+      download(csv.text, csv.name, "text/csv");
+    },
+    owner: () => {
+      const owner = $<HTMLSelectElement>("report-owner").value;
+      if (owner === "" || year === undefined) return nothingToDownload();
+      download(
+        formatOwnerSummary(ownerSummaryFor(owner, year), year),
+        `rental-income-${owner.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-fy${year}.csv`,
+        "text/csv",
+      );
+    },
+  };
+  downloads[kind]();
+}
+
+/**
+ * The accountant's package for a year: each report as the page builds it,
+ * for the whole year, from our own postings, adjusting entries included.
+ *
+ * The reports read the page's own choices -- year, basis, period -- so those
+ * are set for the year while the files are made, and put back after.
+ */
+function accountantPackage(year: number): { name: string; data: Uint8Array }[] {
+  const text = (value: string): Uint8Array => new TextEncoder().encode(value);
+  const csv = (rows: (string | number)[][]): string => rows.map((r) => r.map((c) => spreadsheetCell(String(c))).join(",")).join("\r\n") + "\r\n";
+  const cents = (value: number): string => (value / 100).toFixed(2);
+  const kind = $<HTMLSelectElement>("report-kind");
+  const basis = $<HTMLSelectElement>("report-basis");
+  const yearSelect = $<HTMLSelectElement>("report-year");
+  const unadjusted = $<HTMLInputElement>("report-unadjusted");
+  const held = { kind: kind.value, basis: basis.value, year: yearSelect.value, unadjusted: unadjusted.checked };
+  kind.value = "home";
+  basis.value = "posted";
+  if (![...yearSelect.options].some((o) => o.value === String(year))) {
+    const option = document.createElement("option");
+    option.value = String(year);
+    yearSelect.append(option);
+  }
+  yearSelect.value = String(year);
+  unadjusted.checked = false;
+  const files: { name: string; data: Uint8Array }[] = [];
+  const add = (name: string, value: string | null | undefined): void => {
+    if (value !== null && value !== undefined && value.trim() !== "") files.push({ name, data: text(value) });
+  };
+  const { from, to } = { from: taxYearStart(year), to: taxYearEnd(year) };
+  const listed: string[] = [];
+  try {
+    const built = currentReport({ from, to });
+    if (built !== null) {
+      add("profit-and-loss.csv", profitAndLossText(built, "Accrual basis, from our postings."));
+      listed.push("profit-and-loss.csv: the year's income and expenses");
+    }
+
+    const company = companyBooks();
+    const opening = state.ledger.openingBalances;
+    const sheet = computeBalanceSheet({
+      asAt: to,
+      ...(opening ? { openingBalances: opening } : {}),
+      journals: reportPostings(),
+      chart: state.chart,
+      shareholderCurrentAccounts: company && booksCountry().id === "nz",
+      profitInRetainedEarnings: company,
+    });
+    const sheetRows: (string | number)[][] = [[`Balance sheet as at ${to}`], ["Section", "Account", "Opening", "Movement", "Closing"]];
+    for (const part of [sheet.currentAssets, sheet.nonCurrentAssets, sheet.currentLiabilities, sheet.nonCurrentLiabilities, sheet.equity]) {
+      for (const line of part.lines) sheetRows.push([part.title, balanceSheetLabel(line), cents(line.opening), cents(line.movement), cents(line.closing)]);
+      sheetRows.push([part.title, "Total", "", "", cents(part.total)]);
+    }
+    sheetRows.push(["", "Net assets", "", "", cents(sheet.netAssets)], ["", "Total equity", "", "", cents(sheet.totalEquity)]);
+    add("balance-sheet.csv", csv(sheetRows));
+    listed.push("balance-sheet.csv: what is owned and owed at the year end");
+
+    const yearJournals = journalsForYear(year);
+    const balance = trialBalance(yearJournals);
+    const tbRows: (string | number)[][] = [[`Trial balance of the postings in FY${year}`], ["Code", "Account", "Debit", "Credit"]];
+    for (const row of balance.rows) {
+      if (row.balance === 0) continue;
+      tbRows.push([row.accountCode, row.accountName, row.balance > 0 ? cents(row.balance) : "", row.balance < 0 ? cents(-row.balance) : ""]);
+    }
+    add("trial-balance.csv", csv(tbRows));
+    listed.push("trial-balance.csv: each account's postings in the year, debit and credit");
+
+    const ledger = generalLedgerCsv(year);
+    add("general-ledger.csv", ledger?.text);
+    if (ledger !== null) listed.push("general-ledger.csv: every posting, line by line");
+
+    const journals = (state.ledger.manualJournals ?? []).filter((j) => j.date >= from && j.date <= to && j.deleted === undefined);
+    if (journals.length > 0) {
+      const rows: (string | number)[][] = [["Date", "Narration", "Adjusting", "Account", "Debit", "Credit", "Description"]];
+      for (const j of [...journals].sort((a, b) => a.date.localeCompare(b.date))) {
+        for (const l of j.lines) {
+          rows.push([j.date, j.narration, j.adjusting === true ? "yes" : "", l.code, l.amount > 0 ? cents(l.amount) : "", l.amount < 0 ? cents(-l.amount) : "", l.description ?? ""]);
+        }
+      }
+      add("manual-journals.csv", csv(rows));
+      listed.push("manual-journals.csv: the journals written by hand, adjusting entries marked");
+    }
+
+    for (const [docKind, file, said] of [
+      ["sales", "aged-receivables.csv", "what customers owed at the year end"],
+      ["purchase", "aged-payables.csv", "what was owed to suppliers at the year end"],
+    ] as const) {
+      if (!(state.ledger.invoices ?? []).some((i) => i.kind === docKind)) continue;
+      add(file, agedCsv(docKind, year).text);
+      listed.push(`${file}: ${said}`);
+    }
+
+    if (state.ledger.transactions.length > 0) {
+      add("bank-reconciliation.csv", packageBankCsv(year).text);
+      listed.push("bank-reconciliation.csv: each bank account against its statement");
+    }
+
+    const assets = state.ledger.assets ?? [];
+    if (assets.length > 0) {
+      add("fixed-assets.csv", formatFixedAssets(assets));
+      const schedule = depreciationSchedule(assets, { from, to }, depreciationRules());
+      if (schedule.rows.length > 0) add("depreciation-schedule.csv", formatDepreciationSchedule(schedule, `Depreciation schedule, FY${year}`));
+      listed.push("fixed-assets.csv and depreciation-schedule.csv: the asset register and the year's depreciation");
+    }
+
+    if (!noSalesTax()) {
+      const returns = gstReturnsFor(year);
+      for (const one of returns) {
+        add(`gst-returns/gst-return-${one.period.to}.csv`, formatGstReturn(one, `GST return ${one.period.from} to ${one.period.to}`));
+      }
+      if (returns.length > 0) listed.push("gst-returns/: each GST return of the year, as worked out from the coding");
+    }
+
+    add("chart-of-accounts.csv", formatChartOfAccounts(state.chart));
+    listed.push("chart-of-accounts.csv: the accounts");
+
+    const locked = state.ledger.lockedChanges ?? [];
+    if (locked.length > 0) {
+      add(
+        "changes-in-locked-periods.csv",
+        csv([["When", "Who", "What", "Figures moved"], ...locked.map((c) => [c.at, c.who, c.summary, c.moved.join("; ")])]),
+      );
+      listed.push("changes-in-locked-periods.csv: changes made in a period after it was locked");
+    }
+  } finally {
+    kind.value = held.kind;
+    basis.value = held.basis;
+    yearSelect.value = held.year;
+    unadjusted.checked = held.unadjusted;
+  }
+
+  const entity = reportingEntity()?.name;
+  const readme = [
+    `Accountant's package, FY${year} (${from} to ${to})`,
+    entity !== undefined ? `For ${entity}.` : "For all the entities in these books.",
+    `Made ${new Date().toLocaleString(booksLocale())}${state.who.trim() !== "" ? ` by ${state.who.trim()}` : ""}.`,
+    "",
+    "Figures are on the accrual basis, from the postings these books make, adjusting entries included.",
+    "",
+    ...listed.map((l) => `- ${l}`),
+    "",
+  ].join("\r\n");
+  return [{ name: "README.txt", data: text(readme) }, ...files];
+}
+
+function downloadGeneralLedger(year: number | undefined): void {
+  const csv = year === undefined ? null : generalLedgerCsv(year);
+  if (csv === null) return nothingToDownload();
+  download(csv.text, csv.name, "text/csv");
+}
+
+/** A built profit and loss as a CSV, the one way it is written out. */
+function profitAndLossText(built: { report: ProfitAndLoss; title: string; year: number }, said: string): string {
+  return formatProfitAndLoss(
+    built.report,
+    `${built.title} — Profit and Loss, ${periodHeading(built.year)}`,
+    said,
+    reportLookups().classOf,
+    lineRoles(),
+  );
+}
+
+/** The profit and loss as shown: for the P&L only. */
+function downloadProfitAndLoss(): void {
+  const built = currentReport();
+  if (!built) return;
+
+  // The exported file has to say what it is. It leaves this app and gets read
+  // months later beside three others, and a figure whose basis is guessed at is
+  // worse than no figure.
+  const exportBasis = $<HTMLSelectElement>("report-basis").value;
+  const exportNote =
+    (exportBasis === "cash"
+      ? "Cash basis, from bank data. No depreciation or year-end journals."
+      : exportBasis === "posted"
+        ? "Accrual basis, from our postings."
+        : "Accrual basis, from the imported file.") +
+    ($<HTMLSelectElement>("report-gst").value === "gross" && exportBasis !== "accrual"
+      ? " GST inclusive."
+      : " GST exclusive.");
+
+  download(
+    profitAndLossText(built, exportNote),
+    `profit-and-loss-${built.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${periodFileName(built.year)}.csv`,
+    "text/csv",
+  );
+}
+
+/** The five choices that decide which report is shown, and downloading it. */
+export function wireReports(): void {
+
+  $("report-basis").addEventListener("change", () => redraw("reports"));
+  $("report-gst").addEventListener("change", () => redraw("reports"));
+  $("report-unadjusted").addEventListener("change", () => redraw("reports"));
+  $("report-columns").addEventListener("change", () => redraw("reports"));
+
+  $("report-kind").addEventListener("change", () => redraw("reports"));
+  $("report-owner").addEventListener("change", () => redraw("reports"));
+  $("report-year").addEventListener("change", () => redraw("reports"));
+  for (const id of ["report-period", "report-from", "report-to", "report-compare"]) {
+    document.getElementById(id)?.addEventListener("change", () => redraw("reports"));
+  }
+  $("report-download").addEventListener("click", () => downloadReport());
+  $("report-download-excel").addEventListener("click", () => downloadExcelReport());
+}
+
+/**
+ * The entries behind one line of a report.
+ *
+ * A total nobody can look inside is a total nobody can check, and "where does
+ * 18,342.72 of sales come from" is the first question anyone asks of a set of
+ * accounts. The bank lines are the report's own -- it carries the ids it
+ * counted -- so what is listed always adds up to the figure it opened from,
+ * which a second query over the same arguments could not promise.
+ *
+ * A row that is not a bank line is shown by its id rather than dropped: on the
+ * accrual basis a figure can come from a year-end journal, and a report that
+ * silently listed fewer entries than it counted would be worse than one that
+ * admits what it cannot name.
+ */
+function behindRow(
+  line: ReportLine,
+  money: (cents: number) => string,
+  grossBasis: boolean,
+): HTMLTableRowElement {
+  const row = document.createElement("tr");
+  row.className = "report-behind";
+  const cell = document.createElement("td");
+  cell.colSpan = comparing() ? 5 : 3;
+
+  const byId = new Map(state.ledger.transactions.map((t) => [t.id, t]));
+  const engine = reportEngine();
+  const table = document.createElement("table");
+  table.className = "report-table match-table";
+  const head = document.createElement("thead");
+  // Gross, GST and net, because the figure on the report is the net and the
+  // figure on the statement is the gross. Showing only one of them invites the
+  // question this panel exists to answer.
+  head.innerHTML =
+    "<tr><th>Date</th><th>Account</th><th>Who</th><th>Reference</th>" +
+    "<th>Gross</th><th>GST</th><th>Net</th></tr>";
+  const tbody = document.createElement("tbody");
+
+  // On an accrual basis most of a sales figure comes from invoices, which post
+  // as journals and have no bank line at all. Listing only what could be found
+  // in the statements showed a handful of receipts under a figure built mostly
+  // from invoices, and said the rest was "from a journal" without saying which
+  // -- so the answer to "where does this come from" was still missing exactly
+  // the part being asked about.
+  const journals = new Map<string, Journal>();
+  for (const journal of state.ledger.journals ?? []) journals.set(String(journal.id), journal);
+  const posted = new Map<string, PostedJournal>();
+  for (const journal of postedJournals()) posted.set(journal.transactionId, journal);
+  const labelOf = reportLabeller();
+
+  // One row per entry, not per posting. A report line records the id it
+  // counted once for each line of a journal that reaches this account, so an
+  // invoice with two sales lines names itself twice -- and a row built per id
+  // that sums the whole journal each time shows the invoice twice at its full
+  // value. The figure was right; the list was not.
+  const entries = [...new Set(line.transactionIds)];
+
+  let shown = 0;
+  let unnamed = 0;
+  for (const id of entries) {
+    const transaction = byId.get(id);
+    if (transaction === undefined) {
+      const fromJournal = journalRow(id, line.code, journals, posted, labelOf, money);
+      if (fromJournal === null) {
+        unnamed += 1;
+        continue;
+      }
+      shown += 1;
+      tbody.append(fromJournal);
+      continue;
+    }
+    shown += 1;
+    const gst = engine ? gstWithin(transaction.amount, engine.classify(transaction)) : 0;
+    const tr = document.createElement("tr");
+    tr.append(nameCell(transaction.date));
+    tr.append(nameCell(bankLabel(transaction.account)));
+    tr.append(nameCell(transaction.otherParty || transaction.particulars || ""));
+    tr.append(nameCell(transaction.reference ?? ""));
+    tr.append(amountCell(money(transaction.amount)));
+    tr.append(amountCell(gst === 0 ? "" : money(gst)));
+    tr.append(amountCell(money(grossBasis ? transaction.amount : transaction.amount - gst)));
+    tbody.append(tr);
+  }
+
+  // The report's own totals, so the panel cannot disagree with the line it
+  // opened from. Signed as the bank moved it: an expense is money out here and
+  // is shown positive on the report above, which is what a profit and loss
+  // does to expenses.
+  const total = document.createElement("tr");
+  total.className = "report-total";
+  total.append(nameCell(`${shown} entr${shown === 1 ? "y" : "ies"}`));
+  total.append(nameCell(""));
+  total.append(nameCell(""));
+  total.append(nameCell(""));
+  total.append(amountCell(money(line.gross)));
+  total.append(amountCell(line.gst === 0 ? "" : money(line.gst)));
+  total.append(amountCell(money(line.net)));
+  tbody.append(total);
+
+  table.append(head, tbody);
+  if (unnamed > 0) {
+    cell.append(
+      note(
+        `${unnamed} entr${unnamed === 1 ? "y" : "ies"} could not be matched to a bank line or ` +
+          "journal. Loading the journal report again usually fixes this.",
+      ),
+    );
+  }
+  cell.append(table);
+  row.append(cell);
+  return row;
+}
+
+/**
+ * One row for a figure that came from a journal rather than a statement.
+ *
+ * An invoice, a year-end adjustment, depreciation: real entries with real
+ * amounts and no bank line behind them. The amount shown is this journal's
+ * contribution to *this* report line rather than its total, because a journal
+ * touches several accounts and only one of them is the figure that was opened.
+ */
+function journalRow(
+  id: string,
+  code: string,
+  journals: Map<string, Journal>,
+  posted: Map<string, PostedJournal>,
+  labelOf: (line: { accountCode: string; accountName: string }) => string,
+  money: (cents: number) => string,
+): HTMLTableRowElement | null {
+  const imported = journals.get(id);
+  const ours = posted.get(id);
+  const source = imported ?? ours;
+  if (source === undefined) return null;
+
+  // A ledger credits income and debits expenses; the report reads the other
+  // way round, which is the same flip `accrualProfitAndLoss` makes.
+  let net = 0;
+  for (const entry of source.lines) {
+    if (labelOf(entry) !== code) continue;
+    net += -entry.amount;
+  }
+
+  const row = document.createElement("tr");
+  row.append(nameCell(source.date));
+  row.append(nameCell(imported ? `journal ${id}` : "posted"));
+  row.append(nameCell(source.narration || ""));
+  row.append(nameCell(""));
+  row.append(amountCell(""));
+  row.append(amountCell(""));
+  row.append(amountCell(money(net)));
+  return row;
+}
