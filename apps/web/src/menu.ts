@@ -1,0 +1,524 @@
+import { refreshPresentation } from "./presentation.js";
+import { afterPress } from "./busy.js";
+import { showPage } from "./app.js";
+import { toggleNarrow } from "./chrome.js";
+import { $, state } from "./state.js";
+import { applyModules } from "./modules.js";
+import { bankLabel, billsAvailable } from "./books.js";
+import { editBill, editInvoice, startNewBill, startNewInvoice, startNewReceipt } from "./daily/invoices.js";
+import { openQuickEntry } from "./daily/quick-entry.js";
+import { booksMoney } from "./country.js";
+import { searchBooks } from "@nzosa/core";
+import type { SearchHit } from "@nzosa/core";
+import { startNewJournal } from "./daily/reports.js";
+
+/**
+ * The menu: which item is lit, which groups are open, and finding a page by
+ * name.
+ *
+ * A flat list stopped being findable once it passed a dozen items, and it
+ * mixed the one-off (loading a trial balance) with the every-day (coding a
+ * line). So it is grouped by what somebody is doing, the groups fold, and
+ * anything in it -- or any report -- can be found by typing.
+ *
+ * Three items are reports rather than pages: things typed in, or looked at
+ * every period, that were only reachable through the report picker. They open
+ * the Reports page on that report, and are lit instead of Reports while it
+ * shows, so the menu never claims two places at once.
+ */
+
+const GROUPS_KEY = "nzosa:menu-groups";
+
+type GroupChoice = Partial<Record<string, "open" | "closed">>;
+
+// Beside the narrow-menu setting, and for the same reason: which groups
+// somebody keeps open is about them and this screen, not about the books.
+function storedGroups(): GroupChoice {
+  try {
+    const parsed: unknown = JSON.parse(localStorage.getItem(GROUPS_KEY) ?? "{}");
+    return typeof parsed === "object" && parsed !== null ? (parsed as GroupChoice) : {};
+  } catch {
+    return {};
+  }
+}
+
+function storeGroup(name: string, choice: "open" | "closed"): void {
+  try {
+    localStorage.setItem(GROUPS_KEY, JSON.stringify({ ...storedGroups(), [name]: choice }));
+  } catch {
+    // Not remembered, but still applied until the next page.
+  }
+}
+
+function menuItems(): HTMLButtonElement[] {
+  return [
+    ...document.querySelectorAll<HTMLButtonElement>(
+      ".sidebar-nav button[data-page], .sidebar-nav button[data-report]",
+    ),
+    // The set of books at the foot of the menu is the way to the Books page,
+    // so it is lit, titled and searched like any other item on it.
+    ...document.querySelectorAll<HTMLButtonElement>(".sidebar-foot button[data-page]"),
+  ];
+}
+
+function isMenuReport(kind: string): boolean {
+  return menuItems().some((button) => button.dataset["report"] === kind);
+}
+
+/** Open a report, from the menu or from a search. */
+export function openReport(kind: string): void {
+  const select = document.querySelector<HTMLSelectElement>("#report-kind");
+  if (select) select.value = kind;
+  showPage("reports", "top");
+}
+
+/**
+ * Reports, from the menu, is the list of reports -- unless what is showing is
+ * a report with no item of its own, which is left where it was, as it always
+ * has been. Otherwise pressing Reports while Manual journals shows would light
+ * Manual journals and appear to do nothing.
+ */
+export function reportsFromMenu(): void {
+  const select = document.querySelector<HTMLSelectElement>("#report-kind");
+  if (select && isMenuReport(select.value)) select.value = "home";
+}
+
+function setCollapsed(group: HTMLElement, collapsed: boolean): void {
+  group.classList.toggle("collapsed", collapsed);
+  group.querySelector(".sidebar-heading")?.setAttribute("aria-expanded", String(!collapsed));
+}
+
+/**
+ * Light the item for this page, name the page in the topbar, and open or fold
+ * the groups.
+ *
+ * Run after the set-up progress is marked, because Set up folds itself away
+ * once nothing is left to do there -- until somebody opens it, which is then
+ * remembered. The group holding the page on screen is always open: a lit item
+ * inside a folded group is a menu hiding where you are.
+ */
+export function markSidebar(page: string): void {
+  // What belongs to a module that is off stays out of the way (modules.ts).
+  applyModules();
+  // Presentation mode masks people's names: the books may have just loaded.
+  refreshPresentation(page);
+  // Bills, besides, only for the entities that keep them: companies and
+  // commercial rentals.
+  const billsItem = document.querySelector<HTMLElement>('.sidebar-nav button[data-page="bills"]');
+  if (billsItem && !billsAvailable()) billsItem.hidden = true;
+  const kind = page === "reports"
+    ? (document.querySelector<HTMLSelectElement>("#report-kind")?.value ?? "")
+    : "";
+  const onMenuReport = page === "reports" && isMenuReport(kind);
+
+  let active: HTMLButtonElement | undefined;
+  for (const button of menuItems()) {
+    const report = button.dataset["report"];
+    const on = report !== undefined
+      ? onMenuReport && report === kind
+      : button.dataset["page"] === page && !onMenuReport;
+    button.classList.toggle("active", on);
+    if (on) active = button;
+  }
+  // The page name lives in the topbar rather than inside each section, so it
+  // is read off the lit item rather than kept in a second list that could
+  // drift from it.
+  $("page-title").textContent = active?.querySelector("span")?.textContent ?? "";
+
+  const stored = storedGroups();
+  const setupLeft =
+    document.querySelector('.sidebar-nav button[data-page="setup"]')?.classList.contains("needs-doing") === true;
+  for (const group of document.querySelectorAll<HTMLElement>(".sidebar-group")) {
+    const name = group.dataset["group"] ?? "";
+    const choice = stored[name];
+    let collapsed = choice !== undefined ? choice === "closed" : name === "setup" && !setupLeft;
+    if (active !== undefined && group.contains(active)) collapsed = false;
+    setCollapsed(group, collapsed);
+  }
+}
+
+// --- search ---------------------------------------------------------------
+
+/**
+ * Other words for the same place. Somebody looking for depreciation types
+ * "depreciation", not "Fixed assets", and an accountant types "trial balance".
+ */
+const KEYWORDS: Readonly<Record<string, string>> = {
+  reconcile: "code coding categorise transactions review",
+  import: "bank feed akahu csv statements balances upload",
+  invoices: "sales customers receivables owed allocations",
+  statements: "bank statement reconcile tick cleared difference ending balance",
+  time: "time tracking hours timesheet billable rate unbilled invoice time",
+  aupayroll: "payroll pay run wages employees payg withholding super superannuation stp single touch payroll w1 w2",
+  apps: "modules apps features turn on off menu",
+  classes: "class classes department location job project segment tag profit and loss by class",
+  currencies: "currency currencies foreign exchange rate fx usd aud eur gbp wise revaluation gains losses",
+  jobs: "jobs job costing project contract profitability margin customer work profit and loss by job",
+  items: "products services price list catalog inventory sku",
+  budgets: "budget plan forecast target spend limit variance",
+  contacts: "customers vendors suppliers clients address email phone w-9 w9 1099 contact list",
+  tenancies: "rent tenants bond overdue arrears tenancy rental information",
+  rentalyear: "rental year end property manager statements agent management fees rent mileage trips vehicle kilometre rates schedule ir3r",
+  personalyear: "ir3 individual income tax return personal year end pack provisional tax pie kiwisaver interest dividends",
+  payroll: "wages salaries paye kiwisaver payday filing ird employee employer esct student loan",
+  manual: "journal entries adjustments year end accountant",
+  assets: "depreciation register disposals purchases",
+  yearend: "vehicle logbook private use prepayments balance date adjustments",
+  reports: "all reports",
+  gstreturn: "gst return box refund pay ird",
+  migration: "start begin setup migration xero convert move new first",
+  setup: "start files load",
+  opening: "trial balance conversion year end",
+  gst: "filed returns mark as filed variance",
+  check: "xero coding compare account transactions",
+  entities: "chart of accounts owners company rental gst registered bank links",
+  rules: "coding rules automatic",
+  ai: "ai gemini suggestions unknown unrecognised model key",
+  books: "ledger switch open new set clear archive",
+  history: "undo changes log who",
+  pl: "profit and loss income statement p&l",
+  balancesheet: "assets liabilities equity",
+  cashflow: "cash flow statement operating investing financing money in out",
+  depreciation: "fixed assets",
+  shareholders: "current account drawings",
+  ir10: "ird financial statements summary",
+  journal: "trial balance",
+  general: "general ledger",
+  extract: "account transactions",
+  rentals: "rental schedules ir3r",
+  ir3: "individual tax return income tax",
+  owner: "owners shares",
+  charts: "analytics graphs",
+  // Other countries' returns, in the words people search for them by.
+  bas: "gst bas business activity statement g1 1a 1b g10 g11 payg instalment withholding w1 w2 quarterly ato",
+  autax: "income tax return estimate medicare levy offset small business ato individual",
+  aurental: "rental property schedule negative gearing landlord ato",
+  schedulec: "schedule c 1040 business profit loss sole proprietor irs",
+  schedulee: "schedule e 1040 rental real estate irs",
+  ustax: "self-employment tax estimated tax 1040-es quarterly payments schedule se qbi 8995 irs",
+  contractors: "1099 1099-nec contractors w-9 irs",
+  salestax: "sales tax collected state",
+  payrolltax: "941 payroll tax withholding social security medicare futa 940",
+};
+
+interface Destination {
+  label: string;
+  where: string;
+  words: string;
+  go: () => void;
+}
+
+/** Everything the menu and the report picker hold, read off them rather than listed twice. */
+function destinations(): Destination[] {
+  const found: Destination[] = [];
+  const names = new Set<string>();
+  for (const button of menuItems()) {
+    // Not what the menu itself is hiding: a module that is off, say.
+    if (button.hidden) continue;
+    const label = button.querySelector("span")?.textContent?.trim() ?? "";
+    const key = button.dataset["report"] ?? button.dataset["page"] ?? "";
+    found.push({
+      label,
+      where: button.closest(".sidebar-group")?.querySelector(".sidebar-heading")?.textContent?.trim() ?? "",
+      words: KEYWORDS[key] ?? "",
+      go: () => button.click(),
+    });
+    names.add(label.toLowerCase());
+  }
+  for (const link of document.querySelectorAll<HTMLAnchorElement>("#sidebar-import-sublinks a")) {
+    const target = link.getAttribute("href") ?? "";
+    found.push({
+      label: link.textContent?.trim() ?? "",
+      where: "Bank import",
+      words: "",
+      go: () => {
+        showPage("import");
+        if (target.startsWith("#")) document.querySelector(target)?.scrollIntoView({ block: "start" });
+      },
+    });
+  }
+  for (const option of document.querySelectorAll<HTMLOptionElement>("#report-kind option")) {
+    const label = option.textContent?.trim() ?? "";
+    if (option.value === "home" || option.hidden || names.has(label.toLowerCase())) continue;
+    const group = option.closest("optgroup")?.label ?? "";
+    found.push({
+      label,
+      where: group === "" ? "Reports" : `Reports · ${group}`,
+      words: KEYWORDS[option.value] ?? "",
+      go: () => openReport(option.value),
+    });
+  }
+  return found;
+}
+
+/** Put a page's own search box to a query, as if typed. */
+function searchOn(page: string, box: string, query: string, before?: () => void): void {
+  showPage(page, "top");
+  before?.();
+  const input = document.getElementById(box);
+  if (!(input instanceof HTMLInputElement)) return;
+  input.value = query;
+  input.dispatchEvent(new Event("input"));
+}
+
+const KIND_SAID: Record<SearchHit["kind"], string> = {
+  contact: "Contact",
+  invoice: "Invoice",
+  bill: "Bill",
+  line: "Bank line",
+  journal: "Journal",
+};
+
+/** Things to do, found by what they are called and what people call them. */
+function actions(): Destination[] {
+  const bills = billsAvailable();
+  const all: (Destination | null)[] = [
+    { label: "New invoice", where: "Action · Alt+Shift+I", words: "create add make raise sale invoice", go: () => { showPage("invoices", "top"); startNewInvoice(); } },
+    { label: "New sales receipt", where: "Action", words: "create add cash sale receipt counter walk-in", go: () => { showPage("invoices", "top"); startNewReceipt(); } },
+    bills ? { label: "New bill", where: "Action · Alt+Shift+B", words: "create add enter bill supplier purchase", go: () => { showPage("bills", "top"); startNewBill(); } } : null,
+    { label: "New journal", where: "Action · Alt+Shift+J", words: "create add write manual journal adjustment", go: () => startNewJournal() },
+    { label: "Quick entry: invoices", where: "Action", words: "paper backlog many invoices type", go: () => { showPage("invoices", "top"); openQuickEntry("sales"); } },
+    bills ? { label: "Quick entry: bills", where: "Action", words: "paper backlog many bills type", go: () => { showPage("bills", "top"); openQuickEntry("purchase"); } } : null,
+    { label: "Load a bank file", where: "Action", words: "import upload csv statement ofx qif bank file", go: () => showPage("import") },
+  ];
+  return all.filter((a): a is Destination => a !== null);
+}
+
+/** Chart accounts by code or name: opened on the chart, the row found. */
+function accountsMatching(query: string): Destination[] {
+  const words = query.toLowerCase().split(/\s+/).filter((w) => w !== "");
+  if (words.length === 0) return [];
+  return state.chart
+    .filter((a) => a.code.trim() !== "" || a.name.trim() !== "")
+    .filter((a) => words.every((w) => `${a.code} ${a.name}`.toLowerCase().includes(w)))
+    .sort((a, b) => (a.code.toLowerCase().startsWith(words[0]!) ? 0 : 1) - (b.code.toLowerCase().startsWith(words[0]!) ? 0 : 1))
+    .slice(0, 4)
+    .map((a) => ({
+      label: `${a.code} ${a.name}`.trim(),
+      where: `Account · ${a.type || "no type yet"}`,
+      words: "",
+      go: () => {
+        showPage("entities");
+        setTimeout(() => {
+          const row = [...document.querySelectorAll<HTMLTableRowElement>(".accounts-table tbody tr")].find(
+            (r) => r.cells[0]?.textContent === a.code && (r.cells[1]?.textContent ?? "") === a.name,
+          );
+          if (row === undefined) return;
+          row.scrollIntoView({ block: "center" });
+          row.classList.add("row-found");
+          setTimeout(() => row.classList.remove("row-found"), 2500);
+        }, 200);
+      },
+    }));
+}
+
+/** What the books hold that matches: contacts, documents, bank lines, journals. */
+function inTheBooks(query: string): Destination[] {
+  const hits = searchBooks(query, {
+    contacts: state.ledger.contacts ?? [],
+    invoices: state.ledger.invoices ?? [],
+    transactions: state.ledger.transactions,
+    journals: state.ledger.manualJournals ?? [],
+    money: booksMoney,
+    bankName: bankLabel,
+  });
+  return hits.map((hit) => ({
+    label: hit.title,
+    where: hit.detail.startsWith(KIND_SAID[hit.kind]) ? hit.detail : `${KIND_SAID[hit.kind]} · ${hit.detail}`,
+    words: "",
+    go: () => {
+      if (hit.kind === "contact") searchOn("contacts", "contacts-search", hit.id);
+      else if (hit.kind === "invoice") {
+        searchOn("invoices", "invoice-search", hit.id);
+        editInvoice(hit.id);
+      } else if (hit.kind === "bill") {
+        searchOn("bills", "bill-search", hit.id);
+        editBill(hit.id);
+      } else if (hit.kind === "journal") openReport("manual");
+      else {
+        const line = state.ledger.transactions.find((t) => t.id === hit.id);
+        const said = line === undefined ? hit.title : (line.otherParty || line.particulars || (Math.abs(line.amount) / 100).toFixed(2)).trim();
+        searchOn("reconcile", "reconcile-search", said, () => {
+          const filter = document.getElementById("reconcile-filter");
+          if (filter instanceof HTMLSelectElement && filter.value !== "all") {
+            filter.value = "all";
+            filter.dispatchEvent(new Event("change"));
+          }
+        });
+      }
+    },
+  }));
+}
+
+function matches(query: string): Destination[] {
+  const words = query.toLowerCase().split(/\s+/).filter((word) => word !== "");
+  if (words.length === 0) return [];
+  const phrase = words.join(" ");
+  return [...actions(), ...destinations()]
+    .flatMap((destination) => {
+      const label = destination.label.toLowerCase();
+      const haystack = `${label} ${destination.where.toLowerCase()} ${destination.words}`;
+      if (!words.every((word) => haystack.includes(word))) return [];
+      // Names before other words for them, so "gst" finds the GST pages
+      // ahead of a report that merely mentions GST among its keywords.
+      const score = label.startsWith(phrase) ? 0 : label.includes(phrase) ? 1 : 2;
+      return [{ destination, score }];
+    })
+    .sort((a, b) => a.score - b.score)
+    .slice(0, 5)
+    .map((scored) => scored.destination)
+    .concat(query.trim().length >= 2 ? [...accountsMatching(query), ...inTheBooks(query)] : []);
+}
+
+function wireSearch(): void {
+  const input = $<HTMLInputElement>("menu-search");
+  const results = $("menu-search-results");
+  let shown: Destination[] = [];
+  let selected = 0;
+
+  const close = (): void => {
+    input.value = "";
+    results.textContent = "";
+    results.hidden = true;
+    shown = [];
+    selected = 0;
+  };
+  const go = (destination: Destination | undefined): void => {
+    if (destination === undefined) return;
+    close();
+    input.blur();
+    destination.go();
+  };
+  const draw = (): void => {
+    shown = matches(input.value);
+    selected = Math.min(selected, Math.max(shown.length - 1, 0));
+    results.textContent = "";
+    results.hidden = input.value.trim() === "";
+    if (shown.length === 0) {
+      const none = document.createElement("div");
+      none.className = "menu-search-empty";
+      none.textContent = "Nothing called that, and nothing in the books.";
+      results.append(none);
+      return;
+    }
+    shown.forEach((destination, index) => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.setAttribute("role", "option");
+      option.setAttribute("aria-selected", String(index === selected));
+      if (index === selected) option.className = "selected";
+      const name = document.createElement("span");
+      name.textContent = destination.label;
+      const where = document.createElement("small");
+      where.textContent = destination.where;
+      option.append(name, where);
+      // Pressed rather than clicked would blur the input first, which hides
+      // the list before the click lands on it.
+      option.addEventListener("pointerdown", (event) => event.preventDefault());
+      option.addEventListener("click", () => go(destination));
+      results.append(option);
+    });
+  };
+
+  input.addEventListener("input", () => {
+    selected = 0;
+    draw();
+  });
+  input.addEventListener("focus", () => {
+    if (input.value.trim() !== "") draw();
+  });
+  input.addEventListener("blur", () => {
+    results.hidden = true;
+  });
+  input.addEventListener("keydown", (event) => {
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (shown.length === 0) return;
+      selected = (selected + (event.key === "ArrowDown" ? 1 : shown.length - 1)) % shown.length;
+      draw();
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      go(shown[selected]);
+    } else if (event.key === "Escape") {
+      close();
+      input.blur();
+    }
+  });
+
+  // A new invoice, bill or journal from anywhere: Alt+Shift and its letter,
+  // which no browser keeps for itself.
+  document.addEventListener("keydown", (event) => {
+    if (!event.altKey || !event.shiftKey || event.ctrlKey || event.metaKey) return;
+    const key = event.code;
+    if (key === "KeyI") {
+      event.preventDefault();
+      showPage("invoices", "top");
+      startNewInvoice();
+    } else if (key === "KeyB") {
+      if (!billsAvailable()) return;
+      event.preventDefault();
+      showPage("bills", "top");
+      startNewBill();
+    } else if (key === "KeyJ") {
+      event.preventDefault();
+      startNewJournal();
+    }
+  });
+
+  // Ctrl+K, as most apps have it now. A menu narrowed to icons has no room for
+  // the box, so it is widened first.
+  document.addEventListener("keydown", (event) => {
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+      event.preventDefault();
+      if (document.querySelector(".shell")?.classList.contains("narrow")) toggleNarrow();
+      input.focus();
+      input.select();
+    }
+  });
+}
+
+export function wireMenu(): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>(".sidebar-nav button[data-report]")) {
+    button.addEventListener("click", () => afterPress(button, () => openReport(button.dataset["report"] ?? "home")));
+  }
+  for (const heading of document.querySelectorAll<HTMLButtonElement>(".sidebar-nav .sidebar-heading")) {
+    heading.addEventListener("click", () => {
+      const group = heading.closest<HTMLElement>(".sidebar-group");
+      if (!group) return;
+      const collapse = !group.classList.contains("collapsed");
+      setCollapsed(group, collapse);
+      storeGroup(group.dataset["group"] ?? "", collapse ? "closed" : "open");
+    });
+  }
+  // Choosing a report from the picker can move the light between Reports and
+  // one of the report items.
+  $("report-kind").addEventListener("change", () => markSidebar(state.page));
+  wireSearch();
+}
+
+/**
+ * Where Bank import sits: under Daily, or under Set up once a bank feed is
+ * connected.
+ *
+ * With a feed, transactions arrive on their own each time the books open, and
+ * Bank import becomes somewhere visited to set things up rather than every
+ * day. Moved rather than drawn twice, so its click handlers and its sub-links
+ * go with it.
+ */
+export function placeBankImport(connected: boolean): void {
+  const button = document.querySelector<HTMLButtonElement>('.sidebar-nav button[data-page="import"]');
+  const sublinks = document.getElementById("sidebar-import-sublinks");
+  if (button === null) return;
+  const moving = sublinks === null ? [button] : [button, sublinks];
+  if (connected) {
+    const setup = document.querySelector('.sidebar-group[data-group="setup"] .sidebar-group-items');
+    const after = setup?.querySelector('button[data-page="migration"]');
+    if (after) after.after(...moving);
+    else setup?.prepend(...moving);
+    return;
+  }
+  const daily = document.querySelector('.sidebar-group[data-group="today"] .sidebar-group-items');
+  const after =
+    daily?.querySelector('button[data-page="actions"]') ?? daily?.querySelector('button[data-page="reconcile"]');
+  if (after) after.after(...moving);
+}

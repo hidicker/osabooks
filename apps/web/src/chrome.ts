@@ -1,0 +1,261 @@
+import { $ } from "./state.js";
+import { THEME_KEY, currentTheme } from "./ui.js";
+import type { Theme } from "./ui.js";
+import { backendKind } from "./store.js";
+import { isDemoBuild } from "./ai-consent.js";
+import { loadDemoData } from "./migrate/setup-wizard.js";
+import { openTutorials, openTutorialsOnArrival } from "./tutorials/panel.js";
+import { placeExampleSuggestions } from "./tutorials/examples.js";
+import { DEMO_PERSONAS, currentDemoPersona, personaCountry } from "./demo-personas.js";
+import { flagIcon } from "./flags.js";
+
+/**
+ * The frame around the pages: theme, sidebar width, and the loading screen.
+ *
+ * None of it is about accounting and none of it touches the ledger. It is here
+ * rather than in `ui.ts` because each of these remembers a choice -- which
+ * theme, how wide -- and reading that back from the browser's own storage is
+ * state, even when it is nobody's books.
+ *
+ * Both are applied before anything is drawn rather than after. A page that
+ * renders light and then turns dark, or renders wide and then narrows, looks
+ * like a fault even though it settles correctly.
+ */
+
+export function dismissLoading(): void {
+  const el = document.getElementById("app-loading");
+  if (!el) return;
+  el.classList.add("dismissed");
+  setTimeout(() => el.remove(), 400);
+}
+
+/**
+ * Whether the menu is narrowed to icons.
+ *
+ * Beside the theme in localStorage rather than with the books: how wide
+ * somebody likes their menu is a fact about them and this screen, and has no
+ * business travelling in a folder that gets copied to a colleague.
+ */
+export const NARROW_KEY = "nzosa:narrow";
+
+export function applyNarrow(narrow: boolean): void {
+  document.querySelector(".shell")?.classList.toggle("narrow", narrow);
+  const button = $("sidebar-toggle");
+  button.setAttribute("aria-expanded", String(!narrow));
+  button.title = narrow ? "Show the menu names" : "Narrow the menu to icons";
+}
+
+export function toggleNarrow(): void {
+  const narrow = !document.querySelector(".shell")?.classList.contains("narrow");
+  try {
+    localStorage.setItem(NARROW_KEY, narrow ? "yes" : "no");
+  } catch {
+    // Not remembered, but still applied for this session.
+  }
+  applyNarrow(narrow);
+}
+
+/**
+ * On a phone the menu slides out from the button at the top, with the names,
+ * rather than being a strip of icons too small to tell apart.
+ */
+const SMALL = "(max-width: 820px)";
+
+function smallScreen(): boolean {
+  return matchMedia(SMALL).matches;
+}
+
+function menuIsOpen(): boolean {
+  return document.querySelector(".shell")?.classList.contains("menu-open") === true;
+}
+
+function setMenuOpen(open: boolean): void {
+  const shell = document.querySelector<HTMLElement>(".shell");
+  const sidebar = document.querySelector<HTMLElement>(".sidebar");
+  if (!shell || !sidebar) return;
+  // Below the bar at the top, wherever the banners above it have left it.
+  shell.style.setProperty("--menu-top", `${Math.max(0, sidebar.getBoundingClientRect().bottom)}px`);
+  shell.classList.toggle("menu-open", open);
+  const button = $("sidebar-toggle");
+  if (smallScreen()) {
+    button.setAttribute("aria-expanded", String(open));
+    button.title = open ? "Close the menu" : "Open the menu";
+  }
+}
+
+function wireMenuDrawer(): void {
+  const sidebar = document.querySelector<HTMLElement>(".sidebar");
+  if (!sidebar) return;
+  if (smallScreen()) setMenuOpen(false);
+  // Going somewhere closes it; unfolding a group does not.
+  sidebar.querySelector(".sidebar-nav")?.addEventListener("click", (event) => {
+    const target = event.target as HTMLElement;
+    if (!menuIsOpen() || target.closest(".sidebar-heading, .menu-search input")) return;
+    if (target.closest("button, a, [role=option]")) setMenuOpen(false);
+  });
+  // A tap beside it, or Escape, puts it away.
+  document.addEventListener("click", (event) => {
+    if (menuIsOpen() && !sidebar.contains(event.target as Node)) setMenuOpen(false);
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && menuIsOpen()) setMenuOpen(false);
+    // Search lives in the menu: on a phone, Ctrl+K opens it first.
+    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k" && smallScreen() && !menuIsOpen()) {
+      setMenuOpen(true);
+    }
+  }, true);
+  matchMedia(SMALL).addEventListener("change", (change) => {
+    setMenuOpen(false);
+    if (!change.matches) applyNarrow(document.querySelector(".shell")?.classList.contains("narrow") === true);
+  });
+}
+
+export function applyTheme(theme: Theme): void {
+  const root = document.documentElement;
+  if (theme === "system") root.removeAttribute("data-theme");
+  else root.setAttribute("data-theme", theme);
+
+  // The button says what pressing it does next, not what the theme is now.
+  const dark = theme === "dark" || (theme === "system" && matchMedia("(prefers-color-scheme: dark)").matches);
+  const button = $("theme-toggle");
+  button.textContent = dark ? "☀" : "☽";
+  button.title =
+    theme === "system"
+      ? `Following this computer (${dark ? "dark" : "light"}). Click for ${dark ? "light" : "dark"}.`
+      : `${theme[0]?.toUpperCase()}${theme.slice(1)}. Click to cycle light, dark, follow the computer.`;
+}
+
+export function cycleTheme(): void {
+  const order: Theme[] = ["system", "light", "dark"];
+  const next = order[(order.indexOf(currentTheme()) + 1) % order.length] as Theme;
+  try {
+    localStorage.setItem(THEME_KEY, next);
+  } catch {
+    // Not remembered, but still applied for this session.
+  }
+  applyTheme(next);
+}
+
+/** The frame: theme, sidebar width, and the demo banner. */
+/**
+ * Where these books actually are, said in the footer.
+ *
+ * It used to say one thing everywhere: that the ledger stays in this browser
+ * until you export it, and that NZOSA keeps running until you double-click Stop
+ * NZOSA in the folder you started it from. On the hosted copy none of that is
+ * true -- there is no folder and no local server to stop, and the books are on
+ * a server rather than in the browser -- so the footer told the people most
+ * likely to be strangers here something plainly wrong.
+ */
+function sayWhereBooksLive(): void {
+  const where = document.getElementById("footer-where");
+  if (where === null) return;
+  const kind = backendKind();
+  where.textContent =
+    kind === "folder"
+      ? "These books are the folder on this computer. NZOSA keeps running after you " +
+        "close this tab; to stop it, double-click Stop NZOSA in the folder you started it from."
+      : kind === "cloud"
+        ? "These books are kept on the server, under the account you are signed in to. " +
+          "Download a backup from the Books page to keep a copy of your own."
+        : "These books stay in this browser until you download a backup from the Books page.";
+}
+
+export function wireChrome(): void {
+  sayWhereBooksLive();
+  const demoBanner = document.getElementById("demo-banner");
+  if (demoBanner) {
+    // Shown only where the page itself says it is the demo: the demo build
+    // takes the hidden attribute off, and nothing else does. The app used to
+    // show it on any copy with no folder behind it, which put "this is a demo"
+    // across the top of books people keep for real on the hosted site.
+    if (backendKind() === "folder") demoBanner.hidden = true;
+    $("demo-banner-close")?.addEventListener("click", () => {
+      demoBanner.hidden = true;
+    });
+    // The demo seeds a browser once and then keeps what that visitor did with
+    // it, which is right for a visit and wrong for coming back: somebody who
+    // reconciled it last week found almost nothing left to reconcile, and a
+    // demo updated since never reached them. One press gives the fresh books.
+    if (isDemoBuild()) {
+      const again = document.createElement("button");
+      again.type = "button";
+      again.className = "demo-banner-again";
+      again.textContent = "Start the demo again";
+      again.addEventListener("click", () => {
+        void loadDemoData(again).finally(() => {
+          placeExampleSuggestions();
+          again.disabled = false;
+          again.textContent = "Start the demo again";
+        });
+      });
+      // The lessons: short tours of the real app over the demo books, opened
+      // by themselves whenever the demo is opened, and from here after that.
+      const tutorials = document.createElement("button");
+      tutorials.type = "button";
+      tutorials.className = "demo-banner-again";
+      tutorials.textContent = "Take a tutorial";
+      tutorials.addEventListener("click", () => openTutorials());
+      // Which invented books are open, and the others, in the banner where
+      // every visitor sees them: in the Tutorials panel alone they were easy
+      // to miss.
+      const ready = DEMO_PERSONAS.filter((p) => p.ready === true);
+      const books = document.createElement("select");
+      books.className = "demo-banner-books";
+      books.title = "Other demo books";
+      books.setAttribute("aria-label", "Demo books");
+      for (const persona of ready) {
+        const option = document.createElement("option");
+        option.value = persona.id;
+        option.textContent = persona.label;
+        option.selected = persona.id === currentDemoPersona();
+        books.append(option);
+      }
+      // The open set's flag beside the choice: whose country these books are kept in.
+      const flagOf = (id: string): SVGSVGElement => {
+        const country = personaCountry(ready.find((p) => p.id === id));
+        return flagIcon(country.id, `Kept in ${country.name}`);
+      };
+      const flag = document.createElement("span");
+      flag.className = "demo-banner-flag";
+      flag.append(flagOf(currentDemoPersona()));
+      books.addEventListener("change", () => {
+        flag.replaceChildren(flagOf(books.value));
+        const busy = document.createElement("button");
+        void loadDemoData(busy, books.value).finally(() => {
+          placeExampleSuggestions();
+          books.value = currentDemoPersona();
+          flag.replaceChildren(flagOf(books.value));
+        });
+      });
+      const label = document.createElement("label");
+      label.className = "demo-banner-books-label";
+      label.append(document.createTextNode("Demo books "), flag, books);
+      demoBanner.querySelector(".demo-banner-content")?.append(...(ready.length > 1 ? [label] : []), tutorials, again);
+      openTutorialsOnArrival();
+    }
+  }
+
+  const demoNotice = document.getElementById("demo-import-privacy-notice");
+  if (demoNotice) {
+    // The same rule: a warning not to import private data belongs on the demo,
+    // and is wrong on hosted books, where importing your own data is the point.
+    if (backendKind() === "folder") demoNotice.hidden = true;
+  }
+  $("sidebar-toggle").addEventListener("click", () => {
+    if (smallScreen()) setMenuOpen(!menuIsOpen());
+    else toggleNarrow();
+  });
+  try {
+    applyNarrow(localStorage.getItem(NARROW_KEY) === "yes");
+  } catch {
+    applyNarrow(false);
+  }
+  wireMenuDrawer();
+  $("theme-toggle").addEventListener("click", () => cycleTheme());
+  applyTheme(currentTheme());
+  // Following the computer means noticing when the computer changes its mind.
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (currentTheme() === "system") applyTheme("system");
+  });
+}

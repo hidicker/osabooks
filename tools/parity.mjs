@@ -1,0 +1,418 @@
+/**
+ * Parity: two builds of NZOSA, the same books, the same answers.
+ *
+ * Opens each build's app on a fresh copy of the same set of books, in
+ * headless Chrome, and walks it the way a person would: every page under
+ * every entity, every report for every year, basis and owner, each year end
+ * with every property opened, the AI check's prompts and the workbook. What is
+ * on screen is captured as text. The two captures must be identical, word for
+ * word and figure for figure; any difference is printed, line by line.
+ *
+ * Nothing in either app is changed to make this possible -- it reads what a
+ * person reads -- so the build it checks is the build that ships. The books are
+ * copied first, because opening books can write to them, and never written back.
+ *
+ *   node tools/parity.mjs --a <repo> --b <repo> --ledgers <folder> --books a,b,c [--out <folder>]
+ *
+ * --a and --b are two checkouts (say, main before and after a change),
+ * each built with `npm run build`. Run a build against itself first: two runs
+ * must agree, or a difference later proves nothing.
+ */
+import { spawn } from "node:child_process";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve } from "node:path";
+
+const arg = (name, fallback) => {
+  const at = process.argv.indexOf(`--${name}`);
+  return at >= 0 ? process.argv[at + 1] : fallback;
+};
+const repoA = resolve(arg("a", "."));
+const repoB = resolve(arg("b", "."));
+const ledgers = resolve(arg("ledgers", join(repoA, "ledgers")));
+const books = (arg("books", "") || "").split(",").filter(Boolean);
+const outDir = resolve(arg("out", join(tmpdir(), "nzosa-parity")));
+// One moment for both sides. Anything dated "today" -- the aged reports, a
+// due date -- otherwise differs when a run crosses midnight, and that is a
+// difference in the clock, not in the code.
+const frozenNow = Number(arg("now", String(Date.now())));
+const FREEZE_CLOCK = `(() => {
+  const fixed = ${frozenNow};
+  const Real = Date;
+  class Frozen extends Real {
+    constructor(...args) { if (args.length === 0) super(fixed); else super(...args); }
+    static now() { return fixed; }
+  }
+  Frozen.parse = Real.parse;
+  Frozen.UTC = Real.UTC;
+  window.Date = Frozen;
+  // Offline, the same on both sides: what another site says (the shared AI's
+  // allowance, a bank feed) changes from one minute to the next, and would
+  // read as a difference between builds that is not one.
+  const realFetch = window.fetch.bind(window);
+  window.fetch = (input, init) => {
+    const url = new URL(typeof input === "string" ? input : input.url, location.href);
+    if (url.origin !== location.origin) return Promise.reject(new TypeError("offline for the parity check"));
+    return realFetch(input, init);
+  };
+})();`;
+const chromePath = arg("chrome", "C:/Program Files/Google/Chrome/Application/chrome.exe");
+if (books.length === 0) {
+  console.error("usage: node tools/parity.mjs --a <repo> --b <repo> --ledgers <folder> --books a,b");
+  process.exit(2);
+}
+mkdirSync(outDir, { recursive: true });
+
+const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * A copy of a set of books, less its lock. The ".open-by" file says which
+ * NZOSA has the books open; copied, it made the copy look open too, and the
+ * build refused to start on it.
+ */
+function copyBooks(from, to) {
+  cpSync(from, to, { recursive: true, filter: (path) => !path.endsWith(".open-by") });
+}
+
+/** One build serving one copy of one set of books, until stopped. */
+async function serveBooks(repo, folder, book, port) {
+  const child = spawn(
+    process.execPath,
+    [join(repo, "apps/web/build.js"), "--serve", "--port", String(port), "--ledgers", folder, "--ledger", book],
+    { cwd: repo, stdio: ["ignore", "pipe", "pipe"] },
+  );
+  let said = "";
+  child.stdout.on("data", (d) => (said += d));
+  child.stderr.on("data", (d) => (said += d));
+  for (let i = 0; i < 240; i++) {
+    await wait(500);
+    try {
+      const r = await fetch(`http://127.0.0.1:${port}/`);
+      if (r.ok) return child;
+    } catch {}
+  }
+  child.kill();
+  throw new Error(`${repo} did not start on ${port}. It said:
+${said.slice(-1500)}`);
+}
+
+/** Headless Chrome, driven over its DevTools protocol. */
+async function openChrome(port) {
+  const chrome = spawn(
+    chromePath,
+    [
+      "--headless=new",
+      `--remote-debugging-port=${port}`,
+      "--no-first-run",
+      "--hide-scrollbars",
+      `--user-data-dir=${mkdtempSync(join(tmpdir(), "parity-chrome-"))}`,
+      "about:blank",
+    ],
+    { stdio: "ignore" },
+  );
+  let target;
+  for (let i = 0; i < 60 && !target; i++) {
+    await wait(250);
+    try {
+      target = (await (await fetch(`http://127.0.0.1:${port}/json`)).json()).find((t) => t.type === "page");
+    } catch {}
+  }
+  const ws = new WebSocket(target.webSocketDebuggerUrl);
+  await new Promise((r) => ws.addEventListener("open", r));
+  let id = 0;
+  const pending = new Map();
+  const problems = [];
+  // Chrome gone -- crashed, or out of memory -- fails what was waiting on it,
+  // rather than leaving the run waiting for an answer that will never come.
+  ws.addEventListener("close", () => {
+    for (const resolve of pending.values()) resolve({ result: { exceptionDetails: { text: "Chrome closed the connection" } } });
+    pending.clear();
+  });
+  ws.addEventListener("message", (e) => {
+    const m = JSON.parse(e.data);
+    // How far the capture has got, so a long run can be told from a stuck one.
+    if (m.method === "Runtime.consoleAPICalled" && m.params.type === "log" && String(m.params.args?.[0]?.value ?? "").startsWith("parity:")) {
+      process.stdout.write(`    ${String(m.params.args[0].value).slice(7)}\n`);
+    }
+    if (m.method === "Runtime.exceptionThrown") problems.push(m.params.exceptionDetails?.exception?.description ?? m.params.exceptionDetails?.text);
+    if (m.method === "Runtime.consoleAPICalled" && m.params.type === "error") problems.push(m.params.args.map((a) => a.value ?? a.description).join(" "));
+    if (pending.has(m.id)) {
+      pending.get(m.id)(m);
+      pending.delete(m.id);
+    }
+  });
+  const send = (method, params = {}) =>
+    new Promise((r) => {
+      const n = ++id;
+      pending.set(n, r);
+      ws.send(JSON.stringify({ id: n, method, params }));
+    });
+  return {
+    problems,
+    send,
+    async evaluate(expression) {
+      const reply = await send("Runtime.evaluate", { expression, awaitPromise: true, returnByValue: true });
+      if (reply.result?.exceptionDetails) throw new Error(JSON.stringify(reply.result.exceptionDetails).slice(0, 500));
+      return reply.result?.result?.value;
+    },
+    close() {
+      ws.close();
+      chrome.kill();
+    },
+  };
+}
+
+/**
+ * Walk the app and capture what it shows. Runs in the page. Only navigates,
+ * chooses from selects and opens details: it presses nothing that acts.
+ */
+const CAPTURE = String.raw`
+(async () => {
+  const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+  const text = (el) => (el?.innerText ?? "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+  const stable = async (el) => {
+    let last = null;
+    for (let i = 0; i < 40; i++) {
+      await wait(200);
+      const now = text(el);
+      if (now === last) return now;
+      last = now;
+    }
+    return last ?? "";
+  };
+  for (let i = 0; i < 150; i++) {
+    const l = document.getElementById("app-loading");
+    if (!l || l.hidden || getComputedStyle(l).display === "none") break;
+    await wait(200);
+  }
+  await wait(2500);
+  // Writes back are suppressed nowhere: the books are a copy. But nothing here
+  // clicks a button that acts -- only navigation, selects and details.
+  window.confirm = () => false;
+  window.prompt = () => null;
+  window.alert = () => {};
+  const out = {};
+  out["_meta"] = JSON.stringify({
+    title: document.getElementById("page-title")?.textContent ?? "",
+    nav: document.querySelectorAll(".sidebar-nav button[data-page], .sidebar-nav button[data-report]").length,
+    start: (document.body?.innerText ?? "").slice(0, 300),
+  });
+  const choose = async (select, value) => {
+    select.value = value;
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  };
+  const visible = (el) => el && !el.hidden && el.offsetParent !== null;
+  const navButtons = () =>
+    [...document.querySelectorAll(".sidebar-nav button[data-page], .sidebar-nav button[data-report]")].filter(visible);
+  // Every sidebar section open: a collapsed one hides its pages, and pages
+  // nobody can see are pages nobody compared.
+  for (const heading of document.querySelectorAll('.sidebar-heading[aria-expanded="false"]')) heading.click();
+  await wait(300);
+  const filter = document.getElementById("entity-filter");
+  const entityValues = filter ? [...filter.options].map((o) => o.value) : [""];
+
+  for (const entity of entityValues) {
+    if (filter) await choose(filter, entity);
+    await wait(300);
+    const tag = "entity=" + (entity || "all");
+    for (const button of navButtons()) {
+      const page = button.dataset.page ?? "reports";
+      const key = tag + " | " + (button.dataset.page ? "page " + page : "report " + button.dataset.report);
+      button.click();
+      const body = document.getElementById("page-" + page);
+      out[key] = await stable(body);
+      console.log("parity:" + Object.keys(out).length + " views, " + key);
+
+      if (page === "reports" && !button.dataset.report) {
+        const kind = document.getElementById("report-kind");
+        // Only what a person can choose: a hidden option, or one in a hidden
+        // group, belongs to a module or a country these books do not have.
+        const choosable = [...kind.options].filter((o) => !o.hidden && !(o.parentElement instanceof HTMLOptGroupElement && o.parentElement.hidden));
+        for (const k of choosable.map((o) => o.value)) {
+          await choose(kind, k);
+          await wait(200);
+          const year = document.getElementById("report-year");
+          const basis = document.getElementById("report-basis");
+          const owner = document.getElementById("report-owner");
+          const years = visible(year) ? [...year.options].map((o) => o.value) : [null];
+          const bases = visible(basis) ? [...basis.options].map((o) => o.value) : [null];
+          const owners = visible(owner) ? [...owner.options].map((o) => o.value) : [null];
+          for (const y of years) {
+            if (y !== null) await choose(year, y);
+            for (const b of bases) {
+              if (b !== null) await choose(basis, b);
+              for (const o of owners) {
+                if (o !== null) await choose(owner, o);
+                out[tag + " | reports kind=" + k + " year=" + y + " basis=" + b + " owner=" + o] = await stable(
+                  document.getElementById("reports-body"),
+                );
+              }
+            }
+          }
+        }
+      }
+
+      // Pages with a year of their own: every year, everything opened.
+      if (["rentalyear", "personalyear", "aicheck"].includes(page)) {
+        const select = body.querySelector("select");
+        const values = select ? [...select.options].map((o) => o.value) : [null];
+        for (const v of values) {
+          if (v !== null) await choose(select, v);
+          await wait(300);
+          for (const d of body.querySelectorAll("details:not([open])")) d.open = true;
+          for (const b of [...body.querySelectorAll("button")].filter((x) => x.textContent.trim() === "Show prompt")) b.click();
+          out[key + " year=" + v] = await stable(body);
+        }
+      }
+    }
+  }
+
+  // The workbook, for every year it offers, captured rather than saved.
+  const ai = [...navButtons()].find((b) => b.dataset.page === "aicheck");
+  if (ai) {
+    ai.click();
+    await wait(800);
+    const body = document.getElementById("page-aicheck");
+    const select = body.querySelector("select");
+    const values = select ? [...select.options].map((o) => o.value) : [null];
+    for (const v of values) {
+      if (v !== null) await choose(select, v);
+      await wait(300);
+      let blob = null;
+      const make = URL.createObjectURL;
+      const click = HTMLAnchorElement.prototype.click;
+      URL.createObjectURL = (b) => ((blob = b), "blob:parity");
+      HTMLAnchorElement.prototype.click = function () {};
+      const go = [...body.querySelectorAll("button")].find((x) => x.textContent.trim() === "Download the workbook");
+      if (go) go.click();
+      for (let i = 0; i < 100 && blob === null; i++) await wait(100);
+      URL.createObjectURL = make;
+      HTMLAnchorElement.prototype.click = click;
+      if (blob !== null) {
+        // Stored, not compressed: the sheets' XML is readable as it stands.
+        const raw = new TextDecoder("utf-8").decode(new Uint8Array(await blob.arrayBuffer()));
+        const sheets = raw.split(/(?=<\?xml)/).filter((s) => s.includes("<sheetData>"));
+        sheets.forEach((s, i) => {
+          // Cut at the sheet's end: what follows is the zip's next header,
+          // which carries a timestamp and differs on every run.
+          out["workbook year=" + v + " sheet " + (i + 1)] = s.slice(0, s.indexOf("</worksheet>")).replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        });
+      }
+    }
+  }
+  return out;
+})()
+`;
+
+function diffText(a, b) {
+  const x = (a ?? "").split("\n");
+  const y = (b ?? "").split("\n");
+  const lines = [];
+  const n = Math.max(x.length, y.length);
+  for (let i = 0; i < n && lines.length < 12; i++) {
+    if (x[i] !== y[i]) lines.push(`    line ${i + 1}\n      A: ${x[i] ?? "(none)"}\n      B: ${y[i] ?? "(none)"}`);
+  }
+  return lines.join("\n");
+}
+
+/** Every text in a capture, with these folders named rather than spelled out (also as JSON writes them). */
+function withoutPaths(value, folders) {
+  if (typeof value === "string") {
+    let text = value;
+    for (const [path, name] of folders) {
+      text = text.split(path.replaceAll("\\", "\\\\")).join(name).split(path).join(name);
+    }
+    return text;
+  }
+  if (Array.isArray(value)) return value.map((one) => withoutPaths(one, folders));
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, one]) => [key, withoutPaths(one, folders)]));
+  }
+  return value;
+}
+
+async function captureSide(repo, label, book, port, chromePort) {
+  const folder = mkdtempSync(join(tmpdir(), `parity-${label}-`));
+  copyBooks(join(ledgers, book), join(folder, book));
+  const server = await serveBooks(repo, folder, book, port);
+  const chrome = await openChrome(chromePort);
+  try {
+    await chrome.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+    await chrome.send("Page.enable");
+    await chrome.send("Runtime.enable");
+    await chrome.send("Page.addScriptToEvaluateOnNewDocument", { source: FREEZE_CLOCK });
+    await chrome.send("Page.navigate", { url: `http://127.0.0.1:${port}/` });
+    await wait(1500);
+    // The AI page shows where the books and the app are on this computer,
+    // and the two sides run from different folders by design.
+    return withoutPaths(await chrome.evaluate(CAPTURE), [
+      [join(folder, book), "<books folder>"],
+      [resolve(repo), "<app folder>"],
+    ]);
+  } finally {
+    chrome.close();
+    server.kill();
+    await wait(800);
+    rmSync(folder, { recursive: true, force: true });
+  }
+}
+
+// --probe "<script>": open the first set of books in build A and print what
+// the script returns. For finding out what the capture should look at.
+const probe = arg("probe", "");
+if (probe !== "") {
+  const folder = mkdtempSync(join(tmpdir(), "parity-probe-"));
+  copyBooks(join(ledgers, books[0]), join(folder, books[0]));
+  const server = await serveBooks(repoA, folder, books[0], 3459);
+  const chrome = await openChrome(9449);
+  await chrome.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await chrome.send("Runtime.enable");
+  await chrome.send("Page.navigate", { url: "http://127.0.0.1:3459/" });
+  await wait(6000);
+  try {
+    console.log(JSON.stringify(await chrome.evaluate(probe), null, 1));
+    if (chrome.problems.length > 0) console.log(`PAGE ERRORS:\n${chrome.problems.slice(0, 10).join("\n")}`);
+  } finally {
+    chrome.close();
+    server.kill();
+    await wait(800);
+    rmSync(folder, { recursive: true, force: true });
+  }
+  process.exit(0);
+}
+
+let failed = 0;
+for (const book of books) {
+  if (!existsSync(join(ledgers, book))) {
+    console.error(`No books called ${book} in ${ledgers}`);
+    failed++;
+    continue;
+  }
+  console.log(`\n== ${book}`);
+  console.log("  A: " + repoA);
+  const a = await captureSide(repoA, "a", book, 3451, 9441);
+  console.log("  B: " + repoB);
+  const b = await captureSide(repoB, "b", book, 3452, 9442);
+  writeFileSync(join(outDir, `${book}.a.json`), JSON.stringify(a, null, 1));
+  writeFileSync(join(outDir, `${book}.b.json`), JSON.stringify(b, null, 1));
+  const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].sort();
+  let differ = 0;
+  for (const key of keys) {
+    if (a[key] === b[key]) continue;
+    differ++;
+    if (differ <= 25) {
+      console.log(`  DIFFERS: ${key}${a[key] === undefined ? " (only in B)" : b[key] === undefined ? " (only in A)" : ""}`);
+      if (a[key] !== undefined && b[key] !== undefined) console.log(diffText(a[key], b[key]));
+    }
+  }
+  console.log(`  ${keys.length} views compared, ${differ} differ`);
+  // Seeing nothing is not agreeing. A capture this small means the app did not
+  // open, and a pass would prove nothing.
+  if (keys.length < 20) {
+    console.log("  TOO FEW VIEWS: the app did not open properly. What it showed:", a["_meta"] ?? "(nothing)");
+    failed++;
+  }
+  if (differ > 0) failed++;
+}
+console.log(failed === 0 ? "\nPARITY: identical" : `\nPARITY: ${failed} set(s) of books differ`);
+process.exit(failed === 0 ? 0 : 1);

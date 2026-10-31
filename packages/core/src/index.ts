@@ -1,0 +1,515 @@
+/**
+ * @nzosa/core
+ *
+ * Bank flat files in, canonical transactions out.
+ *
+ * Everything here is a pure function over strings and plain objects. There is
+ * no file system, no network and no database, which is what lets the same code
+ * run in a browser tab with the file never leaving the machine, in a Node CLI,
+ * or behind a server. Storage is the caller's problem, deliberately.
+ */
+
+export { parseCsv, parseCsvRecords, findHeaderRow, normaliseHeader, spreadsheetCell } from "./csv.js";
+export type {
+  Row,
+  ReadonlyRow,
+  CsvRecord,
+  ReadonlyCsvRecord,
+  CsvParseOptions,
+  HeaderMatch,
+} from "./csv.js";
+
+export { matchInvoices } from "./invoice-matching.js";
+export type {
+  InvoiceMatch,
+  InvoiceMatchProposal,
+  InvoiceMatchOptions,
+  InvoiceMatchResult,
+} from "./invoice-matching.js";
+
+export {
+  parseDailyBalances,
+  matchBalanceAccount,
+  checkDailyBalances,
+  judgeDuplicates,
+} from "./bank-balances.js";
+export type {
+  DailyBalance,
+  BalanceSection,
+  BalanceImportResult,
+  BalanceBreak,
+  BalanceCheck,
+  DuplicateJudgement,
+  DuplicateVerdict,
+} from "./bank-balances.js";
+
+export {
+  postInvoice,
+  postDepreciation,
+  postTransfer,
+  taxTypeFromRate,
+  postTransaction,
+  postDisposal,
+  journalImbalance,
+  trialBalance,
+  taxSummary,
+  taxTypeFor,
+  isGstControlCode,
+} from "./posting.js";
+export type {
+  JournalSource,
+  TaxBasis,
+  SettledInvoice,
+  DepreciationPosting,
+  TransferPosting,
+  TaxType,
+  PostedLine,
+  PostedJournal,
+  PostingPart,
+  PostingOptions,
+  TrialBalance,
+  TrialBalanceRow,
+  TaxSummary,
+} from "./posting.js";
+
+export {
+  inferRules,
+  inferAccountUsage,
+  keywordFor,
+  ruleForLine,
+  coverage,
+} from "./rule-inference.js";
+export type {
+  CodedExample,
+  RuleProposal,
+  InferenceOptions,
+  AccountUsage,
+  AccountUse,
+} from "./rule-inference.js";
+
+export { canonicalCodeFor, matchAccountName, bareAccountName } from "./coding-names.js";
+export { knownCodes, labelForChartAccount, chartTreatments, accountLabel, splitAccountLabel, withoutStaleTreatments } from "./chart-codes.js";
+export { starterChart } from "./starter-chart.js";
+export { isSuffix, standardAccounts, suggestSuffix, suffixedCode } from "./standard-accounts.js";
+export { ACCOUNT_CODE, codeIn, isAccountCode } from "./account-code.js";
+export { identifyExport } from "./identify-export.js";
+export type { ExportKind, Identified } from "./identify-export.js";
+export { invoiceDocument, invoiceEmail, customerStatement, collectionLetter, reminderStageFor, lateFee, cleanLogo, LOGO_MAX_BYTES } from "./invoice-document.js";
+export type { InvoiceSupplier, InvoiceDocumentOptions, StatementLine, ReminderStage } from "./invoice-document.js";
+export { mergeAccount, renameAccount, renameProblem } from "./rename-account.js";
+export type { AccountReferences, RenameResult } from "./rename-account.js";
+export type { RuleFile, ImpliedTreatment } from "./chart-codes.js";
+
+export { formatChartOfAccounts } from "./chart.js";
+
+export {
+  parseFixedAssets,
+  depreciationSchedule,
+  formatDepreciationSchedule,
+} from "./assets.js";
+export type {
+  FixedAsset,
+  AssetImportResult,
+  DepreciationRow,
+  DepreciationSchedule,
+} from "./assets.js";
+
+export {
+  TAX_EXTRA_CATEGORIES,
+  taxTypeOf,
+  groupProfitAndLoss,
+  plClassForType,
+  balanceSheetRole,
+  totalExtras,
+} from "./reports.js";
+export type {
+  GroupedProfitAndLoss,
+  PlClass,
+  PlGroup,
+  TaxExtra,
+  TaxExtraCategory,
+  TaxExtraDetail,
+} from "./reports.js";
+
+export {
+  accrualProfitAndLoss,
+  profitAndLoss,
+  formatProfitAndLoss,
+  summariseForOwner,
+  formatOwnerSummary,
+  isKnownType,
+  sectionForType,
+  sectionsFromChart,
+  gstWithin,
+} from "./reports.js";
+export type {
+  AccrualOptions,
+  OwnerShare,
+  OwnerSummary,
+  ProfitAndLoss,
+  ProfitAndLossOptions,
+  ReportLine,
+  ReportSection,
+} from "./reports.js";
+
+export {
+  formatOwners,
+  ownersOf,
+  parseOwners,
+  ownersTotal,
+  shareOf,
+  sameEntityBanks,
+  BUSINESS_STRUCTURES,
+} from "./entities.js";
+export type { Owner, EntityKind, BusinessStructure } from "./entities.js";
+
+export {
+  accountEntityKey,
+  emptyEntityModel,
+  defaultEntityModel,
+  reportsNetOfGst,
+  DEFAULT_ENTITY_NAME,
+  entityId,
+  entityOfAccount,
+  entitiesOfBank,
+  validateEntityModel,
+  entityCoverage,
+  bankOwner,
+  suggestedBankOwner,
+  banksNeedingOwner,
+} from "./entities.js";
+export type {
+  Entity,
+  EntityModel,
+  AccountEntities,
+  BankEntities,
+  EntityProblem,
+} from "./entities.js";
+
+export { parseAmount, formatAmount, minorUnits } from "./money.js";
+export type { Cents } from "./money.js";
+
+export {
+  parseDate,
+  fromExcelSerial,
+  dayAfter,
+  dayBefore,
+  daysBetween,
+  daysInMonth,
+  financialYear,
+  financialYearOf,
+  inRange,
+} from "./dates.js";
+export type {
+  IsoDate,
+  DateParseOptions,
+  DateRange,
+  FinancialYearOptions,
+} from "./dates.js";
+
+export { normaliseAccountNumber, isAccountNumber, accountId } from "./accounts.js";
+
+export { hash } from "./hash.js";
+
+export {
+  importers,
+  getImporter,
+  detect,
+  detectAll,
+  importFile,
+  bnzAccount,
+  bnzCard,
+  bnzTransactionList,
+  anzLoan,
+  wise,
+  quickBooksBank,
+  isQuickBooksBankExport,
+  quickBooksBankCoding,
+  moveToAccount,
+} from "./importers/index.js";
+export type { ImportOptions } from "./importers/index.js";
+
+export { dedupe, dedupeKey, looseKey } from "./dedupe.js";
+export type {
+  DedupeEntry,
+  DedupeOptions,
+  DedupeResult,
+  DedupeStatus,
+} from "./dedupe.js";
+
+export type {
+  DetectionResult,
+  Importer,
+  ImporterContext,
+  ImportProblem,
+  ImportResult,
+  Transaction,
+  TransactionSource,
+} from "./types.js";
+
+export {
+  gstReturn,
+  gstPeriods,
+  gstDueDate,
+  gstPayBy,
+  gstContent,
+} from "./gst.js";
+export type {
+  GstBasis,
+  GstRounding,
+  GstTreatment,
+  GstSide,
+  GstClassification,
+  GstResolver,
+  GstPeriod,
+  GstPeriodOptions,
+  GstReturnBoxes,
+  GstReturnOptions,
+  GstReturnLine,
+  GstReturnResult,
+  OtherPurchase,
+} from "./gst.js";
+
+export { gstResolver, gstSideForType, DEFAULT_GST_RULES } from "./gst-rules.js";
+export type { GstRule, GstRulesOptions } from "./gst-rules.js";
+
+export {
+  categorise,
+  categoriseAll,
+  keywordMatches,
+  matchText,
+  ruleMatches,
+  ruleSearchText,
+  winningRule,
+} from "./rules.js";
+export type {
+  Sign,
+  CategoryRule,
+  CategoryDefault,
+  Categorisation,
+  MatchedBy,
+  RuleSet,
+} from "./rules.js";
+
+export { overrideFor, gstOverride } from "./overrides.js";
+export type { TransactionOverride, Overrides } from "./overrides.js";
+
+export { validateSplits, expandSplits, splitPartId, uncodedParts } from "./splits.js";
+export type { SplitPart, Splits, SplitProblem, ExpandedSplits } from "./splits.js";
+
+export {
+  parseXeroInvoices,
+  parseXeroAllocations,
+  validateInvoices,
+  invoiceGross,
+  allocateAcrossLines,
+  invoiceBalances,
+  emailForContact,
+  cleanDocumentLink,
+  isCreditNote,
+  isPosted,
+  isEstimate,
+  linesWithoutAccount,
+  paidOutsideTotal,
+} from "./invoices.js";
+export type {
+  Invoice,
+  InvoiceLine,
+  InvoiceKind,
+  InvoiceProblem,
+  InvoiceImportResult,
+  PaymentAllocation,
+  AllocationImportResult,
+  InvoiceBalance,
+  CreditAllocation,
+  InvoiceAssignment,
+  InvoiceStatus,
+  OutsidePayment,
+} from "./invoices.js";
+export * from "./bills.js";
+export * from "./xero.js";
+export * from "./days-work.js";
+export * from "./journals.js";
+export * from "./chart.js";
+export * from "./variance.js";
+export * from "./xlsx.js";
+export * from "./akahu.js";
+export * from "./filed-returns.js";
+export * from "./coding-check.js";
+
+export {
+  formatAccountTransactions,
+  accountTransactionRows,
+  gstRateName,
+  EXPORT_MARK,
+} from "./account-transactions.js";
+export type {
+  AccountTransactionRow,
+  AccountTransactionsOptions,
+} from "./account-transactions.js";
+
+export {
+  generalLedgerRows,
+  generalLedgerTotals,
+  formatGeneralLedger,
+} from "./general-ledger.js";
+export type { GeneralLedgerRow, GeneralLedgerOptions } from "./general-ledger.js";
+export * from "./ir10.js";
+export * from "./balance-sheet.js";
+export * from "./financial-years.js";
+export * from "./depreciation-journals.js";
+export * from "./disposal-journals.js";
+export * from "./post-ledger.js";
+export * from "./assignments.js";
+export * from "./coding-engine.js";
+export * from "./invoice-candidates.js";
+export * from "./payout-matching.js";
+export * from "./coding-progress.js";
+export * from "./report-labels.js";
+export * from "./trial-balance.js";
+export * from "./text.js";
+export * from "./disposal.js";
+export * from "./shareholders.js";
+export * from "./payouts.js";
+export * from "./manual-journals.js";
+export * from "./ir3.js";
+export * from "./rental-schedules.js";
+export * from "./agent-statements.js";
+export * from "./agent-statement-reading.js";
+export * from "./asset-register.js";
+export * from "./filed-return-entry.js";
+export * from "./gst-summary.js";
+export * from "./myir-income.js";
+export * from "./cash-flow.js";
+export * from "./gst-account.js";
+export * from "./leave.js";
+export * from "./gst-return-report.js";
+export * from "./ai-coding.js";
+export * from "./mcp.js";
+export * from "./ai-providers.js";
+export * from "./jev.js";
+export * from "./payroll.js";
+export * from "./nz-holidays.js";
+export * from "./year-end-adjustments.js";
+export * from "./vehicle-trips.js";
+export * from "./employee-details.js";
+export * from "./rent-tracker.js";
+export * from "./income-return.js";
+export * from "./company-tax.js";
+export * from "./ird-records.js";
+export * from "./xero-bank-accounts.js";
+export * from "./wise-api.js";
+export * from "./settled-gst.js";
+export * from "./opening-documents.js";
+export * from "./jurisdiction.js";
+export * from "./sales-tax.js";
+export * from "./form-schedules.js";
+export * from "./us-tax.js";
+export * from "./us-sales-tax.js";
+export * from "./au-tax.js";
+export * from "./au-payroll.js";
+export * from "./kr-tax.js";
+export * from "./ofx.js";
+export * from "./country-charts.js";
+export * from "./lock-dates.js";
+export * from "./sheet-ai.js";
+export * from "./nz-businesses.js";
+export * from "./property-care.js";
+export * from "./non-profit.js";
+export * from "./grants.js";
+export * from "./donation-receipts.js";
+export * from "./tier4-report.js";
+export * from "./ir9.js";
+export * from "./trust.js";
+export * from "./ir7.js";
+export * from "./ir4.js";
+export * from "./small-society.js";
+export * from "./tier3-report.js";
+
+export {
+  BETWEEN_PREFIX,
+  betweenEntityJournals,
+  betweenAccountPlan,
+  isSeparatePerson,
+  overdrawnCurrentAccounts,
+  owedBetween,
+  pairKey,
+  personPositions,
+} from "./between-entities.js";
+export type { BetweenAccount, BetweenSetting, LineChoice, OwedBetween, PlannedBetweenAccount, BetweenOverrides, BetweenTreatment, BetweenRole, PersonPosition } from "./between-entities.js";
+export { expenseClaimsFromJournals } from "./expense-claims.js";
+export type { CarriesGst } from "./expense-claims.js";
+export { writeQueue } from "./write-queue.js";
+export type { WriteQueue } from "./write-queue.js";
+export { applyPartOps, copySize, partChanges, partCopy } from "./part-changes.js";
+export { periodChoiceFrom, periodOptions, periodRange, periodSaid, yearEarlier, yearMonths } from "./report-periods.js";
+export type { PeriodChoice, PeriodOption } from "./report-periods.js";
+export { auPayslip, lastDigits, nzPayslip, payslipText, payslipsHtml } from "./payslips.js";
+export type { Payslip, PayslipLeave, PayslipRow } from "./payslips.js";
+export type { PartChanges, PartCopy, PartOp } from "./part-changes.js";
+export {
+  MAX_CATCH_UP,
+  MAX_SCHEDULES,
+  MAX_SCHEDULE_LINES,
+  RECURRING_FREQUENCIES,
+  addDays,
+  generateDue,
+  nextDate,
+  occurrence,
+  scheduleFromInvoice,
+  scheduleProblem,
+} from "./recurring-invoices.js";
+export type {
+  RecurringFrequency,
+  RecurringInvoice,
+  RecurringRun,
+  ScheduleProblem,
+} from "./recurring-invoices.js";
+export * from "./quickbooks.js";
+export * from "./contacts.js";
+export * from "./contact-lists.js";
+export * from "./reconciliation.js";
+export * from "./items.js";
+export * from "./classes.js";
+export * from "./iif.js";
+export * from "./time-entries.js";
+export * from "./slowbooks.js";
+export * from "./qb-desktop-detail.js";
+export * from "./qbo-export.js";
+export * from "./stock.js";
+export * from "./bank-columns.js";
+export * from "./product-lists.js";
+export * from "./document-dates.js";
+export * from "./xls.js";
+export * from "./simplefin.js";
+export { abaFile, auAccountParts, bankText, NZ_BANK_FORMATS, nzAccountParts, nzHashTotal, nzPaymentFile } from "./payment-files.js";
+export type { AbaOptions, BankPayment, NzBankFormat, NzPaymentFileOptions, PaymentFile, SkippedPayment } from "./payment-files.js";
+export { lineKey, moveLines, moveStillHolds, restoreMove } from "./move-lines.js";
+export type { AccountLine, LineRef, MovableBooks, MoveResult, MoveSnapshot } from "./move-lines.js";
+export { accountKeyOf, recodeElsewhere } from "./recode-elsewhere.js";
+export type { CodeKeptStores, PayrollAccountsHeld } from "./recode-elsewhere.js";
+export { isRegisterEntry, REGISTER_IMPORTER, registerProblem, registerRows, registerTransaction } from "./register.js";
+export type { RegisterDraft, RegisterRow } from "./register.js";
+export { allocationProblem, creditsOnAccount, proposeAllocations } from "./credit-on-account.js";
+export type { CreditOnAccount, CreditSource } from "./credit-on-account.js";
+export { ATTACHMENT_LIMIT, attachmentProblem, attachmentsOf, documentOwner, moveAttachments, newAttachmentId, sizeWords } from "./attachments.js";
+export type { Attachment, AttachmentOwner } from "./attachments.js";
+export { isMyobAccounts, isMyobJournal, parseMyobAccounts, parseMyobBooks, parseMyobJournal } from "./myob.js";
+export type { MyobAccounts } from "./myob.js";
+export { fillWording, STANDARD_WORDING, unknownBlanks, WORDING_BLANKS, wordingFor } from "./email-wording.js";
+export type { Wording, WordingKind } from "./email-wording.js";
+export { salesBy } from "./sales-by.js";
+export type { SalesBy, SalesRow } from "./sales-by.js";
+export { paidTo } from "./paid-to.js";
+export type { PaidTo } from "./paid-to.js";
+export * from "./quick-entry.js";
+export * from "./jobs.js";
+export * from "./sub-accounts.js";
+export * from "./analytics.js";
+export * from "./search-books.js";
+export * from "./gnucash.js";
+export * from "./chart-import.js";
+export * from "./fingerprint.js";
+export * from "./date-check.js";
+export * from "./fx.js";
+export * from "./suggested.js";

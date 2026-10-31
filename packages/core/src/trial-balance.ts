@@ -1,0 +1,337 @@
+import type { Cents } from "./money.js";
+import type { IsoDate } from "./dates.js";
+import { parseAmount } from "./money.js";
+import { parseCsvRecords, findHeaderRow } from "./csv.js";
+import type { OpeningBalances } from "./balance-sheet.js";
+
+/**
+ * Reading a trial balance, which is the right source for opening balances.
+ *
+ * A printed balance sheet is not. It is stated in whole dollars, so its
+ * components round one way and its totals another, and a set of figures read
+ * off it cannot be made to balance without inventing an amount to absorb the
+ * difference. Doing exactly that on one real set of books hid five errors: the
+ * fixed asset account held net book value rather than cost, its accumulated
+ * depreciation was missing, a whole vehicle was missing, the shareholder loan
+ * was shown net of drawings, and three accounts were out by cents.
+ *
+ * A trial balance has none of those problems. Every account appears, cost and
+ * accumulated depreciation stand apart as the ledger holds them, and the cents
+ * are there, so the figures balance on their own.
+ */
+
+export interface TrialBalanceAccount {
+  /** Chart code. Empty for bank accounts, which the export leaves uncoded. */
+  code: string;
+  name: string;
+  /** The chart's own type, e.g. `Fixed Asset`. */
+  type: string;
+  /** `Asset`, `Liability`, `Equity`, `Revenue` or `Expense`. */
+  klass: string;
+  /** Balance at each date the report carries, debit positive. */
+  byDate: Record<string, Cents>;
+}
+
+export interface TrialBalance {
+  /** The report's own date, from its heading. */
+  asAt: IsoDate | null;
+  /** Every balance column, in the order the report gives them. */
+  dates: string[];
+  accounts: TrialBalanceAccount[];
+  problems: { message: string; line: number }[];
+  /**
+   * True when the export had no Account Class column, so each account's class
+   * was worked out from its Account Type instead. Said where the file is
+   * loaded, because a type nobody recognises is then left in the balances.
+   */
+  classFromType: boolean;
+}
+
+/**
+ * The class of an account, from its Xero account type: what decides whether it
+ * is carried into a new year (assets, liabilities, equity) or closed off into
+ * retained earnings (revenue and expenses). For a trial balance exported
+ * without its Account Class column. Empty for a type not recognised.
+ */
+export function classFromType(type: string): string {
+  const t = type.trim().toLowerCase();
+  if (t === "") return "";
+  if (["revenue", "sales", "other income", "income"].includes(t)) return "Revenue";
+  if (["direct costs", "expense", "expenses", "overhead", "overheads", "depreciation"].includes(t)) return "Expense";
+  if (t.includes("equity") || t === "retained earnings") return "Equity";
+  if (t.includes("liabilit") || t === "accounts payable" || t === "gst" || t === "historical" || t === "rounding" || t === "unpaid expense claims") {
+    return "Liability";
+  }
+  if (t.includes("asset") || ["bank", "inventory", "prepayment", "accounts receivable", "tracking"].includes(t)) return "Asset";
+  return "";
+}
+
+const REQUIRED = ["Account", "Account Type"];
+
+/** `31 Mar 2025` and `As at 31 March 2026` both become `2025-03-31`. */
+function isoFrom(text: string): IsoDate | null {
+  const months: Record<string, string> = {
+    jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+    jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+  };
+  const match = /(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})/.exec(text);
+  if (!match) return null;
+  const month = months[(match[2] ?? "").slice(0, 3).toLowerCase()];
+  if (month === undefined) return null;
+  return `${match[3]}-${month}-${(match[1] ?? "").padStart(2, "0")}`;
+}
+
+/**
+ * Read a trial balance export.
+ *
+ * Xero writes one row per account. The report's own date comes as a pair of
+ * columns, "Debit - Year to date" and "Credit - Year to date" (or "YTD Debit"
+ * and "YTD Credit"): for a balance sheet account that pair is its balance on
+ * the report's date, and for an income or expense account the year's total,
+ * which an opening balance leaves out anyway. Prior years follow as one
+ * signed column each, headed by their date.
+ *
+ * The month's debit and credit are movements, not balances, and are skipped:
+ * taking one for a balance would state a month's turnover as an opening
+ * figure. Missing the year-to-date pair was how a trial balance "as at 31
+ * March 2026" offered only 2025, 2024 and 2023 -- and the date the books
+ * needed was not on the list.
+ */
+export function parseTrialBalance(text: string): TrialBalance {
+  const records = parseCsvRecords(text);
+  const header = findHeaderRow(records, REQUIRED);
+  if (!header) {
+    return {
+      asAt: null,
+      dates: [],
+      accounts: [],
+      problems: [{ message: "Not a trial balance: an Account column is needed.", line: 0 }],
+      classFromType: false,
+    };
+  }
+
+  const heading = records
+    .slice(0, header.index)
+    .map((r) => (r.fields ?? []).join(" "))
+    .join(" ");
+
+  const columns = records[header.index]?.fields ?? [];
+  const at = (name: string): number => columns.findIndex((c) => c.trim() === name);
+  const codeAt = at("Account Code");
+  const nameAt = at("Account");
+  const typeAt = at("Account Type");
+  const classAt = at("Account Class");
+
+  // A balance column is one headed by a date. Everything else on the row is a
+  // movement, a label, or a running total, and none of those is a balance.
+  const dateColumns: { index: number; label: string; iso: IsoDate }[] = [];
+  columns.forEach((label, index) => {
+    const iso = isoFrom(label);
+    if (iso !== null) dateColumns.push({ index, label: label.trim(), iso });
+  });
+
+  // The report's own date, as a debit and a credit for the year to date.
+  const asAt = isoFrom(heading);
+  const ytd = (side: "debit" | "credit"): number =>
+    columns.findIndex((c) => {
+      const t = c.trim().toLowerCase();
+      return (t.startsWith(side) && t.includes("year to date")) || t === `ytd ${side}`;
+    });
+  const ytdDebit = ytd("debit");
+  const ytdCredit = ytd("credit");
+  const ownDate =
+    asAt !== null && ytdDebit >= 0 && ytdCredit >= 0 && !dateColumns.some((c) => c.iso === asAt)
+      ? asAt
+      : null;
+
+  const accounts: TrialBalanceAccount[] = [];
+  const problems: { message: string; line: number }[] = [];
+
+  for (let i = header.index + 1; i < records.length; i += 1) {
+    const fields = records[i]?.fields ?? [];
+    const name = (fields[nameAt] ?? "").trim();
+    if (name === "") continue;
+
+    const byDate: Record<string, Cents> = {};
+    if (ownDate !== null) {
+      const debit = (fields[ytdDebit] ?? "").trim();
+      const credit = (fields[ytdCredit] ?? "").trim();
+      if (debit !== "" || credit !== "") {
+        byDate[ownDate] = (parseAmount(debit || "0") ?? 0) - (parseAmount(credit || "0") ?? 0);
+      }
+    }
+    for (const column of dateColumns) {
+      const raw = (fields[column.index] ?? "").trim();
+      if (raw === "") continue;
+      const cents = parseAmount(raw);
+      if (cents === null) continue;
+      byDate[column.iso] = cents;
+    }
+    if (Object.keys(byDate).length === 0) continue;
+
+    accounts.push({
+      code: (fields[codeAt] ?? "").trim(),
+      name,
+      type: (fields[typeAt] ?? "").trim(),
+      // Without an Account Class column, every row's class would be empty and
+      // its revenue and expenses carried in as opening balances, leaving
+      // retained earnings at nothing. The type says the same, nearly always.
+      klass: classAt >= 0 ? (fields[classAt] ?? "").trim() : classFromType(fields[typeAt] ?? ""),
+      byDate,
+    });
+  }
+
+  if (accounts.length === 0) {
+    problems.push({ message: "No accounts with balances were found.", line: header.index });
+  }
+
+  return {
+    asAt,
+    // The report's own date first, as the report orders its columns.
+    dates: [...(ownDate !== null ? [ownDate] : []), ...dateColumns.map((c) => c.iso)],
+    accounts,
+    problems,
+    classFromType: classAt < 0,
+  };
+}
+
+export interface OpeningBalancesFromTrialBalance {
+  balances: OpeningBalances;
+  /**
+   * The figure retained earnings had to be for the rest to balance.
+   *
+   * Named rather than folded in silently. A trial balance taken at a year end
+   * shows that year's revenue and expenses as well as the balances, and those
+   * close off into retained earnings when the year does -- so the account is
+   * usually absent from the column, and its opening figure is what the balance
+   * sheet accounts leave over. Anybody looking at these numbers is entitled to
+   * know which one was derived.
+   */
+  retainedEarnings: Cents;
+  /** True when the export already carried a retained earnings figure. */
+  retainedEarningsGiven: boolean;
+  /** Accounts left out because they are revenue or expense. */
+  skipped: string[];
+}
+
+/**
+ * Turn one column of a trial balance into opening balances.
+ *
+ * `retainedEarningsCode` is where the balancing figure goes -- 960 in a Xero
+ * chart. Revenue and expense accounts are left out: a new year starts them at
+ * nothing, and their closing figures are already inside retained earnings.
+ */
+export function openingBalancesFrom(
+  trialBalance: TrialBalance,
+  date: IsoDate,
+  options: { retainedEarningsCode?: string; bankAccountFor?: (name: string) => string | undefined } = {},
+): OpeningBalancesFromTrialBalance {
+  const retainedCode = options.retainedEarningsCode ?? "960";
+  const accounts: Record<string, Cents> = {};
+  const skipped: string[] = [];
+  let total = 0;
+  let given = false;
+
+  for (const account of trialBalance.accounts) {
+    const cents = account.byDate[date];
+    if (cents === undefined || cents === 0) continue;
+
+    const klass = account.klass.trim().toLowerCase();
+    if (klass === "revenue" || klass === "expense") {
+      skipped.push(account.name);
+      continue;
+    }
+
+    // A bank account has no chart code, and this ledger keys it by the account
+    // number rather than by the name the export prints. The caller knows the
+    // mapping; without one the name is used, which at least keeps the figure.
+    const key =
+      account.code !== ""
+        ? account.code
+        : (options.bankAccountFor?.(account.name) ?? account.name.trim());
+
+    accounts[key] = (accounts[key] ?? 0) + cents;
+    total += cents;
+    if (account.code === retainedCode) given = true;
+  }
+
+  // Whatever is left over is retained earnings, because that is what retained
+  // earnings is: everything the company has earned and not distributed. If the
+  // export named it too, this adds to that rather than replacing it.
+  const balancing = -total;
+  if (balancing !== 0) accounts[retainedCode] = (accounts[retainedCode] ?? 0) + balancing;
+
+  return {
+    balances: {
+      asAt: date,
+      source: `Trial balance, ${date} column`,
+      accounts,
+    },
+    retainedEarnings: accounts[retainedCode] ?? 0,
+    retainedEarningsGiven: given,
+    skipped,
+  };
+}
+
+/**
+ * QuickBooks Online's Trial Balance: a title, "As of Oct 15, 2026", and rows
+ * of Account Name, Debit and Credit -- no codes and no types, which come from
+ * the chart the same books were given, matched by the account's whole name.
+ */
+export function isQuickBooksTrialBalance(text: string): boolean {
+  const head = text.slice(0, 2000);
+  return /Trial Balance/i.test(head) && findHeaderRow(parseCsvRecords(head), ["Account Name", "Debit", "Credit"]) !== null;
+}
+
+export function parseQuickBooksTrialBalance(
+  text: string,
+  chart: readonly { code: string; name: string; type: string }[],
+): TrialBalance {
+  const records = parseCsvRecords(text);
+  const header = findHeaderRow(records, ["Account Name", "Debit", "Credit"]);
+  const empty: TrialBalance = { asAt: null, dates: [], accounts: [], problems: [], classFromType: true };
+  if (header === null) return { ...empty, problems: [{ message: "Not a QuickBooks trial balance.", line: 0 }] };
+  const months: Record<string, string> = {
+    jan: "01", feb: "02", mar: "03", apr: "04", may: "05", jun: "06",
+    jul: "07", aug: "08", sep: "09", oct: "10", nov: "11", dec: "12",
+  };
+  const heading = records.slice(0, header.index).map((r) => r.fields.join(" ")).join(" ");
+  const dated = /As of\s+([A-Za-z]{3,9})\s+(\d{1,2}),?\s+(\d{4})/i.exec(heading);
+  const month = dated === null ? undefined : months[(dated[1] ?? "").slice(0, 3).toLowerCase()];
+  const asAt: IsoDate | null =
+    dated === null || month === undefined ? null : `${dated[3]}-${month}-${(dated[2] ?? "").padStart(2, "0")}`;
+  if (asAt === null) return { ...empty, problems: [{ message: "No 'As of' date in the heading.", line: 0 }] };
+
+  const byName = new Map(chart.map((a) => [a.name.trim().toLowerCase(), a]));
+  const columns = records[header.index]?.fields ?? [];
+  const nameAt = columns.findIndex((c) => c.trim() === "Account Name");
+  const debitAt = columns.findIndex((c) => c.trim() === "Debit");
+  const creditAt = columns.findIndex((c) => c.trim() === "Credit");
+  const accounts: TrialBalanceAccount[] = [];
+  const problems: { message: string; line: number }[] = [];
+  for (const record of records.slice(header.index + 1)) {
+    const name = (record.fields[nameAt] ?? "").trim();
+    // The total row, and the report's footer ("Accrual Basis ..."), which has no figures.
+    const figures = `${record.fields[debitAt] ?? ""}${record.fields[creditAt] ?? ""}`.trim();
+    if (name === "" || /^total\b/i.test(name) || figures === "") continue;
+    const debit = parseAmount((record.fields[debitAt] ?? "").replace(/[$,]/g, "") || "0", "USD");
+    const credit = parseAmount((record.fields[creditAt] ?? "").replace(/[$,]/g, "") || "0", "USD");
+    if (debit === null || credit === null) {
+      if ((record.fields[debitAt] ?? "") !== "" || (record.fields[creditAt] ?? "") !== "") {
+        problems.push({ message: `Unreadable amount for ${name}`, line: record.line });
+      }
+      continue;
+    }
+    const charted = byName.get(name.toLowerCase());
+    if (charted === undefined) problems.push({ message: `${name} is not in the chart`, line: record.line });
+    const type = charted?.type ?? "";
+    accounts.push({
+      code: charted?.code ?? "",
+      name,
+      type,
+      klass: classFromType(type),
+      byDate: { [asAt]: debit - credit },
+    });
+  }
+  return { asAt, dates: [asAt], accounts, problems, classFromType: true };
+}

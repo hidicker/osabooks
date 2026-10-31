@@ -1,0 +1,207 @@
+import { DEMO_PERSONAS, currentDemoPersona, personaCountry } from "../demo-personas.js";
+import { flagIcon } from "../flags.js";
+import { loadDemoData } from "../migrate/setup-wizard.js";
+import { runLesson } from "./engine.js";
+import { placeExampleSuggestions } from "./examples.js";
+import type { Lesson } from "./engine.js";
+import { LESSONS } from "./lessons.js";
+
+/**
+ * The Tutorials page: short lessons on the real app, in any order.
+ *
+ * Shown by itself whenever somebody arrives at the demo, and from the
+ * banner after that. Progress is kept in this browser and nowhere else.
+ */
+
+const PROGRESS = "nzosa:tutorials";
+
+type Progress = Record<string, { status: "started" | "done"; step: number }>;
+
+function progress(): Progress {
+  try {
+    const held = JSON.parse(localStorage.getItem(PROGRESS) ?? "{}") as unknown;
+    return held !== null && typeof held === "object" ? (held as Progress) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveProgress(next: Progress): void {
+  try {
+    localStorage.setItem(PROGRESS, JSON.stringify(next));
+  } catch {
+    // Without storage the lessons still run; they just start at the top.
+  }
+}
+
+function el<K extends keyof HTMLElementTagNameMap>(tag: K, className: string, text?: string): HTMLElementTagNameMap[K] {
+  const e = document.createElement(tag);
+  e.className = className;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+
+let panel: HTMLDialogElement | null = null;
+
+export function closeTutorials(): void {
+  panel?.close();
+  panel?.remove();
+  panel = null;
+}
+
+async function start(lesson: Lesson): Promise<void> {
+  closeTutorials();
+  const held = progress()[lesson.id];
+  const from = held?.status === "started" ? held.step : 0;
+  const end = await runLesson(lesson, from);
+  const next = progress();
+  if (end.how === "done") next[lesson.id] = { status: "done", step: 0 };
+  else if (end.how === "later") next[lesson.id] = { status: "started", step: end.step };
+  else if (next[lesson.id]?.status !== "done") delete next[lesson.id];
+  saveProgress(next);
+  // Back to the list after finishing, so the next lesson is one press away.
+  if (end.how === "done") openTutorials();
+}
+
+function lessonCard(lesson: Lesson, held: Progress[string] | undefined, nextUp: boolean): HTMLElement {
+  const card = el("article", nextUp ? "tut-lesson tut-lesson-next" : "tut-lesson");
+  const text = el("div", "tut-lesson-text");
+  if (nextUp) text.append(el("span", "tut-lesson-flag", "Next up"));
+  text.append(el("h3", "tut-lesson-title", lesson.title), el("p", "tut-lesson-summary", lesson.summary));
+  const status = held?.status === "done" ? "Done" : held?.status === "started" ? "Started" : "Not started";
+  text.append(el("span", "tut-lesson-meta", `${lesson.minutes} min · ${status}`));
+
+  const go = el(
+    "button",
+    nextUp ? "primary" : "",
+    held?.status === "done" ? "Again" : held?.status === "started" ? "Continue" : "Start",
+  );
+  go.type = "button";
+  go.addEventListener("click", () => {
+    if (held?.status === "done") {
+      const next = progress();
+      delete next[lesson.id];
+      saveProgress(next);
+    }
+    void start(lesson);
+  });
+  card.append(text, go);
+  return card;
+}
+
+/** Which set of invented books to look at, as cards. Only those ready to show. */
+function booksChooser(): HTMLElement | null {
+  const ready = DEMO_PERSONAS.filter((p) => p.ready === true);
+  if (ready.length < 2) return null;
+  const current = currentDemoPersona();
+  const open = ready.find((p) => p.id === current) ?? ready[0];
+  // The set that is open, said plainly, with the others one press away: the
+  // choice of books is a different thing from the lessons below it.
+  const wrap = el("details", "tut-books");
+  const summary = el("summary", "tut-books-summary");
+  const said = el("span", "tut-books-said");
+  const openCountry = personaCountry(open);
+  said.append(el("span", "tut-books-label", "Demo books"), flagIcon(openCountry.id, openCountry.name), el("strong", "", open?.label ?? ""));
+  summary.append(said, el("span", "tut-books-change", "Change"));
+  wrap.append(summary, el("p", "tut-books-hint", "Whose invented books to explore. Each set has lessons of its own."));
+  const list = el("div", "tut-book-list");
+  list.setAttribute("role", "radiogroup");
+  for (const persona of ready) {
+    const on = persona.id === current;
+    const choice = el("button", on ? "tut-book tut-book-on" : "tut-book");
+    choice.type = "button";
+    choice.setAttribute("role", "radio");
+    choice.setAttribute("aria-checked", on ? "true" : "false");
+    const text = el("span", "tut-book-text");
+    text.append(el("strong", "", persona.label), el("span", "", persona.shows));
+    const country = personaCountry(persona);
+    choice.append(el("span", "tut-book-mark"), flagIcon(country.id, country.name), text);
+    if (on) choice.append(el("span", "tut-book-now", "Open now"));
+    choice.addEventListener("click", () => {
+      if (on) return;
+      closeTutorials();
+      const busy = document.createElement("button");
+      // Back to the lessons once the new books are in, or straight back if
+      // the change was called off: the panel is where the choice was made.
+      void loadDemoData(busy, persona.id).finally(() => {
+        placeExampleSuggestions();
+        openTutorials();
+      });
+    });
+    list.append(choice);
+  }
+  wrap.append(list);
+  return wrap;
+}
+
+export function openTutorials(): void {
+  closeTutorials();
+
+  const box = document.createElement("dialog");
+  box.className = "tut-panel";
+  box.setAttribute("aria-label", "Tutorials");
+
+  const head = el("div", "tut-panel-head");
+  const close = el("button", "tut-panel-close", "Close");
+  close.type = "button";
+  close.addEventListener("click", () => closeTutorials());
+  head.append(el("h2", "", "Tutorials"), close);
+
+  const body = el("div", "tut-panel-body");
+  body.append(
+    el(
+      "p",
+      "tut-panel-intro",
+      "Short, hands-on lessons on the real app, using the demo books. Do them in any order, and come back any time.",
+    ),
+  );
+  const chooser = booksChooser();
+  if (chooser !== null) body.append(chooser);
+
+  const held = progress();
+  const books = currentDemoPersona();
+  const lessons = LESSONS.filter((l) => l.books === undefined || l.books.includes(books));
+  if (chooser !== null) {
+    const label = DEMO_PERSONAS.find((p) => p.id === books)?.label ?? "";
+    const heading = el("div", "tut-lessons-head");
+    heading.append(el("h3", "tut-section-title", "Lessons"), el("span", "tut-lessons-for", `for ${label.charAt(0).toLowerCase()}${label.slice(1)}`));
+    body.append(heading);
+  }
+  const nextUp = lessons.find((l) => held[l.id]?.status !== "done");
+  for (const lesson of lessons) body.append(lessonCard(lesson, held[lesson.id], lesson === nextUp));
+
+  box.append(head, body);
+  box.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    closeTutorials();
+  });
+  box.addEventListener("click", (event) => {
+    // A press on the dimmed space around the panel closes it.
+    if (event.target === box) closeTutorials();
+  });
+  document.body.append(box);
+  panel = box;
+  box.showModal();
+}
+
+/**
+ * Open the Tutorials page whenever somebody arrives at the demo, once the
+ * books have loaded: it is where the demo starts, and Close is one press.
+ *
+ * Waits for the loading screen to go, so it opens over the real app rather
+ * than over a spinner; gives up quietly if that never happens.
+ */
+export function openTutorialsOnArrival(): void {
+  const began = Date.now();
+  const check = window.setInterval(() => {
+    const loading = document.getElementById("app-loading");
+    const gone = loading === null || loading.hidden || loading.offsetParent === null;
+    if (gone) {
+      window.clearInterval(check);
+      placeExampleSuggestions();
+      window.setTimeout(() => openTutorials(), 400);
+    } else if (Date.now() - began > 20_000) {
+      window.clearInterval(check);
+    }
+  }, 300);
+}
