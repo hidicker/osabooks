@@ -1,0 +1,7 @@
+# For the old folder, nbparagliding.nz/nzosa/, once the app lives at
+# nbparagliding.nz/osabooks/. Uploaded there by hand as ".htaccess" (the
+# deploy no longer reaches that folder). Every old address, the /home/ credit
+# link and anything a sign-in returns to, goes to the same place at the new
+# address, its query kept; a fragment after # is kept by the browser.
+RewriteEngine On
+RewriteRule ^(.*)$ https://nbparagliding.nz/osabooks/$1 [R=301,L,QSA]

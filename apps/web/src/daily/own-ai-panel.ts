@@ -13,7 +13,7 @@ import { note } from "../ui.js";
  */
 
 /** The extension, built with each release of the site. */
-export const EXTENSION_URL = "https://nbparagliding.nz/nzosa/nzosa.mcpb";
+export const EXTENSION_URL = "https://nbparagliding.nz/osabooks/nzosa.mcpb";
 
 function copyButton(label: string, text: () => string, said: HTMLElement): HTMLButtonElement {
   const button = document.createElement("button");

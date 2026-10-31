@@ -24,7 +24,7 @@ const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 const SMTP_HOST = Deno.env.get("SMTP_HOST") ?? "";
 const SMTP_USER = Deno.env.get("SMTP_USER") ?? "";
 const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD") ?? "";
-const APP_URL = Deno.env.get("APP_URL") ?? "https://nbparagliding.nz/nzosa/";
+const APP_URL = Deno.env.get("APP_URL") ?? "https://nbparagliding.nz/osabooks/";
 /** Where a warning goes when one person sends a lot of invitations. A secret, so the address is not in the code. */
 const ALERT_EMAIL = Deno.env.get("ALERT_EMAIL") ?? "";
 
