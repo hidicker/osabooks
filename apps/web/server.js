@@ -149,7 +149,7 @@ function scheduleMorning(ledgerRoot) {
   const script = join(dirname(fileURLToPath(import.meta.url)), "nightly.js");
   const xml = `<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
-  <RegistrationInfo><Description>Gets NZOSA's books ready: checks the bank feed and suggests codes. Turned on in NZOSA.</Description></RegistrationInfo>
+  <RegistrationInfo><Description>Gets OsaBooks's books ready: checks the bank feed and suggests codes. Turned on in OsaBooks.</Description></RegistrationInfo>
   <Triggers>
     <CalendarTrigger>
       <StartBoundary>2026-01-01T06:00:00</StartBoundary>
@@ -581,7 +581,7 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
   const already = heldBy(folderOf(current));
   if (already !== null) {
     throw new Error(
-      `These books are already open in another NZOSA (process ${already.pid}` +
+      `These books are already open in another OsaBooks (process ${already.pid}` +
         `${already.since ? `, since ${already.since}` : ""}).\n` +
         `Close that one first, or start this with --ledger <another name>.`,
     );
@@ -822,7 +822,7 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
       if (path === "/api/ledger/archive" && request.method === "POST") {
         // Any set of books, not only the open one, so they can be cleared from
         // the Books page without opening each in turn. Named books are checked
-        // and refused if another NZOSA has them: clearing a folder somebody
+        // and refused if another OsaBooks has them: clearing a folder somebody
         // else is writing to is how two processes disagree about what the
         // books are.
         const body = await readJson(request, "{}");
@@ -836,7 +836,7 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
           const busy = heldBy(folderOf(target));
           if (busy !== null) {
             send(response, 409, {
-              error: `Those books are open in another NZOSA (process ${busy.pid}).`,
+              error: `Those books are open in another OsaBooks (process ${busy.pid}).`,
             });
             return;
           }
@@ -1745,7 +1745,7 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
           const busy = heldBy(folderOf(target));
           if (busy !== null) {
             send(response, 409, {
-              error: `Those books are open in another NZOSA (process ${busy.pid}).`,
+              error: `Those books are open in another OsaBooks (process ${busy.pid}).`,
             });
             return;
           }
@@ -1783,7 +1783,7 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
         const busy = heldBy(folderOf(id));
         if (busy !== null) {
           send(response, 409, {
-            error: `Those books are open in another NZOSA (process ${busy.pid}).`,
+            error: `Those books are open in another OsaBooks (process ${busy.pid}).`,
           });
           return;
         }

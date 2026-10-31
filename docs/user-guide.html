@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NZOSA: a guide for owners</title>
+<title>OsaBooks: a guide for owners</title>
 <style>
 :root { --ink: #14171a; --quiet: #5b6570; --line: #e3e6ea; --page: #fff;
   --soft: #f6f8fa; --link: #1a5fb4; }
@@ -80,7 +80,7 @@ strong { font-weight: 650; }
       <a href="#licence-and-liability">Licence and liability</a>
     </nav>
     <main>
-<h1 id="nzosa-a-guide-for-owners">NZOSA: a guide for owners</h1>
+<h1 id="nzosa-a-guide-for-owners">OsaBooks: a guide for owners</h1>
 <p>For the person whose business this is. No accounting background assumed.</p>
 <p>If you are the accountant, read the <a href="accountant-guide.md">guide for accountants</a> instead. If you are changing the code, read the <a href="developer-guide.md">guide for developers</a>.</p>
 <hr>
@@ -100,27 +100,27 @@ strong { font-weight: 650; }
 <p><strong>Back it up.</strong> In folder mode, copy the folder. Wherever you are, <code>Books → Download a backup</code> (also on Bank import) writes everything to a single file you can keep somewhere else, the coding rules and the history included, and <code>Restore from a backup</code> puts it all back.</p>
 <hr>
 <h2 id="running-it-on-your-own-computer">Running it on your own computer</h2>
-<p>The demo online is for looking at. For books of your own you run NZOSA on your own machine, which takes about ten minutes once.</p>
+<p>The demo online is for looking at. For books of your own you run OsaBooks on your own machine, which takes about ten minutes once.</p>
 <p>You are not "installing an app" in the usual sense: you are putting a folder on your computer and double-clicking a file in it. Nothing goes into Program Files, nothing runs at startup, and nothing phones home.</p>
 <h3 id="1-install-node-js">1. Install Node.js</h3>
 <p>Go to <a href="https://nodejs.org">nodejs.org</a> and download the <strong>LTS</strong> version — the one on the left, marked "Recommended For Most Users". Run the installer and accept every default.</p>
-<p>Node.js is the engine NZOSA runs on. You will never open it or see it again.</p>
-<h3 id="2-get-the-nzosa-folder">2. Get the NZOSA folder</h3>
+<p>Node.js is the engine OsaBooks runs on. You will never open it or see it again.</p>
+<h3 id="2-get-the-nzosa-folder">2. Get the OsaBooks folder</h3>
 <p>You will be given either a ZIP file or a link. Download it and <strong>unzip it somewhere you will find again</strong> — Documents is a good choice, and somewhere inside a folder that is backed up is better.</p>
-<p>Do not run it from inside the ZIP. Windows will let you open files in a ZIP without unpacking it, and NZOSA will fail in confusing ways if you do.</p>
+<p>Do not run it from inside the ZIP. Windows will let you open files in a ZIP without unpacking it, and OsaBooks will fail in confusing ways if you do.</p>
 <h3 id="3-start-it">3. Start it</h3>
 <p>Open the folder and double-click:</p>
 <ul><li><strong>Windows</strong> — <code>NZOSA.cmd</code></li><li><strong>Mac</strong> — <code>NZOSA.command</code></li></ul>
-<p>The first time, it spends a minute or two fetching what it needs and building itself. A black window shows what it is doing; that is normal, and it closes on its own. Your browser then opens at NZOSA.</p>
+<p>The first time, it spends a minute or two fetching what it needs and building itself. A black window shows what it is doing; that is normal, and it closes on its own. Your browser then opens at OsaBooks.</p>
 <p>To stop it, double-click <strong><code>Stop NZOSA</code></strong> in the same folder. Closing the browser tab does not stop it.</p>
 <h3 id="if-something-gets-in-the-way">If something gets in the way</h3>
 <p><strong>Windows says it protected your PC.</strong> Click <em>More info</em>, then <em>Run anyway</em>. This is SmartScreen not recognising a file that few people have downloaded; it is not a virus warning.</p>
 <p><strong>Mac says it is from an unidentified developer.</strong> Right-click <code>NZOSA.command</code>, choose <strong>Open</strong>, then <strong>Open</strong> again in the box that appears. You only do this once.</p>
 <p><strong>Mac says it cannot be opened, or opens it in a text editor.</strong> The file lost its permission to run, which happens with some ways of downloading. Open Terminal, type <code>chmod +x </code> (with the space), drag <code>NZOSA.command</code> into the window, and press Enter. Then double-click it as normal.</p>
 <p><strong>Nothing happens, or the window flashes and vanishes.</strong> Node.js is probably not installed, or was installed after you first tried. Restart the computer and try again.</p>
-<p><strong>It says NZOSA is already running.</strong> It is — the launcher reopens your browser at it rather than starting a second copy.</p>
+<p><strong>It says OsaBooks is already running.</strong> It is — the launcher reopens your browser at it rather than starting a second copy.</p>
 <h3 id="where-your-books-end-up">Where your books end up</h3>
-<p>In a folder called <code>ledgers</code> inside the NZOSA folder, as ordinary files. Back that up the way you back up anything else you would hate to lose. There is no copy anywhere else, and nobody can recover it for you.</p>
+<p>In a folder called <code>ledgers</code> inside the OsaBooks folder, as ordinary files. Back that up the way you back up anything else you would hate to lose. There is no copy anywhere else, and nobody can recover it for you.</p>
 <h3 id="updating">Updating</h3>
 <p>You will be given a new folder. Copy your <code>ledgers</code> folder out of the old one and into the new one before you start it. Your books are those files; everything else is just the software.</p>
 <hr>
@@ -196,10 +196,10 @@ strong { font-weight: 650; }
 <p>Online, it loads by itself: anything you see there is invented, and you can change it freely. On your own machine it opens in books of its own, from <strong>Setup → Demo data</strong>, so nothing of yours is touched.</p>
 <hr>
 <h2 id="licence-and-liability">Licence and liability</h2>
-<p>NZOSA is free software under the GNU Affero General Public Licence, version 3 or later, with the additional terms in NOTICE. You may run, study, share and change it; if you change it and let other people use your version over a network, you have to offer them its source too, keep the credit "NZOSA, by hidicker" with its link, and give your version a name of its own. It is provided as is, with no warranty. Nobody who wrote or distributes it is liable if a figure is wrong.</p>
+<p>OsaBooks is free software under the GNU Affero General Public Licence, version 3 or later, with the additional terms in NOTICE. You may run, study, share and change it; if you change it and let other people use your version over a network, you have to offer them its source too, keep the credit "OsaBooks, by hidicker" with its link, and give your version a name of its own. It is provided as is, with no warranty. Nobody who wrote or distributes it is liable if a figure is wrong.</p>
 <p>You remain responsible for what you file. Check the figures.</p>
       <p class="foot">
-        NZOSA &mdash; free accounting for New Zealand. Free software under the
+        OsaBooks &mdash; free accounting for New Zealand. Free software under the
         GNU AGPL v3 with the additional terms in NOTICE, provided as is and without warranty of any kind.
         Built from <code>user-guide.md</code>.
       </p>

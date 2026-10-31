@@ -1,7 +1,7 @@
 /**
  * AI suggestions on the site's shared key, for any copy without a key of its own.
  *
- * The online demo uses it, and so does NZOSA downloaded and run on somebody's
+ * The online demo uses it, and so does OsaBooks downloaded and run on somebody's
  * own computer when their books have no key. Both draw on the one pool.
  *
  * Separate from `gemini` on purpose. That one serves books kept on the server

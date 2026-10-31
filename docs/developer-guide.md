@@ -1,4 +1,4 @@
-# NZOSA: a guide for developers
+# OsaBooks: a guide for developers
 
 Architecture, data model, the invariants that must not be broken, and the
 mistakes this codebase has already made so you do not repeat them.
@@ -248,7 +248,7 @@ Two things about them are load-bearing:
 - **A busy port never falls back to the next one.** Browser storage is per
   origin, so a different port is a different database; moving silently would
   show someone an empty app and their work would look lost. `build.js` instead
-  fetches the port, and if `<title>NZOSA</title>` comes back it opens that
+  fetches the port, and if `<title>OsaBooks</title>` comes back it opens that
   copy and exits 0; otherwise it prints a plain-English message and exits 1.
 
 `tsconfig` runs with `exactOptionalPropertyTypes`, so `{ x: undefined }` is not

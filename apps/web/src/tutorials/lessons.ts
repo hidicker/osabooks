@@ -47,8 +47,8 @@ const opened = (): boolean => document.querySelector("#reports-body tr.report-be
 export const LESSONS: readonly Lesson[] = [
   {
     id: "welcome",
-    title: "Get to know NZOSA",
-    summary: "What NZOSA does, how the menu is arranged, and where your books live.",
+    title: "Get to know OsaBooks",
+    summary: "What OsaBooks does, how the menu is arranged, and where your books live.",
     minutes: 2,
     steps: [
       {
@@ -56,11 +56,11 @@ export const LESSONS: readonly Lesson[] = [
         body: () =>
           (noSalesTax()
             ? currentDemoPersona() === "us-company"
-              ? "NZOSA turns your bank files into a coded, double-entry set of books, and from those your " +
+              ? "OsaBooks turns your bank files into a coded, double-entry set of books, and from those your " +
                 "financial statements, the Form 941 payroll worksheet and the corporation's Form 1120 tax. "
-              : "NZOSA turns your bank files into a coded, double-entry set of books, and from those your " +
+              : "OsaBooks turns your bank files into a coded, double-entry set of books, and from those your " +
                 "financial statements and the figures for Schedule C, Schedule E and 1099-NEC. "
-            : "NZOSA turns your bank files into a coded, double-entry set of books, and from those your GST returns, " +
+            : "OsaBooks turns your bank files into a coded, double-entry set of books, and from those your GST returns, " +
               "financial statements and tax returns. ") +
           (DEMO_PERSONAS.find((p) => p.id === currentDemoPersona())?.about ?? ""),
         page: "reconcile",
@@ -131,8 +131,8 @@ export const LESSONS: readonly Lesson[] = [
     title: "Code a bank line",
     get summary() {
       return noSalesTax()
-        ? "Give a bank line its account, confirm it, and see what NZOSA learns from it."
-        : "Give a bank line its account and GST, confirm it, and see what NZOSA learns from it.";
+        ? "Give a bank line its account, confirm it, and see what OsaBooks learns from it."
+        : "Give a bank line its account and GST, confirm it, and see what OsaBooks learns from it.";
     },
     minutes: 3,
     steps: [
@@ -140,7 +140,7 @@ export const LESSONS: readonly Lesson[] = [
         title: "Bank lines to code",
         body:
           "Every line from your bank files and feeds lands here until it has an account. Coding is most of " +
-          "bookkeeping, so this is where the time goes, and where NZOSA saves the most of it.",
+          "bookkeeping, so this is where the time goes, and where OsaBooks saves the most of it.",
         page: "reconcile",
         target: firstLine,
       },
@@ -153,7 +153,7 @@ export const LESSONS: readonly Lesson[] = [
         title: "The account",
         body: () =>
           suggested()
-            ? "NZOSA has already suggested one, from how lines like this were coded before. Type in the box to " +
+            ? "OsaBooks has already suggested one, from how lines like this were coded before. Type in the box to " +
               "choose a different account."
             : "Nothing like this line has been coded before, so there is no suggestion yet. Type in the box to " +
               "search the accounts: a name or a number.",
@@ -205,7 +205,7 @@ export const LESSONS: readonly Lesson[] = [
       {
         title: "A known New Zealand business",
         body:
-          "NZOSA also recognises well-known New Zealand businesses, such as fuel stations, phone companies and " +
+          "OsaBooks also recognises well-known New Zealand businesses, such as fuel stations, phone companies and " +
           "couriers, and suggests the one account in your chart that fits. It needs no AI and sends nothing anywhere.",
         target: lineSuggestedBy(/^Known business/),
         // New Zealand's directory: elsewhere there may be no such line to show.
@@ -251,13 +251,13 @@ export const LESSONS: readonly Lesson[] = [
         title: "Email it",
         body:
           "Opens a new message in your own mail program, addressed to the customer and saying what is owing, " +
-          "and saves the invoice to attach. NZOSA never sends mail itself.",
+          "and saves the invoice to attach. OsaBooks never sends mail itself.",
         target: withText("#invoices-body .invoice-send", /^email$/),
       },
       {
         title: "Matched to the bank",
         body:
-          "When a payment arrives, NZOSA finds the invoice it settles: by the invoice number in the reference, " +
+          "When a payment arrives, OsaBooks finds the invoice it settles: by the invoice number in the reference, " +
           "then by amount and date. This says how it knew. Anything less certain waits for you to confirm.",
         target: visible("#invoices-body td.match-how"),
       },
@@ -661,7 +661,7 @@ export const LESSONS: readonly Lesson[] = [
       {
         title: "Drop them in",
         body:
-          "Drop both files, or the zip, on Setup or on Start here. NZOSA works out what each one is: the chart becomes the " +
+          "Drop both files, or the zip, on Setup or on Start here. OsaBooks works out what each one is: the chart becomes the " +
           "chart, the bank and card postings become bank lines, invoices and bills come in with their payments, " +
           "and the rest of the entries become journals. From QuickBooks Desktop, drop its IIF file of lists and " +
           "its Transaction Detail by Account report: the lists bring the accounts, customers and vendors, the " +

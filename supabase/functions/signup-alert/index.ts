@@ -4,7 +4,7 @@
  * Called by the database the moment an account is made (see the
  * 20261014090000_signup_alert migration), with the same key the morning run
  * uses, so only the database can start it. It emails the owner's alert address
- * from NZOSA's mailbox: who, by which way in, and how many accounts there are
+ * from OsaBooks's mailbox: who, by which way in, and how many accounts there are
  * now against the ceiling.
  *
  * Failing to send is not an error anywhere that matters: the account exists
@@ -51,9 +51,9 @@ Deno.serve(async (request: Request) => {
   const total = Number(body.total ?? 0);
   const ceiling = Number(body.ceiling ?? 15);
 
-  const subject = `NZOSA: new online sign-up (${total} of ${ceiling})`;
+  const subject = `OsaBooks: new online sign-up (${total} of ${ceiling})`;
   const text =
-    `Somebody has signed up for NZOSA online.\n\n` +
+    `Somebody has signed up for OsaBooks online.\n\n` +
     `Name: ${name === "" ? "(not given)" : name}\n` +
     `Email: ${email}\n` +
     `Signed up with: ${provider === "google" ? "Google" : "email and password"}\n` +
@@ -63,7 +63,7 @@ Deno.serve(async (request: Request) => {
     connection: { hostname: SMTP_HOST, port: 465, tls: true, auth: { username: SMTP_USER, password: SMTP_PASSWORD } },
   });
   try {
-    await client.send({ from: `NZOSA <${SMTP_USER}>`, to: ALERT_EMAIL, subject, content: text });
+    await client.send({ from: `OsaBooks <${SMTP_USER}>`, to: ALERT_EMAIL, subject, content: text });
     return reply({ sent: true });
   } catch (error) {
     return reply({ sent: false, said: error instanceof Error ? error.message : "could not send" }, 502);

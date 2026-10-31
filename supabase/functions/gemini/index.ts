@@ -1,7 +1,7 @@
 /**
  * Asking a model, for books kept on the server.
  *
- * NZOSA run from a folder keeps its key in a file beside the ledgers and the
+ * OsaBooks run from a folder keeps its key in a file beside the ledgers and the
  * page never sees it. This is that same arrangement moved to a server: the key
  * is in Supabase Vault and this function is the only thing that can read it.
  *

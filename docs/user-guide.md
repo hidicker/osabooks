@@ -1,4 +1,4 @@
-# NZOSA: a guide for owners
+# OsaBooks: a guide for owners
 
 For the person whose business this is. No accounting background assumed.
 
@@ -43,7 +43,7 @@ The app tells you which mode you are in: with a folder behind it, the ledger's n
 
 ## Running it on your own computer
 
-The demo online is for looking at. For books of your own you run NZOSA on your own machine, which takes about ten minutes once.
+The demo online is for looking at. For books of your own you run OsaBooks on your own machine, which takes about ten minutes once.
 
 You are not "installing an app" in the usual sense: you are putting a folder on your computer and double-clicking a file in it. Nothing goes into Program Files, nothing runs at startup, and nothing phones home.
 
@@ -51,13 +51,13 @@ You are not "installing an app" in the usual sense: you are putting a folder on 
 
 Go to [nodejs.org](https://nodejs.org) and download the **LTS** version — the one on the left, marked "Recommended For Most Users". Run the installer and accept every default.
 
-Node.js is the engine NZOSA runs on. You will never open it or see it again.
+Node.js is the engine OsaBooks runs on. You will never open it or see it again.
 
-### 2. Get the NZOSA folder
+### 2. Get the OsaBooks folder
 
 You will be given either a ZIP file or a link. Download it and **unzip it somewhere you will find again** — Documents is a good choice, and somewhere inside a folder that is backed up is better.
 
-Do not run it from inside the ZIP. Windows will let you open files in a ZIP without unpacking it, and NZOSA will fail in confusing ways if you do.
+Do not run it from inside the ZIP. Windows will let you open files in a ZIP without unpacking it, and OsaBooks will fail in confusing ways if you do.
 
 ### 3. Start it
 
@@ -66,7 +66,7 @@ Open the folder and double-click:
 * **Windows** — `NZOSA.cmd`
 * **Mac** — `NZOSA.command`
 
-The first time, it spends a minute or two fetching what it needs and building itself. A black window shows what it is doing; that is normal, and it closes on its own. Your browser then opens at NZOSA.
+The first time, it spends a minute or two fetching what it needs and building itself. A black window shows what it is doing; that is normal, and it closes on its own. Your browser then opens at OsaBooks.
 
 To stop it, double-click **`Stop NZOSA`** in the same folder. Closing the browser tab does not stop it.
 
@@ -80,11 +80,11 @@ To stop it, double-click **`Stop NZOSA`** in the same folder. Closing the browse
 
 **Nothing happens, or the window flashes and vanishes.** Node.js is probably not installed, or was installed after you first tried. Restart the computer and try again.
 
-**It says NZOSA is already running.** It is — the launcher reopens your browser at it rather than starting a second copy.
+**It says OsaBooks is already running.** It is — the launcher reopens your browser at it rather than starting a second copy.
 
 ### Where your books end up
 
-In a folder called `ledgers` inside the NZOSA folder, as ordinary files. Back that up the way you back up anything else you would hate to lose. There is no copy anywhere else, and nobody can recover it for you.
+In a folder called `ledgers` inside the OsaBooks folder, as ordinary files. Back that up the way you back up anything else you would hate to lose. There is no copy anywhere else, and nobody can recover it for you.
 
 ### Updating
 
@@ -258,6 +258,6 @@ Online, it loads by itself: anything you see there is invented, and you can chan
 
 ## Licence and liability
 
-NZOSA is free software under the GNU Affero General Public Licence, version 3 or later, with the additional terms in NOTICE. You may run, study, share and change it; if you change it and let other people use your version over a network, you have to offer them its source too, keep the credit "NZOSA, by hidicker" with its link, and give your version a name of its own. It is provided as is, with no warranty. Nobody who wrote or distributes it is liable if a figure is wrong.
+OsaBooks is free software under the GNU Affero General Public Licence, version 3 or later, with the additional terms in NOTICE. You may run, study, share and change it; if you change it and let other people use your version over a network, you have to offer them its source too, keep the credit "OsaBooks, by hidicker" with its link, and give your version a name of its own. It is provided as is, with no warranty. Nobody who wrote or distributes it is liable if a figure is wrong.
 
 You remain responsible for what you file. Check the figures.

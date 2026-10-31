@@ -6,7 +6,7 @@ import { answerConnectRequest, connectRequest, currentSession, signIn, signInWit
  *
  * Shown instead of the app, because it is a question to answer and go back:
  * allow it, and the browser returns to Claude (or whichever app asked) signed
- * in; refuse, and it returns without. Somebody not yet signed in to NZOSA is
+ * in; refuse, and it returns without. Somebody not yet signed in to OsaBooks is
  * asked to first, here, and the question is asked after.
  */
 
@@ -37,7 +37,7 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
   screen.textContent = "";
   const card = el("section", "", "connect-card");
   screen.append(card);
-  card.append(el("h1", "Connect an AI app to NZOSA"));
+  card.append(el("h1", "Connect an AI app to OsaBooks"));
 
   if (!signedIn()) {
     signInHere(card, () => void draw(screen, id));
@@ -59,13 +59,13 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
 
   const name = asked.client?.client_name ?? asked.client?.name ?? "An AI app";
   card.append(
-    el("p", `${name} is asking to connect to NZOSA as ${currentSession()?.email ?? "you"}.`, "connect-who"),
+    el("p", `${name} is asking to connect to OsaBooks as ${currentSession()?.email ?? "you"}.`, "connect-who"),
     el("p", "Allowed, it can, for any set of books you give it the connector address of:"),
   );
   const can = el("ul");
   for (const line of [
     "read the books: transactions, accounts, coding and entities;",
-    "suggest codes, splits and journals, which wait in NZOSA until you use or decline each one.",
+    "suggest codes, splits and journals, which wait in OsaBooks until you use or decline each one.",
   ]) {
     can.append(el("li", line));
   }
@@ -101,7 +101,7 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
 }
 
 function signInHere(card: HTMLElement, then: () => void): void {
-  card.append(el("p", "Sign in to NZOSA first, with the account your books are kept under."));
+  card.append(el("p", "Sign in to OsaBooks first, with the account your books are kept under."));
   const form = el("form", "", "connect-signin");
   const email = el("input");
   email.type = "email";

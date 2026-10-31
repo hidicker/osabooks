@@ -3,7 +3,7 @@ import type { Cents } from "./money.js";
 import type { IsoDate } from "./dates.js";
 
 /**
- * United States federal forms for the people NZOSA suits best there: landlords
+ * United States federal forms for the people OsaBooks suits best there: landlords
  * (Schedule E, part I, one column per property) and sole proprietors
  * (Schedule C), with the contractors who need a 1099-NEC and the quarterly
  * estimated tax dates.

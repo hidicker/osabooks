@@ -307,7 +307,7 @@ export async function handleFiles(files: File[]): Promise<void> {
             account: "",
             count: 0,
             problems: [],
-            error: "A layout NZOSA doesn't know yet: point out its columns below, and it comes in.",
+            error: "A layout OsaBooks doesn't know yet: point out its columns below, and it comes in.",
           });
           continue;
         }
@@ -948,7 +948,7 @@ async function drawFeed(): Promise<void> {
     body.append(
       note(
         "A bank feed needs the app running on your own computer, or books on the server. " +
-          "Start NZOSA from its shortcut, or sign in.",
+          "Start OsaBooks from its shortcut, or sign in.",
       ),
     );
     return;
@@ -1101,7 +1101,7 @@ function fillFeed(body: HTMLElement, status: FeedStatus | null): void {
   box.addEventListener("change", () => {
     void feedAutoFetch(box.checked);
   });
-  auto.append(box, " Fetch new transactions when NZOSA opens");
+  auto.append(box, " Fetch new transactions when OsaBooks opens");
   body.append(auto, morningChoice());
 
   if (status.pending && status.pending.length > 0) {

@@ -5,7 +5,7 @@ import { note } from "../ui.js";
 /**
  * Use your own AI app: Claude, Cursor, VS Code, LM Studio and the rest.
  *
- * NZOSA's MCP server lets the AI app somebody already uses read these books
+ * OsaBooks's MCP server lets the AI app somebody already uses read these books
  * and suggest codes, splits and journals, which wait here until they are
  * saved. This panel is how they connect it: the Claude Desktop extension to
  * download, or the settings for any other app, with this computer's paths
@@ -70,7 +70,7 @@ function forFolder(inner: HTMLElement): void {
   inner.append(
     heading("Claude Desktop"),
     steps([
-      ["Download the ", Object.assign(document.createElement("a"), { href: EXTENSION_URL, textContent: "NZOSA books extension", download: "nzosa.mcpb" }), "."],
+      ["Download the ", Object.assign(document.createElement("a"), { href: EXTENSION_URL, textContent: "OsaBooks extension", download: "nzosa.mcpb" }), "."],
       ["In Claude Desktop, open Settings, Extensions, and open the file you downloaded."],
       ["When it asks for the books folder, choose this one: ", where],
       ["Turn on Let Claude suggest for codes, splits and journals. Left off, Claude only reads."],
@@ -91,7 +91,7 @@ function forFolder(inner: HTMLElement): void {
 
   void folderPaths().then((paths) => {
     if (paths === null) {
-      where.textContent = "the folder NZOSA keeps these books in.";
+      where.textContent = "the folder OsaBooks keeps these books in.";
       settings.hidden = true;
       copy.hidden = true;
       return;
@@ -99,7 +99,7 @@ function forFolder(inner: HTMLElement): void {
     where.textContent = "";
     where.append(code(paths.books), " ", copyButton("Copy", () => paths.books, said));
     if (paths.mcpServer === null) {
-      settings.textContent = "This copy of NZOSA has no MCP server built. Start NZOSA with NZOSA.cmd (or NZOSA.command) to build it.";
+      settings.textContent = "This copy of OsaBooks has no MCP server built. Start OsaBooks with NZOSA.cmd (or NZOSA.command) to build it.";
       return;
     }
     settings.textContent = JSON.stringify(
@@ -125,14 +125,14 @@ function forOnline(inner: HTMLElement, book: string): void {
     heading("Claude (on the web, the desktop app or a phone)"),
     steps([
       ["Open Settings, Connectors, and choose Add custom connector."],
-      ["Name it NZOSA, paste the address above, and add it."],
-      ["Choose Connect. Sign in to NZOSA when asked, and allow it."],
-      ["In a chat, turn the NZOSA connector on and ask: “Suggest codes for this month's uncoded lines.”"],
+      ["Name it OsaBooks, paste the address above, and add it."],
+      ["Choose Connect. Sign in to OsaBooks when asked, and allow it."],
+      ["In a chat, turn the OsaBooks connector on and ask: “Suggest codes for this month's uncoded lines.”"],
     ]),
     heading("ChatGPT and other apps"),
     note(
       "Any app that takes a remote MCP connector with sign-in can use the same address. In ChatGPT, adding your own " +
-        "connector needs developer mode, in its settings under connectors. The app asks you to sign in to NZOSA and allow it, as above.",
+        "connector needs developer mode, in its settings under connectors. The app asks you to sign in to OsaBooks and allow it, as above.",
     ),
     note(
       "Each set of books has its own address, and only people who are members of these books can connect to them. " +
@@ -150,7 +150,7 @@ export function ownAiPanel(): HTMLElement {
   inner.append(
     note(
       "The AI app you already use — Claude, or one of the others below — can read these books and suggest codes, " +
-        "splits and journals for you to check here. It uses your own subscription, not a key in NZOSA.",
+        "splits and journals for you to check here. It uses your own subscription, not a key in OsaBooks.",
     ),
   );
   const kind = backendKind();
@@ -160,7 +160,7 @@ export function ownAiPanel(): HTMLElement {
     forOnline(inner, openCloudBookId());
   } else {
     inner.append(
-      note("This needs NZOSA running on your own computer, with the books in a folder there, or books kept online."),
+      note("This needs OsaBooks running on your own computer, with the books in a folder there, or books kept online."),
     );
   }
   return box;

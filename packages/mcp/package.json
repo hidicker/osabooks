@@ -1,7 +1,7 @@
 {
   "name": "@nzosa/mcp",
   "version": "0.1.0",
-  "description": "An MCP server over a folder of NZOSA books, for an AI client on the same machine: reads, and with --suggest suggests changes for the person to use in NZOSA.",
+  "description": "An MCP server over a folder of books kept in OsaBooks, for an AI client on the same machine: reads, and with --suggest suggests changes for the person to use in OsaBooks.",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "bin": {

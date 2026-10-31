@@ -1,4 +1,4 @@
-# NZOSA outside New Zealand
+# OsaBooks outside New Zealand
 
 Books can be kept in another country. The engine is the same everywhere:
 - double entry and coding learned from past decisions
@@ -43,7 +43,7 @@ The facts are in `packages/core/src/jurisdiction.ts`. The web app reads them thr
 
 ## Returns and reports by country
 
-**New Zealand:** everything NZOSA has always done:
+**New Zealand:** everything OsaBooks has always done:
 - GST returns, IR10, IR3 and IR3R
 - payroll and myIR
 - Akahu
@@ -72,7 +72,7 @@ Modules tagged `countries: ["nz"]`, and pages marked `data-module="nz"` or `busi
 - An income tax estimate for each owner: resident rates (2024–25 to 2027–28, with the 14% rate from 1 July 2027), the low income tax offset, the small business income tax offset on business income (not rent), and the Medicare levy with the single low-income reduction (the latest threshold held, for a year whose own is not set yet)
 - The full BAS as well as the simpler one: G1, G2, G3, G10 and G11 with 1A and 1B, and the ATO's G1–G20 calculation worksheet beneath. G1 includes GST-free and input taxed sales; only entities registered for GST are on it (a rental kept as its own unregistered entity is not)
 - Payroll (`au-payroll.ts`, the Payroll page): employees, pay runs, PAYG withheld by the ATO's Schedule 1 formula (scales 1 to 4, with the coefficients from 1 July 2024 and from 1 July 2026, checked against the ATO's worked examples; Medicare levy variations and declared tax offsets are for the employer to take off), the super guarantee at 12% with the annual maximum contribution base from 2026-27, and when each pay's super is due (7 business days from 1 July 2026, quarterly before). Pay runs post wages and super, and what is owed to employees, the ATO and the funds; W1 and W2 go on the BAS
-- Single Touch Payroll: each pay event's figures and year to date, to report through STP-enabled software. NZOSA does not lodge STP itself
+- Single Touch Payroll: each pay event's figures and year to date, to report through STP-enabled software. OsaBooks does not lodge STP itself
 - Study and training support loans: the ATO's Schedule 8 component from 24 September 2025 and from 1 July 2026; before that, the marginal repayment from 2025-26 (nothing to $67,000, 15c to $125,000, 17c above, 10% of the whole from $179,286) withheld on top of PAYG, on thresholds lowered by the tax-free threshold where it is not claimed
 - Depreciation (core `assets.ts`, `depreciationRules()` in the web app): by the days an asset is held in the books' own year, from the day it was bought; prime cost or diminishing value, with an effective life on the Fixed assets page setting the rate (200% or 100% of life). An asset disposed of is depreciated to the day it went, and the balancing adjustment note says the whole of a gain is assessable
 - The accountant's workbook carries the BAS, rental property schedule and tax estimate in place of New Zealand's GST return, filed returns and IR3 sheets

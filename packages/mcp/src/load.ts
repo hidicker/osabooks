@@ -78,7 +78,7 @@ export class BookShelf {
     });
 
     return {
-      name: meta.name ?? "NZOSA books",
+      name: meta.name ?? "OsaBooks",
       transactions,
       entities,
       chart,

@@ -512,7 +512,7 @@ function dateQuestion(number: number, held: Onboarding): HTMLElement {
   inner.append(
     held.source === "xero"
       ? advice(
-          `The day NZOSA takes over from Xero. The first day of a financial year (${yearStartSaid()} ` +
+          `The day OsaBooks takes over from Xero. The first day of a financial year (${yearStartSaid()} ` +
             `for most) is the cleanest: the whole year's reports, depreciation and ${taxReturnWord()} then ` +
             "come from one system, and the opening balances are year-end figures your " +
             "accountant has already signed off.",
@@ -1356,7 +1356,7 @@ function theirOwnBooks(held: Onboarding): HTMLElement {
     wrap.append(
       note(
         `These books are ${theirs}'s. A browser holds one set of books; to keep one per ` +
-          "entity, run NZOSA on your own computer or sign in to keep them on the server.",
+          "entity, run OsaBooks on your own computer or sign in to keep them on the server.",
       ),
     );
     return wrap;
@@ -1730,12 +1730,12 @@ function filesQuestion(number: number, held: Onboarding): HTMLElement {
         `File the last ${gstReturnWord()} that ends before it.`,
         "Converting at a year end: have your accountant's year-end journals posted, so the " +
           "trial balance is the one the accounts were signed from.",
-        "Keep access to Xero until your first year in NZOSA is filed. The history stays " +
+        "Keep access to Xero until your first year in OsaBooks is filed. The history stays " +
           "there if a question comes up.",
       ]),
       note(`${have} of ${files.length} loaded.`),
       table(
-        ["Export", "Where in Xero", "What it gives NZOSA"],
+        ["Export", "Where in Xero", "What it gives OsaBooks"],
         files.map((f) => [f.have ? `\u2713 ${f.what}` : f.what, f.where, f.why]),
       ),
       // Under the list of what to get, rather than above it: there is nothing
@@ -1773,7 +1773,7 @@ function quickBooksQuestion(number: number, held: Onboarding): HTMLElement {
   inner.append(
     advice(
       "Export these from the system you are leaving, then drop them below, together or one at a time. " +
-        "NZOSA works out what each file is.",
+        "OsaBooks works out what each file is.",
     ),
     // One table for each system: what is needed to rebuild the books, then
     // what fills in the rest -- the people, the price list, when things are due.
@@ -1926,7 +1926,7 @@ function quickBooksQuestion(number: number, held: Onboarding): HTMLElement {
       ),
     ),
     note(
-      "Drop them all together, CSV, Excel or a zip as QuickBooks gives it, MYOB's text files or GnuCash's CSV: NZOSA reads the accounts and the ledger first, then the rest. " +
+      "Drop them all together, CSV, Excel or a zip as QuickBooks gives it, MYOB's text files or GnuCash's CSV: OsaBooks reads the accounts and the ledger first, then the rest. " +
         "Where a report asks for a date range, choose All dates, so nothing from before it is left out.",
     ),
     dropZone(),
@@ -1938,7 +1938,7 @@ function quickBooksQuestion(number: number, held: Onboarding): HTMLElement {
     inner.append(
       advice(
         `${brought} bank and card lines are in. Each carries the account it was coded to in the system you ` +
-          "are leaving. Accept that coding on the coding check, where anything that differs from NZOSA's own " +
+          "are leaving. Accept that coding on the coding check, where anything that differs from OsaBooks's own " +
           "suggestion is shown first.",
       ),
       actions(button("Check and accept the coding", () => showPage("check"), true)),
@@ -2063,7 +2063,7 @@ function codedHistory(held: Onboarding): HTMLElement {
   const wrap = document.createElement("div");
   wrap.append(
     advice(
-      `Transactions already coded, in ${previousSystem()}. NZOSA compares its coding with ` +
+      `Transactions already coded, in ${previousSystem()}. OsaBooks compares its coding with ` +
         "yours: where they agree, the coding becomes a rule; where they differ, you choose.",
     ),
   );
@@ -2317,7 +2317,7 @@ function modulesQuestion(number: number, held: Onboarding): HTMLElement {
   const following = MODULES.filter((m) => !ASKED.includes(m.id) && moduleOn(m.id)).map((m) => m.name);
   inner.append(
     note(
-      "NZOSA shows only what these books use, so nothing else is in the way. " +
+      "OsaBooks shows only what these books use, so nothing else is in the way. " +
         (following.length > 0
           ? `From your entities and where these books came from, they cover: ${following.join(", ")}. `
           : "") +
@@ -2396,7 +2396,7 @@ function aiQuestion(number: number, held: Onboarding): HTMLElement {
         [
           "prompt",
           "Copy prompts to an AI I already use",
-          "No key: NZOSA gives you the question, you paste the answer back",
+          "No key: OsaBooks gives you the question, you paste the answer back",
         ],
         ["none", "No AI for these books", "Everything by hand and by rules. It can be turned on later"],
       ],
@@ -2527,7 +2527,7 @@ function xeroGuide(held: Onboarding): HTMLElement {
   }
   add(
     "p",
-    `The day NZOSA takes over. The first day of a financial year (${yearStartSaid()} for most) is the ` +
+    `The day OsaBooks takes over. The first day of a financial year (${yearStartSaid()} for most) is the ` +
       `cleanest: the whole year's reports, depreciation and ${taxReturnWord()} then come from one system, ` +
       "and the opening balances are year-end figures your accountant has already signed off.",
   );
@@ -2547,13 +2547,13 @@ function xeroGuide(held: Onboarding): HTMLElement {
   );
   guide.append(
     table(
-      ["Export", "Where in Xero", "What it gives NZOSA"],
+      ["Export", "Where in Xero", "What it gives OsaBooks"],
       xeroMigrationFiles().map((f) => [f.have ? `✓ ${f.what}` : f.what, f.where, f.why]),
     ),
   );
   add(
     "p",
-    "Bank transactions do not come from Xero. NZOSA reads them from the bank itself, through " +
+    "Bank transactions do not come from Xero. OsaBooks reads them from the bank itself, through " +
       "a bank feed or the bank's own CSV exports, so they are the bank's record rather than " +
       "Xero's copy of it.",
   );
@@ -2583,11 +2583,11 @@ function xeroGuide(held: Onboarding): HTMLElement {
   add(
     "p",
     "Before trusting the new books, prove they agree with the old ones. Run each Xero report " +
-      "for the same date as the NZOSA one beside it.",
+      "for the same date as the OsaBooks one beside it.",
   );
   guide.append(
     table(
-      ["Check", "In NZOSA", "Against", "Should show"],
+      ["Check", "In OsaBooks", "Against", "Should show"],
       [
         [
           "Trial balance",
@@ -2637,10 +2637,10 @@ function xeroGuide(held: Onboarding): HTMLElement {
 
   add("h4", "5. After the conversion date");
   items("ul", [
-    "Code new transactions in NZOSA only. Entering them in both is how the two drift apart " +
+    "Code new transactions in OsaBooks only. Entering them in both is how the two drift apart " +
       "without anybody noticing.",
     "Payments for invoices raised in Xero are matched to the invoices brought across.",
-    "At year end, give your accountant the reports from NZOSA. The journal report and trial " +
+    "At year end, give your accountant the reports from OsaBooks. The journal report and trial " +
       "balance are the ones they will ask for first.",
   ]);
 

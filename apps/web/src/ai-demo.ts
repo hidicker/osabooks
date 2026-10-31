@@ -70,7 +70,7 @@ async function shared<T>(body: Record<string, unknown>): Promise<T & { error?: s
 /**
  * The shared pool, for any copy with no key of its own.
  *
- * The demo uses it, and so does a copy of NZOSA downloaded and run on
+ * The demo uses it, and so does a copy of OsaBooks downloaded and run on
  * somebody's own computer whose books have no key: one allowance for all of
  * them together, reset by the site owner. Nothing here knows or asks who is
  * calling -- the pool is what bounds it.

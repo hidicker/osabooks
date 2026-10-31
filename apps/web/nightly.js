@@ -67,7 +67,7 @@ async function serverFor(id) {
   const folder = join(ledgerRoot, id);
   const held = heldBy(folder);
   if (held !== null) {
-    if (!held.port) throw new Error("open in an NZOSA too old to be asked; skipped until it is restarted");
+    if (!held.port) throw new Error("open in an OsaBooks too old to be asked; skipped until it is restarted");
     return { base: `http://127.0.0.1:${held.port}`, stop: () => {} };
   }
   const started = await startServer({ port: 0, ledgerRoot, ledgerId: id });
@@ -96,7 +96,7 @@ async function runOne(id, runner) {
   const server = await serverFor(id);
   try {
     const status = await api(server.base, "status");
-    if (status.ledger !== id) throw new Error(`the running NZOSA has ${status.ledger} open, not ${id}`);
+    if (status.ledger !== id) throw new Error(`the running OsaBooks has ${status.ledger} open, not ${id}`);
 
     const feed = await api(server.base, "feed");
     const ai = await api(server.base, "ai");

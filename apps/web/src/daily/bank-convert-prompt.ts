@@ -1,11 +1,11 @@
 /**
- * A prompt for any AI to turn a bank export into one NZOSA reads.
+ * A prompt for any AI to turn a bank export into one OsaBooks reads.
  *
  * Banks write their exports a dozen ways -- separate debit and credit columns,
  * a running balance, a heading above the table, an Excel file rather than a
- * CSV -- and NZOSA reads a handful of them. Rather than an importer for each,
+ * CSV -- and OsaBooks reads a handful of them. Rather than an importer for each,
  * this asks an AI the person already uses to rewrite the file in the layout
- * NZOSA's BNZ account reader takes, which carries every field a bank line
+ * OsaBooks's BNZ account reader takes, which carries every field a bank line
  * has. The rules are the ones that keep the money right: nothing added,
  * dropped or merged, money in positive, and a total at the end to check
  * against the bank.
@@ -13,7 +13,7 @@
 
 import { note } from "../ui.js";
 
-/** The header row NZOSA's BNZ account reader takes, in order. */
+/** The header row OsaBooks's BNZ account reader takes, in order. */
 export const BANK_COLUMNS = [
   "Date",
   "Amount",
@@ -33,7 +33,7 @@ export const BANK_COLUMNS = [
 
 export function bankConvertPrompt(): string {
   return [
-    "Please convert the bank export I attach into a CSV file that NZOSA, a New Zealand accounting app, can import.",
+    "Please convert the bank export I attach into a CSV file that OsaBooks, a New Zealand accounting app, can import.",
     "",
     "Write one CSV file for each bank account in it, with exactly this header row:",
     BANK_COLUMNS.join(","),
@@ -63,7 +63,7 @@ export function bankConvertPanel(): HTMLElement {
   fold.append(
     note(
       "Give the prompt and your bank's file to any AI you use (ChatGPT, Claude, Gemini). It writes the file " +
-        "in the layout NZOSA reads; drop that here. Check its total against your bank before you rely on it. " +
+        "in the layout OsaBooks reads; drop that here. Check its total against your bank before you rely on it. " +
         "Your bank file goes to that AI's company, under its terms.",
     ),
   );

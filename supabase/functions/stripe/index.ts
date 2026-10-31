@@ -4,7 +4,7 @@
  * Each business connects its own Stripe account with a key it makes there.
  * The key is in Supabase Vault and this function is the only thing that can
  * read it. The money goes to the business's own Stripe account, and Stripe
- * pays it out to the business's bank: NZOSA holds none of it.
+ * pays it out to the business's bank: OsaBooks holds none of it.
  *
  * What it does, asked by the page:
  *   status   whether a key is connected, and to which account

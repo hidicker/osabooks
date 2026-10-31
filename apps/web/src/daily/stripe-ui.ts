@@ -33,7 +33,7 @@ let status: { book: string; answer: Promise<Status | null>; known?: Status | nul
 /** When Stripe was last asked, for which books: not more than once a minute unless asked. */
 let checked = { book: "", at: 0 };
 
-/** Whether these books can use Stripe at all: kept online, on NZOSA's own server. */
+/** Whether these books can use Stripe at all: kept online, on OsaBooks's own server. */
 export function stripePossible(): boolean {
   return backendKind() === "cloud" && openCloudBookId() !== "" && !usingOwnProject();
 }

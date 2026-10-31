@@ -237,7 +237,7 @@ function offerIt(): HTMLElement {
   // said Google to somebody whose key was Anthropic's.
   careful.textContent =
     "This sends some of what is in these books to an AI provider: the one your own key is " +
-    "for, or Google's on the NZOSA demo key. Exactly this:";
+    "for, or Google's on the OsaBooks demo key. Exactly this:";
   wrap.append(careful);
 
   const list = document.createElement("ul");
@@ -259,7 +259,7 @@ function offerIt(): HTMLElement {
   whose.className = "ai-careful";
   whose.textContent =
     "With your own key, data goes to the AI provider under your account. Without one, it " +
-    "uses the NZOSA demo key, through that account. For a client's books, get their consent " +
+    "uses the OsaBooks demo key, through that account. For a client's books, get their consent " +
     "first. It is off until you turn it on, separately for each set of books.";
   wrap.append(whose);
 
@@ -520,7 +520,7 @@ function autoSuggestChoice(): HTMLElement {
   });
   label.append(
     box,
-    ` Suggest codes for waiting lines when NZOSA opens (up to ${AI_OWN_BATCH} lines each time, on your own key)`,
+    ` Suggest codes for waiting lines when OsaBooks opens (up to ${AI_OWN_BATCH} lines each time, on your own key)`,
   );
   return label;
 }

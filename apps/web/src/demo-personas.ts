@@ -2,7 +2,7 @@
  * The sets of invented books the online demo can be viewed as.
  *
  * The coffee roastery with two rentals is the demo. The others exist so a
- * visitor can see the parts of NZOSA it never shows -- a society's grants, a
+ * visitor can see the parts of OsaBooks it never shows -- a society's grants, a
  * trust's people and IR6, a person's own IR3 -- without having to know those
  * pages are there: each page only appears for books that use it.
  *

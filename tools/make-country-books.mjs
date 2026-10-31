@@ -1,5 +1,5 @@
 /**
- * Invented books for each country NZOSA can keep, for walking the country
+ * Invented books for each country OsaBooks can keep, for walking the country
  * packs end to end: a US landlord with a side business, an Australian
  * landlord registered for GST through a small business, and a Korean sole
  * trader with a rental. Every name and number is made up.

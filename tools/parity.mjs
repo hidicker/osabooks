@@ -1,5 +1,5 @@
 /**
- * Parity: two builds of NZOSA, the same books, the same answers.
+ * Parity: two builds of OsaBooks, the same books, the same answers.
  *
  * Opens each build's app on a fresh copy of the same set of books, in
  * headless Chrome, and walks it the way a person would: every page under
@@ -67,7 +67,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * A copy of a set of books, less its lock. The ".open-by" file says which
- * NZOSA has the books open; copied, it made the copy look open too, and the
+ * OsaBooks has the books open; copied, it made the copy look open too, and the
  * build refused to start on it.
  */
 function copyBooks(from, to) {

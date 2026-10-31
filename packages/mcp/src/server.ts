@@ -8,7 +8,7 @@ import { ToolError } from "./tools.js";
  *   nzosa-mcp --books <folder> [--entities a,b] [--max-rows 200] [--suggest]
  *
  * With --suggest it may also suggest codes, splits and journals, kept in a
- * file beside the books until somebody uses them in NZOSA. Without it, it
+ * file beside the books until somebody uses them in OsaBooks. Without it, it
  * writes nothing at all.
  *
  * Started by the client (Claude Desktop, Claude Code) as a child process. It

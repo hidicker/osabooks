@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Only the latest version of NZOSA gets security fixes. Update before
+Only the latest version of OsaBooks gets security fixes. Update before
 reporting a problem: it may already be fixed.
 
 ## Reporting a problem
@@ -12,7 +12,7 @@ privately to the copyright holder (hidicker on GitHub), not in a public issue.
 Say what you found, how to reproduce it, and what it could reach. You will hear
 back, and a fix is released before anything is said publicly.
 
-## How NZOSA protects your data
+## How OsaBooks protects your data
 
 What follows is checked in each security review; the last was on 5 October 2026.
 

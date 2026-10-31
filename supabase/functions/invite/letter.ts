@@ -45,12 +45,12 @@ export function letter(
   const as = ROLES[role] ?? { name: "a member", can: "work on the books" };
   // A line break in the subject would start a mail header of the sender's
   // choosing, so the books' name is one line there whatever it holds.
-  const subject = `You're invited to ${oneLine(books)} in NZOSA`;
+  const subject = `You're invited to ${oneLine(books)} in OsaBooks`;
 
   const text = [
     "Kia ora,",
     "",
-    `${who} has invited you to their books "${books}" in NZOSA, as ${as.name}. You'll be able to ${as.can}.`,
+    `${who} has invited you to their books "${books}" in OsaBooks, as ${as.name}. You'll be able to ${as.can}.`,
     "",
     "To accept:",
     `1. Go to ${appUrl} and sign in, or sign up, with this email address.`,
@@ -58,7 +58,7 @@ export function letter(
     "",
     "Nothing is shared with you until you accept. If you weren't expecting this, you can ignore this email.",
     "",
-    "NZOSA, open-source accounting for New Zealand",
+    "OsaBooks, open-source accounting for New Zealand",
   ].join("\n");
 
   const e = { who: escape(who), books: escape(books), url: escape(appUrl) };
@@ -69,14 +69,14 @@ export function letter(
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#eef1f5;padding:32px 12px;">
 <tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:10px;overflow:hidden;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1d2733;">
-<tr><td style="background:#0f2440;padding:18px 28px;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.08em;">NZOSA</td></tr>
+<tr><td style="background:#0f2440;padding:18px 28px;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.08em;">OsaBooks</td></tr>
 <tr><td style="padding:28px 28px 8px;">
 <p style="margin:0 0 6px;font-size:14px;color:#5d6b7f;">Kia ora,</p>
 <h1 style="margin:0 0 16px;font-size:22px;line-height:1.3;">You're invited to ${e.books}</h1>
-<p style="margin:0 0 14px;font-size:15px;line-height:1.55;"><strong>${e.who}</strong> has invited you to their books in NZOSA as <strong>${escape(as.name)}</strong>.</p>
+<p style="margin:0 0 14px;font-size:15px;line-height:1.55;"><strong>${e.who}</strong> has invited you to their books in OsaBooks as <strong>${escape(as.name)}</strong>.</p>
 <p style="margin:0 0 22px;font-size:15px;line-height:1.55;padding:12px 14px;background:#f4f6f9;border-radius:6px;">You'll be able to ${escape(as.can)}.</p>
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;"><tr><td style="border-radius:6px;background:#1f6feb;">
-<a href="${e.url}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Open NZOSA</a>
+<a href="${e.url}" style="display:inline-block;padding:12px 22px;font-size:15px;font-weight:600;color:#ffffff;text-decoration:none;">Open OsaBooks</a>
 </td></tr></table>
 <p style="margin:0 0 6px;font-size:14px;font-weight:600;">To accept</p>
 <ol style="margin:0 0 22px;padding-left:20px;font-size:14px;line-height:1.6;">
@@ -86,7 +86,7 @@ export function letter(
 </td></tr>
 <tr><td style="padding:16px 28px 22px;border-top:1px solid #e3e7ed;font-size:12px;line-height:1.5;color:#5d6b7f;">
 Nothing is shared with you until you accept. If you weren't expecting this, you can ignore this email.<br>
-NZOSA, open-source accounting for New Zealand &middot; <a href="${e.url}" style="color:#5d6b7f;">${e.url}</a>
+OsaBooks, open-source accounting for New Zealand &middot; <a href="${e.url}" style="color:#5d6b7f;">${e.url}</a>
 </td></tr>
 </table>
 </td></tr>

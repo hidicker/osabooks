@@ -21,7 +21,7 @@ import { askOnPage, note, tellOnPage } from "./ui.js";
  * Books kept on a server are only as safe as somebody's willingness to pay for
  * the backups, and this project starts on a plan that has none worth the name.
  * A file the person holds themselves needs no plan, no company still being in
- * business, and no trust in either: it opens in any copy of NZOSA, including
+ * business, and no trust in either: it opens in any copy of OsaBooks, including
  * the one that runs from a folder on their own machine.
  *
  * It replaced "Export ledger", which wrote the ledger alone -- leaving out the
@@ -155,7 +155,7 @@ export async function restoreBackup(
     return {
       ok: false,
       why:
-        "That is not a NZOSA backup, or a ledger file from an earlier version. " +
+        "That is not an OsaBooks backup, or a ledger file from an earlier version. " +
         "Nothing was changed.",
     };
   }
@@ -251,7 +251,7 @@ export function backupTools(body: HTMLElement, books: string, hosted: boolean): 
     note(
       hosted
         ? "One file with everything in these books, including rules and history. It saves to " +
-          "this computer and opens in any copy of NZOSA. Take one after any significant work."
+          "this computer and opens in any copy of OsaBooks. Take one after any significant work."
         : "One file with everything in these books, including rules and history, for keeping " +
           "a copy elsewhere: another disk or computer.",
     ),

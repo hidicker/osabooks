@@ -344,7 +344,7 @@ export function renderSocietyPage(): void {
     body.append(heading("2. Tier 2 or Tier 1"));
     body.append(
       note(
-        "Tier 2 and Tier 1 are full accrual reporting under PBE Standards, with an audit or review. NZOSA keeps the books " +
+        "Tier 2 and Tier 1 are full accrual reporting under PBE Standards, with an audit or review. OsaBooks keeps the books " +
           "for it, but the financial statements need an accountant. The Reports page has the trial balance and ledger they work from.",
       ),
     );

@@ -318,7 +318,7 @@ export function renderMembers(body: HTMLElement, book: { id: string; name: strin
     list.append(add);
     list.append(
       note(
-        "They are emailed an invitation from NZOSA saying who invited them and how to accept. " +
+        "They are emailed an invitation from OsaBooks saying who invited them and how to accept. " +
           "Read only lets somebody review the books without changing anything.",
       ),
     );

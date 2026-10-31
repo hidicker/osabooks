@@ -51,7 +51,7 @@ export interface AuPayLine {
   gross: Cents;
   /** PAYG withheld. */
   payg: Cents;
-  /** True when `payg` is NZOSA's estimate rather than a figure entered. */
+  /** True when `payg` is OsaBooks's estimate rather than a figure entered. */
   paygEstimated: boolean;
   /** Super guarantee on the gross: paid on top, to the fund. */
   superGuarantee: Cents;
@@ -189,7 +189,7 @@ export function auSchedule1(gross: Cents, frequency: AuPayFrequency, scale: 1 | 
 
 /**
  * The PAYG to withhold from one pay, in whole dollars as the ATO's tables
- * give it: the ATO's Schedule 1 formula from 1 July 2024, NZOSA's estimate
+ * give it: the ATO's Schedule 1 formula from 1 July 2024, OsaBooks's estimate
  * from the year's rates before then. Null for a year whose rates are not held.
  */
 export function auPaygEstimate(gross: Cents, employee: AuEmployee, payDate: IsoDate): Cents | null {

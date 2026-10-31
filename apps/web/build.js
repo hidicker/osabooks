@@ -51,11 +51,12 @@ function openBrowser(url) {
   }
 }
 
-/** Is NZOSA already answering on this port, or is it something else? */
+/** Is OsaBooks already answering on this port, or is it something else? */
 async function nzosaIsOn(url) {
   try {
     const response = await fetch(url, { signal: AbortSignal.timeout(2000) });
-    return (await response.text()).includes("<title>NZOSA</title>");
+    const text = await response.text();
+    return text.includes("<title>OsaBooks</title>") || text.includes("<title>NZOSA</title>");
   } catch {
     return false;
   }
@@ -79,7 +80,7 @@ cpSync(join(root, "public"), outdir, {
 cpSync(join(root, "..", "..", "LICENSE"), join(outdir, "LICENSE.txt"));
 cpSync(join(root, "..", "..", "NOTICE"), join(outdir, "NOTICE.txt"));
 
-// Which edition this is. "nz" is NZOSA as it ships; "international" also lets
+// Which edition this is. "nz" is OsaBooks as it ships; "international" also lets
 // a set of books be kept in another country (Setup, the country choice). Set
 // with --edition international, or NZOSA_EDITION.
 /** Every file under a folder, as paths from the app ("demo/au/bank.csv"). */
@@ -136,7 +137,7 @@ if (serve) {
   } catch (error) {
     // Books already open elsewhere is its own answer, and not a port clash.
     const message = error instanceof Error ? error.message : String(error);
-    if (message.includes("already open in another NZOSA")) {
+    if (message.includes("already open in another OsaBooks") || message.includes("already open in another NZOSA")) {
       process.stderr.write(`
 ${message}
 
@@ -157,9 +158,9 @@ ${message}
       [
         ``,
         `Something else on this computer is already using port ${wanted},`,
-        `so NZOSA cannot start there.`,
+        `so OsaBooks cannot start there.`,
         ``,
-        `Close that other program and try again, or start NZOSA on a`,
+        `Close that other program and try again, or start OsaBooks on a`,
         `different port with:  npm run dev -w @nzosa/web -- --port ${wanted + 1}`,
         ``,
         `(${error instanceof Error ? error.message : String(error)})`,

@@ -218,7 +218,7 @@ test("choosing the folder above the books finds the books; several or none is sa
 
   // None: an error, never an empty answer that reads as a fact about the accounts.
   const empty = mkdtempSync(join(tmpdir(), "nzosa-empty-"));
-  assert.throws(() => new Sandbox(empty), /holds no NZOSA books/);
+  assert.throws(() => new Sandbox(empty), /holds no books kept by OsaBooks/);
 });
 
 test("a book file that is a link to somewhere else is refused", (t) => {

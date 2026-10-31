@@ -3,13 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NZOSA</title>
+<title>OsaBooks</title>
 <link rel="icon" href="../icon.svg">
-<meta name="description" content="NZOSA: free, open-source accounting for New Zealand. Bank feeds, coding that learns from your own history, GST reconciled to what you filed, IR10, IR3 and rental schedules.">
+<meta name="description" content="OsaBooks: free, open-source accounting for New Zealand. Bank feeds, coding that learns from your own history, GST reconciled to what you filed, IR10, IR3 and rental schedules.">
 <!--
-  NZOSA's home page: the address its licence credit links to
-  ("NZOSA, by hidicker"). It must keep working at /nzosa/home/ for as long as
-  copies of NZOSA point here. The site's security policy allows no inline
+  OsaBooks' home page: the address its licence credit links to
+  ("OsaBooks, by hidicker"). It must keep working at /osabooks/home/ (and
+  /nzosa/home/, which forwards here) for as long as copies point here. The site's security policy allows no inline
   scripts, so the worked examples' code is in learn.js beside this page. Screenshots are of the demo's
   invented books.
 -->
@@ -47,7 +47,7 @@
   .top { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
   .top .wrap { display: flex; align-items: center; gap: 20px; height: 62px; }
   .brand { display: flex; align-items: center; gap: 10px; color: var(--text); text-decoration: none; font-weight: 800; letter-spacing: .06em; font-size: 19px; }
-  .brand { gap: 0; font-size: 24px; letter-spacing: .1em; }
+  .brand { gap: 0; font-size: 24px; letter-spacing: .04em; }
   .brand .o { width: .92em; height: .92em; margin: 0 .1em 0 .02em; }
   .top nav { display: flex; gap: 22px; margin-left: auto; }
   .top nav a { color: var(--muted); text-decoration: none; font-size: 15px; font-weight: 600; }
@@ -167,7 +167,7 @@
 
 <header class="top">
   <div class="wrap">
-    <a class="brand" href="./" aria-label="NZOSA home">NZ<svg class="o" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12.5" fill="none" stroke="var(--accent)" stroke-width="4.2"/><path d="M10 16.5L14.5 21L22.5 11" fill="none" stroke="var(--coffee)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>SA</a>
+    <a class="brand" href="./" aria-label="OsaBooks home"><svg class="o" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="12.5" fill="none" stroke="var(--accent)" stroke-width="4.2"/><path d="M10 16.5L14.5 21L22.5 11" fill="none" stroke="var(--coffee)" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>saBooks</a>
     <nav aria-label="Sections">
       <a href="#features">Features</a>
       <a href="#banks">Bank feeds</a>
@@ -191,7 +191,7 @@
       </p>
       <div class="ctas">
         <a class="btn" href="../../nzosa_demo/"><svg class="icon"><use href="#i-play"/></svg>Try the demo</a>
-        <a class="btn primary" href="../">Open NZOSA</a>
+        <a class="btn primary" href="../">Open OsaBooks</a>
         <a class="btn" href="https://github.com/hidicker/nzosa#running-it"><svg class="icon"><use href="#i-download"/></svg>Download free</a>
       </div>
       <p class="limit"><strong class="limit-badge">Only 10 of 15 free online accounts still available</strong></p>
@@ -202,7 +202,7 @@
       </ul>
       <div class="shot">
         <div class="bar"><i></i><i></i><i></i></div>
-        <img src="img/reconcile.webp" width="2880" height="1800" alt="NZOSA's Reconcile page: bank lines with a suggested account, GST rate and description against each.">
+        <img src="img/reconcile.webp" width="2880" height="1800" alt="OsaBooks's Reconcile page: bank lines with a suggested account, GST rate and description against each.">
       </div>
     </div>
   </section>
@@ -210,7 +210,7 @@
   <div class="wrap donate">
     <div class="card">
       <div>
-        <h2>NZOSA is free. A coffee keeps it that way.</h2>
+        <h2>OsaBooks is free. A coffee keeps it that way.</h2>
         <p>
           No subscription and no paid tier. One person builds it and keeps it up
           to date with each year's IRD rates and rules. If it saves you an
@@ -229,7 +229,7 @@
       <div class="head">
         <span class="kicker">More than a bank-statement importer</span>
         <h2>The hard parts of the books, done properly.</h2>
-        <p>Plenty of software reads a bank statement. NZOSA keeps a real set of books, and does some of the work accountants usually charge for.</p>
+        <p>Plenty of software reads a bank statement. OsaBooks keeps a real set of books, and does some of the work accountants usually charge for.</p>
       </div>
       <div class="grid">
         <div class="feature"><div class="badge"><svg class="icon"><use href="#i-brain"/></svg></div><h3>Coding that learns from you</h3><p>Rules are written from how you or your accountant coded before. You never type keywords, and a correction sticks.</p></div>
@@ -864,14 +864,14 @@
         <div class="copy">
           <span class="kicker">Coding</span>
           <h3>Most of a year codes itself. You deal with the handful that matter.</h3>
-          <p>Load the coding from Xero or your spreadsheet and NZOSA lines up every suggestion against what was actually done, then writes the rules from the agreement.</p>
+          <p>Load the coding from Xero or your spreadsheet and OsaBooks lines up every suggestion against what was actually done, then writes the rules from the agreement.</p>
           <ul>
             <li><svg class="icon"><use href="#i-tick"/></svg>Accept the bulk in a few clicks; disagreements are set out on their own.</li>
             <li><svg class="icon"><use href="#i-tick"/></svg>It asks rather than guesses: a line it cannot place stays in front of you.</li>
             <li><svg class="icon"><use href="#i-tick"/></svg>Entertainment split 50/50 with the GST right, in one click.</li>
           </ul>
         </div>
-        <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="img/reports.webp" width="2880" height="1800" alt="A profit and loss report in NZOSA, with the number of lines behind each account."></div>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="img/reports.webp" width="2880" height="1800" alt="A profit and loss report in OsaBooks, with the number of lines behind each account."></div>
       </div>
 
       <div class="split flip">
@@ -885,7 +885,7 @@
             <li><svg class="icon"><use href="#i-tick"/></svg>Each owner of a shared rental can file for their own share.</li>
           </ul>
         </div>
-        <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="img/gst.webp" width="2880" height="1800" alt="NZOSA's GST reconciliation: each period with boxes 5, 11 and 15 and when it is due."></div>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="img/gst.webp" width="2880" height="1800" alt="OsaBooks's GST reconciliation: each period with boxes 5, 11 and 15 and when it is due."></div>
       </div>
 
       <div class="split">
@@ -899,7 +899,7 @@
             <li><svg class="icon"><use href="#i-tick"/></svg>Validated against a practitioner's signed accounts, to the dollar.</li>
           </ul>
         </div>
-        <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="img/rentalyear.webp" width="2880" height="1800" alt="NZOSA's Rental year end page: a rental property's income and expenses for the year, and its property manager statements."></div>
+        <div class="shot"><div class="bar"><i></i><i></i><i></i></div><img src="img/rentalyear.webp" width="2880" height="1800" alt="OsaBooks's Rental year end page: a rental property's income and expenses for the year, and its property manager statements."></div>
       </div>
     </div>
   </section>
@@ -913,7 +913,7 @@
       <div class="trust">
         <div class="feature"><div class="badge"><svg class="icon"><use href="#i-lock"/></svg></div><h3>On your own computer</h3><p>Your books are plain files in a folder you can back up and read without this software. Nothing is uploaded, and the app makes no network requests of its own.</p></div>
         <div class="feature"><div class="badge"><svg class="icon"><use href="#i-code"/></svg></div><h3>Open source</h3><p>Free software under the GNU AGPL. Read every line on GitHub, check how a figure is worked out, or host your own copy online.</p></div>
-        <div class="feature"><div class="badge"><svg class="icon"><use href="#i-swap"/></svg></div><h3>Moving from Xero</h3><p>Bring your Xero files and NZOSA lays its figures beside Xero's, so you can see they agree before you rely on them.</p></div>
+        <div class="feature"><div class="badge"><svg class="icon"><use href="#i-swap"/></svg></div><h3>Moving from Xero</h3><p>Bring your Xero files and OsaBooks lays its figures beside Xero's, so you can see they agree before you rely on them.</p></div>
       </div>
     </div>
   </section>
@@ -924,7 +924,7 @@
       <p>The demo is a coffee roastery and two rentals, part way through a year. Change anything; nothing is real.</p>
       <div class="ctas">
         <a class="btn" href="../../nzosa_demo/"><svg class="icon"><use href="#i-play"/></svg>Try the demo</a>
-        <a class="btn primary" href="../">Open NZOSA</a>
+        <a class="btn primary" href="../">Open OsaBooks</a>
         <a class="btn" href="https://github.com/hidicker/nzosa#running-it"><svg class="icon"><use href="#i-download"/></svg>Download free</a>
         <a class="pill-coffee" style="padding:13px 22px;font-size:16px" href="https://buy.stripe.com/28EaEX2sY2Ar7vy49pd7q00" rel="noopener"><svg class="icon"><use href="#i-cup"/></svg>Donate a coffee</a>
       </div>
@@ -934,7 +934,7 @@
 
 <footer>
   <div class="wrap">
-    <span>NZOSA, by hidicker. Free software under the GNU AGPL v3, with <a href="../NOTICE.txt">additional terms</a>, provided as is and without warranty &mdash; <a href="../LICENSE.txt">licence</a>. You remain responsible for what you file.</span>
+    <span>OsaBooks, by hidicker. Free software under the GNU AGPL v3, with <a href="../NOTICE.txt">additional terms</a>, provided as is and without warranty &mdash; <a href="../LICENSE.txt">licence</a>. You remain responsible for what you file.</span>
     <span><a href="https://github.com/hidicker/nzosa">Source code</a> &middot; <a href="https://github.com/hidicker/nzosa/blob/main/docs/user-guide.md">Guide</a> &middot; <a href="../privacy.html">Privacy</a> &middot; <a href="../terms.html">Terms</a> &middot; <a href="https://buy.stripe.com/28EaEX2sY2Ar7vy49pd7q00" rel="noopener">Donate</a></span>
   </div>
 </footer>
