@@ -3,7 +3,7 @@
  *
  * For somebody happy to have an agent (Claude in Chrome, say) click through
  * Xero for them: they sign in themselves, paste this, and the agent downloads
- * each export NZOSA asks for, with the settings each needs and the dates of
+ * each export OsaBooks asks for, with the settings each needs and the dates of
  * these books filled in. It is told to read and export only, and to stop and
  * ask at anything that needs the person: a sign-in, a code, an approval.
  *
@@ -37,7 +37,7 @@ export function xeroAgentPrompt(start: string, trialBalance: string, accountTran
   const before = said(dayBefore(start));
   const plain = (text: string): string => text.replace(/^Xero:\s*/, "");
   return [
-    "Please export my accounting files from Xero, so I can load them into NZOSA, a free New Zealand accounting app.",
+    "Please export my accounting files from Xero, so I can load them into OsaBooks, a free New Zealand accounting app.",
     "",
     "Ground rules:",
     "- Only read and export. Do not create, edit, approve, delete, void, file, send or reconcile anything in Xero, and do not change any setting except the filters on a report or export screen.",
@@ -45,7 +45,7 @@ export function xeroAgentPrompt(start: string, trialBalance: string, accountTran
     "- If I have more than one organisation in Xero, ask me which one before starting.",
     "- Save each file to my Downloads folder, keeping the name Xero gives it.",
     "",
-    `My books in NZOSA start on ${from}, so the opening figures are as at ${before}.`,
+    `My books in OsaBooks start on ${from}, so the opening figures are as at ${before}.`,
     "",
     "The exports:",
     "1. Chart of accounts: Accounting → Chart of accounts → Export.",
@@ -60,7 +60,7 @@ export function xeroAgentPrompt(start: string, trialBalance: string, accountTran
     `10. Journal report: Reporting → Journal Report, ${from} to today, all columns. Export to Excel.`,
     `11. GST returns: Reporting → GST, then each return filed for a period ending on or after ${from}, opened and exported to Excel, one file per return.`,
     "",
-    "Bank statements are not needed: NZOSA takes those from the bank itself.",
+    "Bank statements are not needed: OsaBooks takes those from the bank itself.",
     "",
     "When you have finished, list every file you saved with its name, and say plainly anything you could not export and why. Do not open or summarise what is in the files.",
   ].join("\n");

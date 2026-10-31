@@ -7,7 +7,7 @@ reconciliation.
 
 ## How the ledger is kept
 
-NZOSA does not store finished journals for bank lines. It stores each line as
+OsaBooks does not store finished journals for bank lines. It stores each line as
 the bank gave it and, when the line is confirmed, the decision about it: the
 account, the GST treatment and side, any split, a transfer pairing, the
 invoice it settles, and (since 10 October) whose money paid it and how money

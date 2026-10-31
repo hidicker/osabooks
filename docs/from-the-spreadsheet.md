@@ -1,6 +1,6 @@
 # What the spreadsheet encodes
 
-NZOSA is a rebuild of a working personal-and-business accounting workbook —
+OsaBooks is a rebuild of a working personal-and-business accounting workbook —
 74 sheets, several years of real use, covering a roasting business, three
 rental properties and personal spending in New Zealand.
 
@@ -60,7 +60,7 @@ Two deliberate deviations:
   values like `-78.08000000000001` and `-195.00000000000003` from float
   round-trips.
 - For a foreign card purchase the workbook puts the original currency in the
-  `CCY` column while `Amount` stays in NZD. NZOSA keeps `currency` as the
+  `CCY` column while `Amount` stays in NZD. OsaBooks keeps `currency` as the
   account's own currency and records the original leg separately in `foreign`,
   so the currency of an amount is never ambiguous.
 
@@ -140,7 +140,7 @@ Things the workbook does not settle, which need a real statement to resolve:
 
 - **Wise fees.** The export has `Source amount (after fees)` and a separate
   `Source fee amount`. Whether the total leaving the balance is the amount, or
-  the amount plus the fee, appears to vary by transfer type. NZOSA records
+  the amount plus the fee, appears to vary by transfer type. OsaBooks records
   the fee in `extras` and never folds it into `amount`, because guessing wrong
   would be invisible. Reconciling against a Wise balance settles it.
 - **Budget months.** The workbook has both a `Month Personal Budget` column and

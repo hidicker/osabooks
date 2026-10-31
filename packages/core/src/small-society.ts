@@ -154,8 +154,8 @@ export function reportingStandard(options: {
     const tier1 = both(expenses, (e) => e > TIER2_LIMIT);
     reasons.push(
       tier1
-        ? "Total expenses were over $33 million in both of the last two years: Tier 1, full PBE Standards. That is beyond what NZOSA prepares; it needs an accountant."
-        : "Total expenses were over $5 million in both of the last two years: Tier 2, PBE Standards with reduced disclosure. That is beyond what NZOSA prepares; it needs an accountant.",
+        ? "Total expenses were over $33 million in both of the last two years: Tier 1, full PBE Standards. That is beyond what OsaBooks prepares; it needs an accountant."
+        : "Total expenses were over $5 million in both of the last two years: Tier 2, PBE Standards with reduced disclosure. That is beyond what OsaBooks prepares; it needs an accountant.",
     );
     return { standard: "tier-2", reasons };
   }

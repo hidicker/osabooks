@@ -141,8 +141,8 @@ export function cycleTheme(): void {
  * Where these books actually are, said in the footer.
  *
  * It used to say one thing everywhere: that the ledger stays in this browser
- * until you export it, and that NZOSA keeps running until you double-click Stop
- * NZOSA in the folder you started it from. On the hosted copy none of that is
+ * until you export it, and that OsaBooks keeps running until you double-click Stop
+ * OsaBooks in the folder you started it from. On the hosted copy none of that is
  * true -- there is no folder and no local server to stop, and the books are on
  * a server rather than in the browser -- so the footer told the people most
  * likely to be strangers here something plainly wrong.
@@ -153,7 +153,7 @@ function sayWhereBooksLive(): void {
   const kind = backendKind();
   where.textContent =
     kind === "folder"
-      ? "These books are the folder on this computer. NZOSA keeps running after you " +
+      ? "These books are the folder on this computer. OsaBooks keeps running after you " +
         "close this tab; to stop it, double-click Stop NZOSA in the folder you started it from."
       : kind === "cloud"
         ? "These books are kept on the server, under the account you are signed in to. " +

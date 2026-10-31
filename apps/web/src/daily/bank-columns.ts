@@ -84,7 +84,7 @@ function card(one: Waiting, host: HTMLElement, importFiles: (files: File[]) => P
   const hint = document.createElement("p");
   hint.className = "page-hint";
   hint.textContent =
-    "NZOSA doesn't know this bank's layout yet. It has guessed each column below; correct any it got wrong. " +
+    "OsaBooks doesn't know this bank's layout yet. It has guessed each column below; correct any it got wrong. " +
     "The layout is kept with these books, so the next file from this bank comes straight in.";
   box.append(title, hint);
 

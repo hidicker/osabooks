@@ -1,7 +1,7 @@
 {
   "name": "@nzosa/cli",
   "version": "0.1.0",
-  "description": "Command-line front end for NZOSA. Imports bank flat files into a local JSON ledger.",
+  "description": "Command-line front end for OsaBooks. Imports bank flat files into a local JSON ledger.",
   "license": "AGPL-3.0-or-later",
   "type": "module",
   "bin": {

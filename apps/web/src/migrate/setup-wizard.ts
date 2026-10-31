@@ -1990,7 +1990,7 @@ export async function seedBrowser(): Promise<void> {
         "a couple, part way through a year."
       : about) +
     " Nothing here is real, and you can change anything. Other demo books are under Demo books at the top. To keep " +
-    "books of your own, run NZOSA on your own computer: see the guide for owners.";
+    "books of your own, run OsaBooks on your own computer: see the guide for owners.";
 }
 
 /** Choosing which system the books are coming from. */

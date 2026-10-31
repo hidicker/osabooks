@@ -61,7 +61,7 @@ if (!/Content-Security-Policy/.test(appSecurity)) {
 }
 
 // Add .htaccess for cPanel / Apache security
-const htaccessContent = `# NZOSA Online Demo Security Configuration
+const htaccessContent = `# OsaBooks Online Demo Security Configuration
 # Prevent directory listing
 Options -Indexes
 
@@ -89,7 +89,7 @@ ${appSecurity}
 writeFileSync(join(demoDir, ".htaccess"), htaccessContent, "utf-8");
 
 // Add instructions for upload
-const readmeContent = `# NZOSA Online Demo Build
+const readmeContent = `# OsaBooks Online Demo Build
 
 This directory contains the production build for the online demo hosted at:
 https://nbparagliding.nz/nzosa_demo/

@@ -1,7 +1,7 @@
 # Tested against official and published examples
 
 Worked examples from Inland Revenue, the ATO, the IRS and OpenAccountants'
-guides (which cite those authorities), checked against NZOSA. Where an example
+guides (which cite those authorities), checked against OsaBooks. Where an example
 could be entered through the app it was: bank files dropped on Bank import,
 entities set up on Entities & accounts, lines coded on Reconcile, and the
 report read. Each figure below is also a core test, so it stays checked.
@@ -10,7 +10,7 @@ Checked 17–18 October 2026.
 
 ## New Zealand
 
-| Example | Source | NZOSA | Result |
+| Example | Source | OsaBooks | Result |
 | --- | --- | --- | --- |
 | Sole trader, taxable income $90,000, 2025-26: tax $19,577.50, no IETC | OpenAccountants NZ IR3 guide, case C1 (IRD tax rates from 1 April 2025) | Entered through the app: IR3 box 24 $90,000, box 36 $19,577.50 | Matches, **after a fix**: box 24 was always nil, so a sole trader's profit never reached the IR3 |
 | Rental: $20,000 rent, $15,000 interest, $8,000 other: $3,000 ring-fenced and carried forward | Same guide, case C7 | Entered through the app: 22E $23,000, 22G $20,000, 22I $3,000 | Matches |
@@ -30,7 +30,7 @@ Checked 17–18 October 2026.
 
 ## Australia
 
-| Example | Source | NZOSA | Result |
+| Example | Source | OsaBooks | Result |
 | --- | --- | --- | --- |
 | Sole trader: $92,000 income, $11,060 deductions, taxable $80,940: tax $15,070, Medicare $1,619, offset $1,000, total $15,689 | OpenAccountants AU individual guide, example 1 (Ryan Duguid, accountant) | Entered through the app on Australian books: $15,070, -$1,000, $1,618.80, estimate $15,688.80 | Matches (the guide rounds Medicare to dollars) |
 | Medicare levy reduction: Angie, $29,000 in 2025-26, pays $98.90; thresholds $28,011 and $35,013 | ATO, "Medicare levy reduction for low-income earners" (updated 30 June 2026) | $98.90 | Matches |
@@ -42,7 +42,7 @@ Checked 17–18 October 2026.
 
 ## United States
 
-| Example | Source | NZOSA | Result |
+| Example | Source | OsaBooks | Result |
 | --- | --- | --- | --- |
 | SE tax on $53,087: $7,501, half $3,750 | OpenAccountants US Schedule C and SE guide (accountant-checked method), example 1 | $7,500.95, half $3,750.48 | Matches |
 | SE tax on $102,500: $14,483 | Same, example 2 | Entered through the app on US books ($142,000 receipts, $39,500 of expenses with the $1,000 home office): Schedule C net $102,500, SE tax $14,482.79, half $7,241.40; QBI deduction $15,901.72 (limited to 20% of taxable income before it), taxable $63,606.88, federal tax $8,907.51; June's payment moved to Monday 16 June 2025 | Matches |
@@ -53,7 +53,7 @@ Checked 17–18 October 2026.
 
 ## South Korea
 
-| Example | Source | NZOSA | Result |
+| Example | Source | OsaBooks | Result |
 | --- | --- | --- | --- |
 | Tax base ₩60,000,000: ₩8,640,000, local income tax ₩864,000 | OpenAccountants KR income tax guide (2025 table) | The same | Matches |
 | VAT periods due 25 July and 25 January | — | The same | Matches; a due date on a weekend is not moved to the next business day (25 July 2026 is a Saturday). Not changed |

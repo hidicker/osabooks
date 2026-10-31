@@ -159,7 +159,7 @@ export function ownProjectPanel(): HTMLElement {
   link.textContent = " Open Supabase";
   one.append(link);
 
-  const two = step("2. In the project, open SQL Editor, paste this script and press Run. It adds the tables NZOSA keeps books in, and nothing else.");
+  const two = step("2. In the project, open SQL Editor, paste this script and press Run. It adds the tables OsaBooks keeps books in, and nothing else.");
   const said = document.createElement("p");
   said.className = "cloud-said";
   const copy = document.createElement("button");

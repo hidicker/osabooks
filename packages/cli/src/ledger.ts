@@ -300,7 +300,7 @@ export function saveLedger(path: string, ledger: Ledger): void {
   // books.
   if (existsSync(path) && statSync(path).isDirectory()) {
     throw new Error(
-      `${path} is a folder of books written by NZOSA, which this command can read ` +
+      `${path} is a folder of books written by OsaBooks, which this command can read ` +
         `but not write. Make the change in the app, or work on a copy: ` +
         `nzosa import <file> --ledger some-name.json`,
     );
@@ -308,7 +308,7 @@ export function saveLedger(path: string, ledger: Ledger): void {
   const since = heldByTheApp(path);
   if (since !== null) {
     throw new Error(
-      `These books are open in NZOSA${since ? ` (since ${since})` : ""}, which writes to ` +
+      `These books are open in OsaBooks${since ? ` (since ${since})` : ""}, which writes to ` +
         `them as you work. Close it -- double-click "Stop NZOSA" -- and run this again. ` +
         `Writing from both at once would lose whichever change landed first.`,
     );

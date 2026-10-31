@@ -120,7 +120,7 @@ function signInForm(body: HTMLElement): void {
       if (result.confirm) {
         say(
           said,
-          `Check ${email.value.trim()} for a message from NZOSA and follow the link in it. ` +
+          `Check ${email.value.trim()} for a message from OsaBooks and follow the link in it. ` +
             "Then come back here and sign in.",
         );
         return;
@@ -636,7 +636,7 @@ function browserBackup(body: HTMLElement): void {
   body.append(
     note(
       "No set of books on the server is open, so this backs up and restores the books held in " +
-        "this browser. To move books up from NZOSA on your own computer, download a backup " +
+        "this browser. To move books up from OsaBooks on your own computer, download a backup " +
         "there, start a set here, open it, and restore the backup into it.",
     ),
   );

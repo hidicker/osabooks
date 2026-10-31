@@ -5,7 +5,7 @@
  * can ask it to code lines, split one, or write a journal. The app never
  * changes the books: what it suggests is kept beside them, in a file of its
  * own, as a set of suggestions made together, and the books take a
- * suggestion only when somebody uses it in NZOSA -- the code on Reconcile, the
+ * suggestion only when somebody uses it in OsaBooks -- the code on Reconcile, the
  * split in the split editor, the journal in the journal editor -- through the
  * same checks as if they had typed it.
  *
@@ -54,7 +54,7 @@ export interface SuggestedJournal {
   because: string;
 }
 
-/** Bring a page up in NZOSA, where it is open, for the person to look at. */
+/** Bring a page up in OsaBooks, where it is open, for the person to look at. */
 export interface SuggestedShow {
   kind: "show";
   page: string;

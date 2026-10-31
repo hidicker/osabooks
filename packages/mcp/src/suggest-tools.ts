@@ -18,17 +18,17 @@ import type { Tool, ToolContext } from "./tools.js";
  * The books are still never written. A suggestion is checked against them --
  * a real line, a real account, a split that adds up, a journal that balances,
  * nothing in a locked period -- and kept in the suggestions file beside them.
- * It reaches the books only when somebody uses it in NZOSA, where it goes
+ * It reaches the books only when somebody uses it in OsaBooks, where it goes
  * through the same checks as if they had typed it. Several suggestions made
  * in one call are one set, and the same set sent twice is kept once, so a
  * call retried after a dropped answer does not suggest everything twice.
  */
 
 const WHERE_IT_WAITS =
-  "Nothing is in the books yet: it waits in NZOSA until somebody uses it there. " +
+  "Nothing is in the books yet: it waits in OsaBooks until somebody uses it there. " +
   "Codes show on Reconcile as suggested; splits and journals are listed under Actions required.";
 
-/** Pages a person can be shown, by the name NZOSA's menu uses. */
+/** Pages a person can be shown, by the name OsaBooks's menu uses. */
 const PAGES = ["reconcile", "actions", "invoices", "bills", "reports", "gst", "contacts", "assets"] as const;
 
 const MAX_CODES = 200;
@@ -294,7 +294,7 @@ export const SUGGEST_TOOLS: Tool[] = [
   {
     name: "show_in_app",
     description:
-      "Bring up a page in NZOSA where the person has it open, for them to look at what you are talking about, with a search filled in. Changes nothing.",
+      "Bring up a page in OsaBooks where the person has it open, for them to look at what you are talking about, with a search filled in. Changes nothing.",
     inputSchema: {
       type: "object",
       properties: {
@@ -314,13 +314,13 @@ export const SUGGEST_TOOLS: Tool[] = [
       // Unique each time: showing the same page twice is two requests.
       const at = context.now?.() ?? new Date().toISOString();
       const kept = keep(context, [{ kind: "show", page, ...(search ? { search } : {}), at } as SuggestedItem]);
-      return { ...kept, said: "Shown in NZOSA if it is open on this computer." };
+      return { ...kept, said: "Shown in OsaBooks if it is open on this computer." };
     },
   },
 
   {
     name: "list_suggestions",
-    description: "The suggestions made here that nobody has used or declined in NZOSA yet.",
+    description: "The suggestions made here that nobody has used or declined in OsaBooks yet.",
     inputSchema: { type: "object", properties: { entity: { type: "string" } }, additionalProperties: false },
     run(args, context) {
       const books = context.shelf.get();
@@ -356,7 +356,7 @@ export const SUGGEST_TOOLS: Tool[] = [
 export const LIST_ACCOUNTS: Tool = {
   name: "list_accounts",
   description:
-    "Every account these books can code to, by the name NZOSA uses, with the entity it belongs to where the books say. Use these names when suggesting.",
+    "Every account these books can code to, by the name OsaBooks uses, with the entity it belongs to where the books say. Use these names when suggesting.",
   inputSchema: { type: "object", properties: { entity: { type: "string" } }, additionalProperties: false },
   run(args, context) {
     const books = context.shelf.get();

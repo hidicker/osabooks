@@ -9,7 +9,7 @@ import type { ToolContext } from "./tools.js";
  *
  * One JSON-RPC message a line, in and out. Written by hand rather than pulled
  * in because the part of the protocol a read-only tool server uses is a page,
- * and NZOSA's core has no dependencies to keep.
+ * and OsaBooks's core has no dependencies to keep.
  *
  * Stdout is the protocol and nothing else; anything to be read by a person goes
  * to stderr.
@@ -24,8 +24,8 @@ export const INSTRUCTIONS = [
 
 /** Said as well when the server may suggest. */
 export const SUGGEST_INSTRUCTIONS = [
-  "This server can also suggest: codes for uncoded lines, a split, a journal, and show a page in NZOSA.",
-  "A suggestion never changes the books. It waits in NZOSA until the person uses or declines it there; tell them that.",
+  "This server can also suggest: codes for uncoded lines, a split, a journal, and show a page in OsaBooks.",
+  "A suggestion never changes the books. It waits in OsaBooks until the person uses or declines it there; tell them that.",
   "Use account names from list_accounts. Never present a suggestion as done.",
 ].join("\n");
 

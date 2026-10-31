@@ -4093,7 +4093,7 @@ function wireAiButton(): void {
       ? "Asked automatically, and charged to your key."
       : shared !== null
         ? aiRoute() === "folder"
-          ? "Asked automatically, using the NZOSA demo key."
+          ? "Asked automatically, using the OsaBooks demo key."
           : "Asked automatically, using this site's key."
         : aiRoute() === "none"
           ? "Needs the app on your own computer, or books on the server. Copy a prompt " +

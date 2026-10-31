@@ -1,5 +1,5 @@
 /**
- * NZOSA's connector: one set of books online, for an outside AI app.
+ * OsaBooks's connector: one set of books online, for an outside AI app.
  *
  * Claude, ChatGPT and other apps that take a remote MCP connector are given
  * this address, one per set of books:
@@ -7,12 +7,12 @@
  *   https://<project>.supabase.co/functions/v1/mcp/<book id>
  *
  * The app signs the person in through Supabase's OAuth server (the consent
- * screen is in NZOSA), then asks here with that token. This checks the token
+ * screen is in OsaBooks), then asks here with that token. This checks the token
  * with Auth, checks the person is a member of these books, loads the books,
  * and answers with the same tools and checks as the server on a person's own
  * computer (packages/mcp, bundled into ./tools.js by
  * tools/build-mcp-function.mjs). What it suggests is saved as the part
- * `suggested`, and waits in NZOSA until somebody uses or declines it there.
+ * `suggested`, and waits in OsaBooks until somebody uses or declines it there.
  *
  * Deployed with --no-verify-jwt: the gateway's check would turn an app away
  * before it learned where to sign in. Every request is checked here instead.
@@ -168,7 +168,7 @@ Deno.serve(async (request) => {
   const path = new URL(request.url).pathname;
   const match = /\/mcp\/([0-9a-f-]{36})(\/.*)?$/i.exec(path);
   if (match === null) {
-    return json({ error: "This address needs the books' id after /mcp/. Copy it from the AI page in NZOSA." }, 404);
+    return json({ error: "This address needs the books' id after /mcp/. Copy it from the AI page in OsaBooks." }, 404);
   }
   const book = (match[1] as string).toLowerCase();
   const rest = match[2] ?? "";
@@ -179,7 +179,7 @@ Deno.serve(async (request) => {
       resource: resourceFor(book),
       authorization_servers: [`${SUPABASE_URL}/auth/v1`],
       bearer_methods_supported: ["header"],
-      resource_name: "NZOSA books",
+      resource_name: "OsaBooks",
     });
   }
   if (rest !== "" && rest !== "/") return json({ error: "Not found." }, 404);
@@ -190,9 +190,9 @@ Deno.serve(async (request) => {
   }
 
   const token = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-  if (token === "") return signInFirst(book, "Sign in to NZOSA to connect these books.");
+  if (token === "") return signInFirst(book, "Sign in to OsaBooks to connect these books.");
   const person = await personFor(token);
-  if (person === null) return signInFirst(book, "That sign-in has expired or is not NZOSA's. Connect again.");
+  if (person === null) return signInFirst(book, "That sign-in has expired or is not OsaBooks's. Connect again.");
 
   const text = await request.text();
   if (text.length > LARGEST_REQUEST) return json(rpcError(null, -32600, "That request is too large."), 413);

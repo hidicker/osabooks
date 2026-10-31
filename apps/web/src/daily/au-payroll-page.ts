@@ -22,7 +22,7 @@ import type { Account, AuEmployee, AuPayFrequency, AuPayRun, AuPayroll, IsoDate 
  * pay event reports through Single Touch Payroll.
  *
  * The PAYG figure starts as the ATO's Schedule 1 formula gives it and is the
- * employer's to change where a declaration varies it. NZOSA does not lodge STP: that is
+ * employer's to change where a declaration varies it. OsaBooks does not lodge STP: that is
  * done through STP-enabled software (the ATO lists free and low-cost ones for
  * small employers), with the figures shown here.
  */

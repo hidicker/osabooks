@@ -1,4 +1,4 @@
-# NZOSA
+# OsaBooks
 
 Free accounting for New Zealand. Bank files in; a coded double-entry ledger, GST returns and financial reports out.
 
@@ -19,7 +19,7 @@ It runs on your own machine. Nothing is uploaded, and the app makes no network r
 
 > **Mac users:** On macOS the first double-click may say it is from an unidentified developer. Right-click the file, choose **Open**, then click **Open** again.
 
-> **Online demo:** Want to try it first with sample data without installing anything? Visit the [online demo](https://nbparagliding.nz/nzosa_demo/). More about NZOSA on its [home page](https://nbparagliding.nz/nzosa/home/).
+> **Online demo:** Want to try it first with sample data without installing anything? Visit the [online demo](https://nbparagliding.nz/nzosa_demo/). More about OsaBooks on its [home page](https://nbparagliding.nz/osabooks/home/).
 
 ### For developers / terminal
 
@@ -52,9 +52,9 @@ Be clear about what that means: whatever the AI asks for is sent to the company 
 
 ### Let it suggest (optional)
 
-Started with `--suggest` (in the Claude Desktop extension, the "Let Claude suggest" setting), it can also suggest: `suggest_codes` for uncoded lines, `suggest_split`, `suggest_journal`, `show_in_app` to bring up a page in NZOSA where it is open, and `list_suggestions`. Each suggestion is checked against the books first (a real line, a real account, a split that adds up, a journal that balances, nothing in a locked period) and kept in `suggested.json` beside the books, never in them. NZOSA picks them up while it is open: codes show on Reconcile as suggestions to tick, and splits and journals wait under Actions required, opening in the split or journal editor filled in for you to save or decline. Nothing reaches the books until you do.
+Started with `--suggest` (in the Claude Desktop extension, the "Let Claude suggest" setting), it can also suggest: `suggest_codes` for uncoded lines, `suggest_split`, `suggest_journal`, `show_in_app` to bring up a page in OsaBooks where it is open, and `list_suggestions`. Each suggestion is checked against the books first (a real line, a real account, a split that adds up, a journal that balances, nothing in a locked period) and kept in `suggested.json` beside the books, never in them. OsaBooks picks them up while it is open: codes show on Reconcile as suggestions to tick, and splits and journals wait under Actions required, opening in the split or journal editor filled in for you to save or decline. Nothing reaches the books until you do.
 
-Books kept online connect the same way through a remote connector: the AI page shows each set of books' address, which Claude (web, desktop or phone), ChatGPT and other apps add as a custom connector, signing in to NZOSA and allowing it. The connector can read and suggest, nothing else; see [docs/ai-commands-plan.md](docs/ai-commands-plan.md).
+Books kept online connect the same way through a remote connector: the AI page shows each set of books' address, which Claude (web, desktop or phone), ChatGPT and other apps add as a custom connector, signing in to OsaBooks and allowing it. The connector can read and suggest, nothing else; see [docs/ai-commands-plan.md](docs/ai-commands-plan.md).
 
 ## Documentation
 
@@ -77,14 +77,14 @@ Every figure is meant to be checkable, and the guides say how to check it. Do th
 
 Copyright (C) 2026 hidicker.
 
-NZOSA is free software under the GNU Affero General Public Licence, version 3 or later
+OsaBooks is free software under the GNU Affero General Public Licence, version 3 or later
 ([LICENSE](LICENSE)), with the additional terms in [NOTICE](NOTICE). You may run, study,
 share and change it. If you change it and let other people use your version, including
 over a network, you have to offer them its source too, keep the attribution
-"NZOSA, by hidicker" with its link to the [NZOSA home page](https://nbparagliding.nz/nzosa/home/),
-and call your version something other than NZOSA. Provided as is, without warranty of any
+"OsaBooks, by hidicker" with its link to the [OsaBooks home page](https://nbparagliding.nz/osabooks/home/),
+and call your version something other than OsaBooks. Provided as is, without warranty of any
 kind. You remain responsible for what you file.
 
-NZOSA is free, and donations keep it going: [donate a coffee](https://buy.stripe.com/28EaEX2sY2Ar7vy49pd7q00).
+OsaBooks is free, and donations keep it going: [donate a coffee](https://buy.stripe.com/28EaEX2sY2Ar7vy49pd7q00).
 If you pass it on or build on it, please leave the donate button in place. Donations are
 voluntary and buy no extra rights.

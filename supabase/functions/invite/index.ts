@@ -3,7 +3,7 @@
  *
  * The invitation itself is made exactly as before, by the database's
  * invite_to_book, called with the caller's own token -- so only an owner can
- * invite, and the rules stay in one place. Then an email goes from NZOSA's
+ * invite, and the rules stay in one place. Then an email goes from OsaBooks's
  * mailbox saying who invited them, to which books, and how to accept.
  *
  * The email is the same whether or not the address has an account here, as
@@ -84,7 +84,7 @@ async function send(to: string, subject: string, text: string, html: string): Pr
     },
   });
   try {
-    await client.send({ from: `NZOSA <${SMTP_USER}>`, to, subject, content: text, ...(html !== "" ? { html } : {}) });
+    await client.send({ from: `OsaBooks <${SMTP_USER}>`, to, subject, content: text, ...(html !== "" ? { html } : {}) });
   } finally {
     await client.close();
   }
@@ -146,7 +146,7 @@ Deno.serve(async (request: Request) => {
       // Told once, on the eleventh: never in the way of the invitation itself.
       await send(
         ALERT_EMAIL,
-        `NZOSA: ${who.email || who.id} has sent ${ALERT_AFTER + 1} invitation emails today`,
+        `OsaBooks: ${who.email || who.id} has sent ${ALERT_AFTER + 1} invitation emails today`,
         [
           `${who.email || "An account"} (user ${who.id}) has now sent ${ALERT_AFTER + 1} invitation emails in the last 24 hours.`,
           `The latest was to ${take.email ?? email}, for the books "${take.books ?? ""}".`,

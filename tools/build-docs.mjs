@@ -264,7 +264,7 @@ function page(title, rendered, source) {
     <main>
 ${rendered.body}
       <p class="foot">
-        NZOSA &mdash; free accounting for New Zealand. Free software under the
+        OsaBooks &mdash; free accounting for New Zealand. Free software under the
         GNU AGPL v3 with the additional terms in NOTICE, provided as is and without warranty of any kind.
         Built from <code>${escapeHtml(source)}</code>.
       </p>

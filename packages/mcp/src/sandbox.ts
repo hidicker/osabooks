@@ -102,8 +102,8 @@ function booksIn(folder: string): string {
   if (inside.length === 1) return join(folder, inside[0] as string);
   if (inside.length === 0) {
     throw new Error(
-      `${folder} holds no NZOSA books (no transactions.json in it, or in any folder directly inside it). ` +
-        `Choose the folder NZOSA keeps your books in.`,
+      `${folder} holds no books kept by OsaBooks (no transactions.json in it, or in any folder directly inside it). ` +
+        `Choose the folder OsaBooks keeps your books in.`,
     );
   }
   throw new Error(

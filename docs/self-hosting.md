@@ -1,6 +1,6 @@
-# Hosting NZOSA online yourself
+# Hosting OsaBooks online yourself
 
-NZOSA runs happily on your own computer with no server at all. This guide is for
+OsaBooks runs happily on your own computer with no server at all. This guide is for
 the other way: books kept online, reachable from any browser, shared with your
 bookkeeper or accountant — on **your own** Supabase project and **your own**
 web hosting, so nobody else holds your books.
@@ -20,7 +20,7 @@ most web hosting are enough for one business's books.
 
 | Piece | What it does | Where it lives |
 |---|---|---|
-| The web app | The NZOSA pages: plain files, no server of their own | Your web host (any static hosting) |
+| The web app | The OsaBooks pages: plain files, no server of their own | Your web host (any static hosting) |
 | Supabase: database | Your books, members and roles, locked down by row-level security | Your Supabase project |
 | Supabase: auth | Sign-in with email and password, and the confirmation email | Your Supabase project |
 | Supabase: Vault | Bank feed tokens, the Wise token, AI keys — encrypted, never readable by a browser | Your Supabase project |
@@ -39,9 +39,9 @@ tokens, API keys — stays inside Supabase.
 You need:
 
 - [ ] **Node.js** (the LTS version) on your computer — [nodejs.org](https://nodejs.org).
-- [ ] **A copy of NZOSA**. The licence (GNU AGPL, with the terms in NOTICE)
+- [ ] **A copy of OsaBooks**. The licence (GNU AGPL, with the terms in NOTICE)
       lets you host it for yourself or others; if you change it, offer your
-      users its source and keep the "NZOSA, by hidicker" credit.
+      users its source and keep the "OsaBooks, by hidicker" credit.
 - [ ] **A Supabase account** — [supabase.com](https://supabase.com). *You* sign up; an AI should not.
 - [ ] **Somewhere to put the web app** — any static host: GitHub Pages, Netlify,
       Cloudflare Pages, or ordinary shared hosting with FTP or WebDAV.
@@ -61,13 +61,13 @@ to them by name (section 10).
 
 1. **New project.** Choose a region near you — **Sydney (ap-southeast-2)** for
    New Zealand — and a strong database password (keep it in your password
-   manager; NZOSA never needs it).
+   manager; OsaBooks never needs it).
 2. From **Project Settings → API**, note:
    - the **Project URL** (`https://<your-ref>.supabase.co`) and **project ref**
      (`<your-ref>`);
    - the **publishable key** (`sb_publishable_…`) — public;
    - the **service role / secret key** — *secret*. You will not paste this
-     anywhere in NZOSA; the Edge Functions get it from Supabase automatically.
+     anywhere in OsaBooks; the Edge Functions get it from Supabase automatically.
 3. From **Account → Access Tokens**, create a **personal access token** if you
    want to run the steps below from the command line (or let an AI run them).
    Store it as an environment variable, e.g. `SUPABASE_ACCESS_TOKEN`.
@@ -262,7 +262,7 @@ are typing commands and checking results. Keep these for yourself:
 
 A good way to start the conversation:
 
-> I want to host NZOSA online on my own Supabase project and web host, using
+> I want to host OsaBooks online on my own Supabase project and web host, using
 > docs/self-hosting.md in the repository. My project ref is `<ref>`. My
 > Supabase personal access token is in the environment variable
 > `SUPABASE_ACCESS_TOKEN`; don't print it. Walk me through the guide one
@@ -305,7 +305,7 @@ A good way to start the conversation:
 
 ## 11. Keeping it up to date
 
-When NZOSA changes:
+When OsaBooks changes:
 
 1. Get the new code.
 2. Run any **new** files in `supabase/migrations/` (by date, after the last one
@@ -329,7 +329,7 @@ Your books are in your database and are not touched by an update.
   address was confirmed.
 - **The service role key** never leaves Supabase. If it ever appears in a
   browser, a file, or a chat, rotate it in the dashboard.
-- **Revoking** is always yours: disconnect in NZOSA, and also revoke the token
+- **Revoking** is always yours: disconnect in OsaBooks, and also revoke the token
   at Akahu, Wise or the AI provider if you want to be certain.
 - **Backups:** Supabase's free tier keeps daily backups for a short time; the
   app's **Download a backup** on the Books page gives you a copy you hold.

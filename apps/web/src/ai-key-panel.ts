@@ -148,7 +148,7 @@ export function aiKeyPanel(options: KeyPanelOptions): HTMLElement {
             ? `${left} ${counted} left on your account.`
             : `${left} ${counted} left, shared by everybody without a key of their own.`) +
           (aiRoute() === "folder"
-            ? " It belongs to the NZOSA site, so what you send goes to Google through that account."
+            ? " It belongs to the OsaBooks site, so what you send goes to Google through that account."
             : ""),
       ),
     );

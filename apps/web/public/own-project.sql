@@ -1,4 +1,4 @@
--- NZOSA: the tables for books kept in your own Supabase project.
+-- OsaBooks: the tables for books kept in your own Supabase project.
 -- Paste all of this into your project's SQL editor and run it once.
 -- Made by tools/own-project-sql.mjs from the migrations in supabase/migrations.
 

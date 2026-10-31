@@ -1,4 +1,4 @@
-# Apache hosting: make sure an updated NZOSA is the one that actually loads.
+# Apache hosting: make sure an updated OsaBooks is the one that actually loads.
 #
 # The page, its styles and its bundle keep the same names from one build to the
 # next, so a browser holding yesterday's copy will go on running yesterday's app

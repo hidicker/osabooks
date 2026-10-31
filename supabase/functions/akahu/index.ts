@@ -1,7 +1,7 @@
 /**
  * The bank feed, for books kept on the server.
  *
- * NZOSA run from a folder keeps Akahu's two tokens in a file beside the
+ * OsaBooks run from a folder keeps Akahu's two tokens in a file beside the
  * ledgers, and the page never sees them: it is told whether a connection
  * exists and nothing more. This is that same arrangement, moved to a server --
  * the tokens are held in Supabase Vault, and this function is the only thing

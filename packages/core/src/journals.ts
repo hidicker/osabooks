@@ -8,7 +8,7 @@ import { ColumnReader } from "./importers/shared.js";
 /**
  * The general ledger, as an accounting system recorded it.
  *
- * NZOSA derives everything from bank lines, which is what lets it run from
+ * OsaBooks derives everything from bank lines, which is what lets it run from
  * a flat file with no backend. The cost of that is a blind spot: an accounting
  * system also holds events that never touch a bank account -- a year-end
  * adjustment, a GST expense claimed late, a write-off between two ledger

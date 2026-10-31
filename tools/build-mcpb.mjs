@@ -52,22 +52,22 @@ writeFileSync(
 // The compiled files are ES modules.
 writeFileSync(join(stage, "package.json"), JSON.stringify({ name: "nzosa-mcp", version, type: "module" }, null, 2));
 for (const file of ["LICENSE", "NOTICE"]) cpSync(join(root, file), join(stage, file));
-cpSync(join(root, "brand", "nzosa-mark-1024.png"), join(stage, "icon.png"));
+cpSync(join(root, "brand", "osabooks-mark-1024.png"), join(stage, "icon.png"));
 
 const manifest = {
   manifest_version: "0.3",
   name: "nzosa",
-  display_name: "NZOSA books",
+  display_name: "OsaBooks",
   version,
-  description: "Ask Claude about your NZOSA books, and let it suggest codes, splits and journals for you to check in NZOSA.",
+  description: "Ask Claude about your books in OsaBooks, and let it suggest codes, splits and journals for you to check in OsaBooks.",
   long_description:
-    "A view of a folder of NZOSA books, on your own computer. Claude can list your entities, search bank transactions, " +
+    "A view of a folder of books kept in OsaBooks, on your own computer. Claude can list your entities, search bank transactions, " +
     "list what is not yet coded, report coding progress and compare the bank's daily balances with your transactions. " +
-    "It cannot change the books. With suggestions turned on it can also suggest codes, a split or a journal, and bring up a page in NZOSA: " +
-    "each waits in NZOSA, beside the books, until you use or decline it there. " +
+    "It cannot change the books. With suggestions turned on it can also suggest codes, a split or a journal, and bring up a page in OsaBooks: " +
+    "each waits in OsaBooks, beside the books, until you use or decline it there. " +
     "What Claude asks for is sent to Anthropic as part of your chat, including payee names, so choose the folder with that in mind.",
-  author: { name: "hidicker", url: "https://nbparagliding.nz/nzosa/home/" },
-  homepage: "https://nbparagliding.nz/nzosa/home/",
+  author: { name: "hidicker", url: "https://nbparagliding.nz/osabooks/home/" },
+  homepage: "https://nbparagliding.nz/osabooks/home/",
   license: "AGPL-3.0-or-later",
   icon: "icon.png",
   server: {
@@ -82,15 +82,15 @@ const manifest = {
   user_config: {
     books_folder: {
       type: "directory",
-      title: "NZOSA books folder",
-      description: "The folder NZOSA keeps your books in (it holds transactions.json). Claude can read this folder and nothing else.",
+      title: "Books folder",
+      description: "The folder OsaBooks keeps your books in (it holds transactions.json). Claude can read this folder and nothing else.",
       required: true,
     },
     allow_suggestions: {
       type: "boolean",
       title: "Let Claude suggest",
       description:
-        "Claude may suggest codes, splits and journals, kept in a file beside the books until you use or decline each in NZOSA. " +
+        "Claude may suggest codes, splits and journals, kept in a file beside the books until you use or decline each in OsaBooks. " +
         "Off, it only reads.",
       default: false,
       required: false,

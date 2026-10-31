@@ -735,7 +735,7 @@ export function backendKind(): Backend {
  * business knowing what a banner is.
  */
 export interface SaveTrouble {
-  /** "offline": NZOSA on this computer did not answer, and it is tried again. */
+  /** "offline": OsaBooks on this computer did not answer, and it is tried again. */
   kind: "conflict" | "refused" | "failed" | "offline";
   why: string;
 }
@@ -1002,15 +1002,15 @@ async function putPartNow(part: string, data: unknown): Promise<boolean> {
       body: JSON.stringify({ version: versions.get(part) ?? 0, data }),
     });
   } catch {
-    // Nothing answered: NZOSA on this computer was closed, or the connection
+    // Nothing answered: OsaBooks on this computer was closed, or the connection
     // to it dropped. Said at once, and tried again until it is back.
     markUnsaved(part);
     retryLater(part, data);
     tellAboutTrouble({
       kind: "offline",
       why:
-        "NZOSA on this computer isn't answering, so your last change is not saved yet. " +
-        "It will keep trying: leave this page open, and start NZOSA again if it was closed.",
+        "OsaBooks on this computer isn't answering, so your last change is not saved yet. " +
+        "It will keep trying: leave this page open, and start OsaBooks again if it was closed.",
     });
     return false;
   }
@@ -2122,7 +2122,7 @@ export async function restoreArchive(stamp: string, ledger = ""): Promise<boolea
  * Clear another set of books, without opening it.
  *
  * The same archive-then-empty as clearing the open one, aimed elsewhere. The
- * server refuses a folder another NZOSA is holding, because clearing books
+ * server refuses a folder another OsaBooks is holding, because clearing books
  * somebody else is writing to is how two processes end up disagreeing about
  * what the books are.
  *
@@ -2143,7 +2143,7 @@ export async function archiveOther(ledger: string): Promise<{ ok: boolean; why: 
     };
     if (!response.ok) return { ok: false, why: body.error ?? "Those books could not be cleared." };
 
-    // An older NZOSA takes no notice of which books were named and clears
+    // An older OsaBooks takes no notice of which books were named and clears
     // whichever ones are open. Refusing on the answer rather than trusting the
     // request is what stops "clear the spare set" from clearing the set in
     // front of you, in the one situation where that is possible: a server left
@@ -2152,7 +2152,7 @@ export async function archiveOther(ledger: string): Promise<{ ok: boolean; why: 
       return {
         ok: false,
         why:
-          "This NZOSA is running an older server, which would clear whichever " +
+          "This OsaBooks is running an older server, which would clear whichever " +
           "books are open rather than the ones you chose. Nothing has been " +
           "cleared. Stop NZOSA and start it again, then try once more.",
       };

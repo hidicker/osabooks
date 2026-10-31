@@ -1,5 +1,5 @@
 /**
- * More invented books for the online demo, for the parts of NZOSA the coffee
+ * More invented books for the online demo, for the parts of OsaBooks the coffee
  * roastery never shows: a society's grants, a trust and its IR6, a person's
  * own IR3 with a rental, and a business with staff on payroll.
  *

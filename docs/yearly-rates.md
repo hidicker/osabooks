@@ -1,6 +1,6 @@
 # Rates to update each year
 
-New Zealand's tax and payroll figures change on 1 April. NZOSA holds them in
+New Zealand's tax and payroll figures change on 1 April. OsaBooks holds them in
 tables, one row per tax year (named by the 31 March it ends on). A year with
 no row works out no tax, so `packages/core/test/yearly-rates.test.js` fails on
 the first day of a tax year that has none. When it does, work through this

@@ -1,4 +1,4 @@
-# NZOSA: A Guide for Accountants and Tax Practitioners
+# OsaBooks: A Guide for Accountants and Tax Practitioners
 
 What this software does with client financial data, how its double-entry journal engine works, what it will and will not do, and how its figures can be verified for New Zealand Inland Revenue (IRD / Te Tari Taake) compliance.
 
@@ -8,27 +8,27 @@ Read this before relying on anything it produces.
 
 ## 1. What It Is — And the Rules of Engagement
 
-NZOSA takes raw bank exports and live bank feeds, reconciles invoices and fixed assets, and produces a fully balanced double-entry transaction ledger, statutory GST returns, and annual financial summaries. It runs locally on your machine or inside a browser — financial data is processed in-memory and on your local disk, never uploaded to third-party cloud servers.
+OsaBooks takes raw bank exports and live bank feeds, reconciles invoices and fixed assets, and produces a fully balanced double-entry transaction ledger, statutory GST returns, and annual financial summaries. It runs locally on your machine or inside a browser — financial data is processed in-memory and on your local disk, never uploaded to third-party cloud servers.
 
 ### Can It Be Used to Prepare Accounts?
 
-**It is your judgement alone, we suggest the safeguards below. At this point it is still a WIP.** NZOSA is built to be checked rather than trusted: every reported figure decomposes into the bank lines, invoices and human decisions behind it, and the trial balance proof in section 2 either balances to zero or names the journal that does not. Section 9 sets out how to validate it against a signed set of accounts before you rely on it.
+**It is your judgement alone, we suggest the safeguards below. At this point it is still a WIP.** OsaBooks is built to be checked rather than trusted: every reported figure decomposes into the bank lines, invoices and human decisions behind it, and the trial balance proof in section 2 either balances to zero or names the journal that does not. Section 9 sets out how to validate it against a signed set of accounts before you rely on it.
 
 **It must be used with caution and professional diligence.**
 
-1. **No Developer Guarantees or Warranties:** NZOSA is free software distributed under the GNU Affero General Public Licence, version 3 or later, with the additional terms in NOTICE. It is provided strictly *"as is"*, without warranty of any kind, express or implied. Neither the developers who wrote it nor anyone distributing it assume any liability or legal responsibility if a figure, tax classification, or return is incorrect. The compiling accountant, tax agent, or taxpayer remains entirely responsible for every figure filed with Inland Revenue.
+1. **No Developer Guarantees or Warranties:** OsaBooks is free software distributed under the GNU Affero General Public Licence, version 3 or later, with the additional terms in NOTICE. It is provided strictly *"as is"*, without warranty of any kind, express or implied. Neither the developers who wrote it nor anyone distributing it assume any liability or legal responsibility if a figure, tax classification, or return is incorrect. The compiling accountant, tax agent, or taxpayer remains entirely responsible for every figure filed with Inland Revenue.
 2. **Not a Blind "Black Box":** The software is deliberately designed around **complete auditability and traceability**. It does not make opaque adjustments or hide unreviewed guesses. Every ledger figure decomposes into visible bank lines, source invoices, and explicit human decisions.
-3. **Accountant in the Loop:** NZOSA automates the mechanical heavy lifting of bank transaction coding, GST classification, invoice settlement matching, and asset depreciation calculations. What it does not replace are the professional judgements of a qualified accountant: year-end closing journals, opening equity reconciliations, tax provisions, shareholder loan benchmark interest adjustments, and compilation disclosures under Service Engagement Standard 2 (SES-2).
+3. **Accountant in the Loop:** OsaBooks automates the mechanical heavy lifting of bank transaction coding, GST classification, invoice settlement matching, and asset depreciation calculations. What it does not replace are the professional judgements of a qualified accountant: year-end closing journals, opening equity reconciliations, tax provisions, shareholder loan benchmark interest adjustments, and compilation disclosures under Service Engagement Standard 2 (SES-2).
 
 ---
 
 ## 2. How the Double-Entry Journal Works
 
-At the very heart of NZOSA is a deterministic, balanced **double-entry journal posting engine**. Understanding how this engine functions is essential for any accountant reviewing its output.
+At the very heart of OsaBooks is a deterministic, balanced **double-entry journal posting engine**. Understanding how this engine functions is essential for any accountant reviewing its output.
 
 ### The Journal Entry Model
 
-Unlike simple single-entry cashbooks that merely categorise bank inflows and outflows, every approved transaction in NZOSA generates balanced double-entry journal lines:
+Unlike simple single-entry cashbooks that merely categorise bank inflows and outflows, every approved transaction in OsaBooks generates balanced double-entry journal lines:
 
 $$\sum \text{Debits} = \sum \text{Credits}$$
 
@@ -53,7 +53,7 @@ In an accrual-aware accounting workflow, customer sales are invoiced before paym
    Cr  820 GST Control Account          $150.00  [Output Tax — Box 5 & 8]
    ```
 2. **When the Bank Receipt Clears:**
-   When the customer pays $1,150.00 into the bank account, NZOSA matches the payment to the outstanding invoice. The receipt does **not** credit Sales again (which would inflate revenue by 100%):
+   When the customer pays $1,150.00 into the bank account, OsaBooks matches the payment to the outstanding invoice. The receipt does **not** credit Sales again (which would inflate revenue by 100%):
    ```text
    Dr  Bank Account (BNZ Current)     $1,150.00  [Cash Asset Inflow]
    Cr  610 Accounts Receivable        $1,150.00  [Debtor Asset Settled]
@@ -62,7 +62,7 @@ In an accrual-aware accounting workflow, customer sales are invoiced before paym
 #### Example C: Inter-Bank Account Transfers
 When funds move between the trading current account and the business credit card, single-entry systems often double-count income and expenditure or leave unreconciled balances in clearing accounts. 
 
-NZOSA pairs corresponding outflow and inflow legs across accounts owned by the same entity:
+OsaBooks pairs corresponding outflow and inflow legs across accounts owned by the same entity:
 ```text
 Dr  BNZ Visa Card                  $1,260.65  [Liability Reduction / Card Inflow]
 Cr  BNZ 01 Current Account         $1,260.65  [Cash Outflow]
@@ -70,7 +70,7 @@ Cr  BNZ 01 Current Account         $1,260.65  [Cash Outflow]
 Both legs are posted as **one single journal**, with no intermediate clearing account, and both sides marked strictly *Out of Scope* for GST.
 
 #### Example D: Split Transactions (e.g. Stripe Payouts & Customs Border GST)
-Real commercial transactions rarely fit single ledger categories. NZOSA enforces that all split parts must sum to the bank statement line to the exact cent:
+Real commercial transactions rarely fit single ledger categories. OsaBooks enforces that all split parts must sum to the bank statement line to the exact cent:
 
 * **Stripe Card Payout:** A net bank deposit of $972.43 represents gross sales of $1,000.00 less Stripe processing fees of $27.57:
   ```text
@@ -78,27 +78,27 @@ Real commercial transactions rarely fit single ledger categories. NZOSA enforces
   Dr  506 Stripe Fees                  $27.57  [No GST / Exempt Expense]
   Cr  610 Accounts Receivable / 200  $1,000.00  [Gross Sales Settled, incl GST]
   ```
-* **Customs Border GST:** A courier payment of $1,039.02 may represent $102.42 of freight (subject to 15% GST) and $936.60 of customs border GST paid on behalf of the importer. In NZOSA, the $936.60 is tagged as `imports` (100% GST claimed directly in Box 13), while $102.42 is standard freight.
+* **Customs Border GST:** A courier payment of $1,039.02 may represent $102.42 of freight (subject to 15% GST) and $936.60 of customs border GST paid on behalf of the importer. In OsaBooks, the $936.60 is tagged as `imports` (100% GST claimed directly in Box 13), while $102.42 is standard freight.
 
 ### Derived vs Stored Postings
 
-In NZOSA, **journal lines are derived, not frozen in opaque database tables**. 
+In OsaBooks, **journal lines are derived, not frozen in opaque database tables**. 
 
 When you modify a rule, correct an account mapping, or assign an invoice settlement, the journals for those transactions are recomputed from the underlying source data and the updated human decision. This ensures that the ledger never suffers from "drift" or orphan records where a rule was updated but historical journal lines were left stranded.
 
 ### The Trial Balance Proof
 
-NZOSA can run a full mathematical proof over every journal in the book. However many journals and lines a set of books holds, the aggregate is the same:
+OsaBooks can run a full mathematical proof over every journal in the book. However many journals and lines a set of books holds, the aggregate is the same:
 
 $$\text{Total Debits} - \text{Total Credits} = \$0.00$$
 
-If any journal fails to balance to zero, NZOSA flags the offending journal ID and blocks generation of financial reports until the discrepancy is resolved.
+If any journal fails to balance to zero, OsaBooks flags the offending journal ID and blocks generation of financial reports until the discrepancy is resolved.
 
 ---
 
 ## 3. The Three Accounting Bases
 
-One of the most common pitfalls in small business software is conflating cash movements with accrual financial statements. NZOSA clearly separates three accounting bases:
+One of the most common pitfalls in small business software is conflating cash movements with accrual financial statements. OsaBooks clearly separates three accounting bases:
 
 | Feature | Cash Basis | Accrual (Own Postings) | Accrual (Imported General Ledger) |
 | :--- | :--- | :--- | :--- |
@@ -116,13 +116,13 @@ A cash P&L will almost never equal an accrual P&L. Taking round figures for illu
 * **Cash banked in the year:** $79,700
 * **Difference:** $5,300
 
-This difference is not an error — it is the net movement in trade debtors across the balance date. Sales invoiced in March and paid in April belong to the year they were invoiced in, and to next year's bank statement. Expect the two figures to differ, and expect the difference to equal the movement in Accounts Receivable; if it does not, something is miscoded. NZOSA’s dual-engine allows you to prepare GST returns on the cash/payments basis mandated by Inland Revenue while simultaneously tracking trade debtors and accrued revenue.
+This difference is not an error — it is the net movement in trade debtors across the balance date. Sales invoiced in March and paid in April belong to the year they were invoiced in, and to next year's bank statement. Expect the two figures to differ, and expect the difference to equal the movement in Accounts Receivable; if it does not, something is miscoded. OsaBooks’s dual-engine allows you to prepare GST returns on the cash/payments basis mandated by Inland Revenue while simultaneously tracking trade debtors and accrued revenue.
 
 ---
 
 ## 4. Chart of Accounts and New Zealand Tax Rules
 
-NZOSA reads the chart of accounts from the system the books come from, and places each account by its type rather than its number. The standard Xero New Zealand chart it is most often given looks like this:
+OsaBooks reads the chart of accounts from the system the books come from, and places each account by its type rather than its number. The standard Xero New Zealand chart it is most often given looks like this:
 
 * **200–299: Revenue** (200 Sales, 260 Other Revenue, 270 Interest Income)
 * **300–399: Other income and cost of sales** (300 Depreciation Recovered, 301 Capital Gain on Disposal, 310 Cost of Goods Sold)
@@ -140,23 +140,23 @@ The GST engine operates according to the Goods and Services Tax Act 1985:
 2. **Zero-Rated (0%):** Exports, financial services where applicable. Reported in Box 5 and deducted in Box 6.
 3. **Exempt / Out of Scope:** Bank fees, interest, drawings, director loans, inter-account transfers, and Inland Revenue tax settlements. Does not appear on the GST101A form. A transfer recorded between the entity's own accounts is out of scope before any rule is consulted, whatever its bank line says.
 4. **Customs / Border GST Imports:** 100% of the line is tax (no $3/23$ fraction). Claimed in Box 13 as a credit adjustment.
-5. **50% Non-Deductible Entertainment:** Under Subpart DD of the Income Tax Act 2007, business entertainment (meals, corporate events) is only 50% deductible for income tax, and the associated GST input tax on the non-deductible half must be adjusted. NZOSA supports assigning a `deductiblePercent: 50` tag to entertainment expenses to maintain statutory compliance.
+5. **50% Non-Deductible Entertainment:** Under Subpart DD of the Income Tax Act 2007, business entertainment (meals, corporate events) is only 50% deductible for income tax, and the associated GST input tax on the non-deductible half must be adjusted. OsaBooks supports assigning a `deductiblePercent: 50` tag to entertainment expenses to maintain statutory compliance.
 6. **Refunds:** A coded line sits on the side of the return its account is on. A supplier's refund reduces Box 11; a refund to a customer reduces Box 5. The GST is the same either way, but the boxes then agree with a return prepared in the accounting system.
 
 ---
 
 ## 5. Bank Feeds and Verification of Completeness
 
-A major source of accounting error is missing transactions or duplicate imports. NZOSA addresses this at two levels:
+A major source of accounting error is missing transactions or duplicate imports. OsaBooks addresses this at two levels:
 
 1. **Akahu Open Banking Integration:** Direct, read-only OAuth connection to New Zealand registered banks (ANZ, ASB, BNZ, Westpac, Kiwibank). Pulls transactions directly with end-to-end data integrity.
-2. **Daily Balance Verification (`Bank import → Import bank balances`):** Compares the running balance of imported transactions against the bank’s official daily closing balances. If a transaction is missed or duplicated, NZOSA flags the exact calendar day and exact dollar variance immediately.
+2. **Daily Balance Verification (`Bank import → Import bank balances`):** Compares the running balance of imported transactions against the bank’s official daily closing balances. If a transaction is missed or duplicated, OsaBooks flags the exact calendar day and exact dollar variance immediately.
 
 ---
 
 ## 6. The Decisioning Engine: Rules Suggest, Humans Decide
 
-Automated accounting AI often fails when it guesses silently. NZOSA adheres to a strict design principle:
+Automated accounting AI often fails when it guesses silently. OsaBooks adheres to a strict design principle:
 
 * **Rules Propose:** Machine learning or regex keyword rules suggest a probable account code and GST treatment.
 * **Humans Decide:** No coding becomes part of the permanent ledger until a human confirms it or overrides it.
@@ -171,7 +171,7 @@ From the perspective of an accountant, tax agent, or IRD auditor, software must 
 
 ### Record-Keeping (TAA Section 22)
 Under section 22, taxpayers must keep sufficient records in English or Te Reo Māori to enable the Commissioner to ascertain readily their taxable income, allowable deductions, and GST liabilities, and retain them for at least 7 years.
-* NZOSA stores all data in standard, non-proprietary JSON files on local disk. 
+* OsaBooks stores all data in standard, non-proprietary JSON files on local disk. 
 * Books can be copied, archived, or version-controlled using Git, ensuring that financial records remain permanently readable without vendor lock-in or subscription requirements.
 
 ### GST Returns (GST101A)
@@ -184,7 +184,7 @@ Returns are built on the payments basis for one-, two- or six-monthly periods, f
 Filed returns can be loaded and compared period by period, as Box 8 less Box 12, with the lines behind each difference and a place to record an explanation against it.
 
 ### IR10 Financial Statements Summary
-Every company income tax return (IR4) is filed with an IR10 or a full set of financial statements. NZOSA produces the IR10 set out as the current form is filed — boxes 1 to 60, in whole dollars, totals in bold — from the same postings as the financial statements:
+Every company income tax return (IR4) is filed with an IR10 or a full set of financial statements. OsaBooks produces the IR10 set out as the current form is filed — boxes 1 to 60, in whole dollars, totals in bold — from the same postings as the financial statements:
 * **Income (boxes 2–11):** sales in box 2; interest, dividends and rental income in 7 to 9; other income, such as depreciation recovered, in 10. A capital gain on disposal is not income: it is reported in box 53 as an untaxed realised gain.
 * **Expenses (12–25):** bad debts, depreciation, insurance (excluding ACC levies), interest, professional fees, rates, rent, repairs, research and development, associated persons' remuneration, wages and contractors in their own boxes; everything else in 24, including non-deductible entertainment and a loss on disposal.
 * **Profit (26–29):** net profit before tax (27), tax adjustments (28 — non-deductible expenses added back) and current year taxable profit (29). Losses brought forward remain on the IR4.
@@ -200,7 +200,7 @@ Rounding follows a signed return. Each box is its accounts summed and rounded to
 ### Shareholder Current Accounts (Section HB 1 & FBT/Deemed Dividend Rules)
 In owner-operated New Zealand companies, transactions between the company and its shareholders are heavily scrutinised by the IRD:
 * If a shareholder current account becomes overdrawn (the shareholder owes the company money), the company has provided a low-interest or interest-free loan. The IRD prescribes an official **benchmark interest rate** (currently ~8.41%). If interest is not charged at or above this benchmark, the shortfall is treated as a taxable dividend or subject to Fringe Benefit Tax (FBT).
-* NZOSA identifies the accounts that make up a shareholder's current account — a director's loan (`910`), funds introduced (`970`) and drawings (`980`), or accounts named that way — and, for a company, sets them out as one current liability on the balance sheet and in IR10 box 47, with drawings in box 57 and the year-end balance in box 58. They feed the Shareholder Current Account schedule required for pages 2 and 3 of the IR4 (boxes 40A–40E).
+* OsaBooks identifies the accounts that make up a shareholder's current account — a director's loan (`910`), funds introduced (`970`) and drawings (`980`), or accounts named that way — and, for a company, sets them out as one current liability on the balance sheet and in IR10 box 47, with drawings in box 57 and the year-end balance in box 58. They feed the Shareholder Current Account schedule required for pages 2 and 3 of the IR4 (boxes 40A–40E).
 
 ### Rental Properties and the IR3
 A ledger can hold a household's affairs: rental properties, personal accounts and a business side by side. Each rental is an entity with a kind (residential or commercial), a GST registration and owners with shares, and its accounts are assigned to it.
@@ -231,9 +231,9 @@ A full statutory financial report consists of eight essential parts:
 7. **Shareholder Current Accounts Schedule:** Detailed reconciliation for each shareholder: Opening balance, Funds Introduced, Share of Profit / Salaries, Drawings, and Closing balance.
 8. **Notes to the Financial Statements:** Accounting policies adopted (measurement base, revenue recognition, accounts receivable valuation, depreciation rates, GST presentation).
 
-### What NZOSA Provides vs What the Accountant Supplies
+### What OsaBooks Provides vs What the Accountant Supplies
 
-| Statement / Schedule | NZOSA Native Capability | What the Accountant / Practitioner Supplies |
+| Statement / Schedule | OsaBooks Native Capability | What the Accountant / Practitioner Supplies |
 | :--- | :--- | :--- |
 | **Profit or Loss** | Complete from bank + invoices + assets, under trading income, cost of sales, gross profit, other income and operating expenses | Year-end non-cash adjustments (accruals, provisions) |
 | **Depreciation Schedule** | Computed from Fixed Asset CSV | Review of depreciation rates & tax vs book methods |
@@ -296,7 +296,7 @@ A validation has passed when every difference is *explained*, not when every dif
 
 ## 10. Summary Checklist for Practitioners
 
-When using NZOSA to review client books or compile financial statements:
+When using OsaBooks to review client books or compile financial statements:
 
 1. **Verify Bank Feed Completeness:** Run `Bank import → Import bank balances` to ensure zero missing or duplicated transactions.
 2. **Review Uncoded & Guess Rates:** Ensure that 100% of transactions are confirmed decisions, with zero unreviewed guesses.
@@ -308,4 +308,4 @@ When using NZOSA to review client books or compile financial statements:
 8. **Check for Draft Invoices:** Confirm that only approved invoices are in the figures.
 9. **Explain Every GST Difference:** Load the filed returns and record an explanation for each period until nothing is left unexplained.
 
-With these safeguards in place, NZOSA provides an exceptionally rigorous, auditable, and transparent accounting platform for New Zealand small businesses and their professional advisors.
+With these safeguards in place, OsaBooks provides an exceptionally rigorous, auditable, and transparent accounting platform for New Zealand small businesses and their professional advisors.

@@ -1,6 +1,6 @@
 /**
  * The one script a person pastes into their own Supabase project's SQL editor
- * to give it the tables NZOSA keeps books in: the migrations that need only the
+ * to give it the tables OsaBooks keeps books in: the migrations that need only the
  * database, in order. The bank feed, the AI, the morning run and email
  * invitations are functions that have to be deployed as well, so what they
  * need is left out.
@@ -35,7 +35,7 @@ const PARTS = ["payroll", "nightly"];
 
 export function ownProjectSql() {
   const out = [
-    "-- NZOSA: the tables for books kept in your own Supabase project.",
+    "-- OsaBooks: the tables for books kept in your own Supabase project.",
     "-- Paste all of this into your project's SQL editor and run it once.",
     "-- Made by tools/own-project-sql.mjs from the migrations in supabase/migrations.",
     "",

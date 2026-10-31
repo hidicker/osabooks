@@ -450,7 +450,7 @@ async function loadEach(
           // have its columns pointed out on Bank import.
           if (looksLikeBankFile(await asCsvText(file.name, new Uint8Array(await file.arrayBuffer())))) {
             await handleFiles([file]);
-            say(`${file.name} — a bank file in a layout NZOSA doesn't know yet: point out its columns under Bank import.`);
+            say(`${file.name} — a bank file in a layout OsaBooks doesn't know yet: point out its columns under Bank import.`);
             continue;
           }
           say(`${file.name} — not recognised, so nothing was done with it.`);

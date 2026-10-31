@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>NZOSA: a guide for developers</title>
+<title>OsaBooks: a guide for developers</title>
 <style>
 :root { --ink: #14171a; --quiet: #5b6570; --line: #e3e6ea; --page: #fff;
   --soft: #f6f8fa; --link: #1a5fb4; }
@@ -88,7 +88,7 @@ strong { font-weight: 650; }
       <a href="#19-running-it-and-deploying-it">19. Running it, and deploying it</a>
     </nav>
     <main>
-<h1 id="nzosa-a-guide-for-developers">NZOSA: a guide for developers</h1>
+<h1 id="nzosa-a-guide-for-developers">OsaBooks: a guide for developers</h1>
 <p>Architecture, data model, the invariants that must not be broken, and the mistakes this codebase has already made so you do not repeat them.</p>
 <hr>
 <h2 id="1-shape">1. Shape</h2>
@@ -158,7 +158,7 @@ cd apps/web &amp;&amp; node build.js --serve     # dev server on :3210</code></p
 <p><code>Stop NZOSA.cmd</code> / <code>Stop NZOSA.command</code> stop it, finding the process by the port it listens on rather than by a saved process id: a stale id after a crash points at nothing, or at whatever has since been given that number.</p>
 <p>Detaching costs the two things a visible window gave for free, so both are replaced. Errors go to <code>nzosa-log.txt</code> beside the app, because a hidden process has nowhere to print; and the launcher waits for the port before exiting, so a failure keeps its window open with the log in it rather than vanishing. The launcher also checks whether the app is already running <em>before</em> installing or building — without that, a second double-click started a second server that could not even write its log, because the first still held the file open.</p>
 <p>Two things about them are load-bearing:</p>
-<ul><li><strong><code>NZOSA.cmd</code> must be CRLF</strong>, and must not be renamed to anything starting with the word <code>Start</code>. <code>cmd /c "Start NZOSA.cmd"</code> parses <code>Start</code> as the START builtin and detaches the process, and LF-only line endings break <code>goto</code> and parenthesised blocks. <code>NZOSA.command</code> must stay LF: <code>/bin/sh</code> chokes on CR.</li><li><strong>A busy port never falls back to the next one.</strong> Browser storage is per origin, so a different port is a different database; moving silently would show someone an empty app and their work would look lost. <code>build.js</code> instead fetches the port, and if <code>&lt;title&gt;NZOSA&lt;/title&gt;</code> comes back it opens that copy and exits 0; otherwise it prints a plain-English message and exits 1.</li></ul>
+<ul><li><strong><code>NZOSA.cmd</code> must be CRLF</strong>, and must not be renamed to anything starting with the word <code>Start</code>. <code>cmd /c "Start NZOSA.cmd"</code> parses <code>Start</code> as the START builtin and detaches the process, and LF-only line endings break <code>goto</code> and parenthesised blocks. <code>NZOSA.command</code> must stay LF: <code>/bin/sh</code> chokes on CR.</li><li><strong>A busy port never falls back to the next one.</strong> Browser storage is per origin, so a different port is a different database; moving silently would show someone an empty app and their work would look lost. <code>build.js</code> instead fetches the port, and if <code>&lt;title&gt;OsaBooks&lt;/title&gt;</code> comes back it opens that copy and exits 0; otherwise it prints a plain-English message and exits 1.</li></ul>
 <p><code>tsconfig</code> runs with <code>exactOptionalPropertyTypes</code>, so <code>{ x: undefined }</code> is not assignable to <code>{ x?: string }</code>. Spread conditionally: <code>...(v !== undefined ? { x: v } : {})</code>.</p>
 <h2 id="2-money-and-dates">2. Money and dates</h2>
 <ul><li><strong>Money is integer minor units</strong> (<code>Cents</code>). Never floats. <code>parseAmount</code> handles the formats banks emit; <code>formatAmount</code> is the only way out.</li><li><strong>Dates are ISO strings</strong> (<code>YYYY-MM-DD</code>), compared lexically. Bank formats are ambiguous, so importers take a <code>dayFirst</code> option.</li><li>NZ financial years end 31 March. FY2026 is 1 Apr 2025 to 31 Mar 2026.</li></ul>
@@ -352,7 +352,7 @@ for r,d,f in os.walk('.'):
 <ul><li><strong>Each visitor's books live in their own browser</strong>, in IndexedDB under that origin. There is no shared ledger, and nothing is uploaded — the host never sees a figure.</li><li><strong>They are not durable.</strong> Clearing site data deletes them; a private window keeps nothing; the browser may evict them under storage pressure unless <code>requestPersistence()</code> has been granted.</li><li><strong>The folder-only features are absent</strong>: switching ledgers, archives, restoring an archive, and the per-part file writes. <code>writesToFolder()</code> is false and the app adjusts what it offers accordingly.</li></ul>
 <p>That makes a static deployment right for a demo or for somebody to try, and wrong for books anybody depends on. Real books want the launcher, which runs the small server that owns the folder -- or books kept online on a Supabase project of your own, which <a href="self-hosting.md">Hosting it online yourself</a> walks through.</p>
       <p class="foot">
-        NZOSA &mdash; free accounting for New Zealand. Free software under the
+        OsaBooks &mdash; free accounting for New Zealand. Free software under the
         GNU AGPL v3 with the additional terms in NOTICE, provided as is and without warranty of any kind.
         Built from <code>developer-guide.md</code>.
       </p>

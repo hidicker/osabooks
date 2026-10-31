@@ -174,7 +174,7 @@ works).
   $225,000 must go on the invoice basis whatever basis is chosen (unless
   settled within 365 days), and on the invoice basis a payment received
   before the invoice is issued makes the GST due when paid. Both rare for the
-  businesses NZOSA is for; the GST return takes neither into account yet.
+  businesses OsaBooks is for; the GST return takes neither into account yet.
 - **The cash flow statement never recognises a bank account named "loan".**
   Its pattern in `apps/web/src/daily/cash-flow-report.ts` (`isLoanAccount`)
   has held a backspace character where a word boundary was meant, since the
