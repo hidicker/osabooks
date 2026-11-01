@@ -4,6 +4,7 @@ import { redraw, showPage } from "../app.js";
 import {
   AI_BATCH,
   AI_OWN_BATCH,
+  DIRECTORY_VIA,
   aiSuggestionFor,
   askAboutLines,
   rateForSuggestion,
@@ -377,7 +378,9 @@ export async function acceptAllShown(): Promise<void> {
     lines.map((one) => codeFor(one)).filter((code): code is string => code !== null),
   );
   const elsewhere = lines.filter((one) => codeFor(one) === null).length;
-  const guessed = lines.filter((one) => modelSaid(one) !== undefined).length;
+  // The list of known businesses suggests without AI, and is said as itself.
+  const known = lines.filter((one) => modelSaid(one)?.via === DIRECTORY_VIA).length;
+  const guessed = lines.filter((one) => modelSaid(one) !== undefined).length - known;
   const summary =
     accounts.size === 0
       ? "settled by their splits or the invoices they pay"
@@ -412,6 +415,9 @@ export async function acceptAllShown(): Promise<void> {
         (guessed > 0
           ? `${guessed} ${guessed === 1 ? "was" : "were"} suggested by AI rather than a rule, ` +
             "and will be recorded as such.\n\n"
+          : "") +
+        (known > 0
+          ? `${known} ${known === 1 ? "was" : "were"} suggested from the list of known businesses rather than a rule.\n\n`
           : "") +
         (cautioned > 0
           ? `${cautioned} AI suggestion${cautioned === 1 ? " is" : "s are"} left out: the ` +
