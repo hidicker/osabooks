@@ -110,6 +110,15 @@ Later, with a dedicated test account (not yours), it could also sign in,
 open a test set of books, save one change and read it back. That is the one
 check the stand-in in 4 can't give.
 
+### 6. Xero's Australian demo company, end to end (have it)
+
+Xero's demo company (AU) exported, imported into empty books, reconciled,
+and every account compared with Xero's own: the scripts and what to expect
+are in `New2/XeroDemoAU/test` (outside the repo, the data being Xero's).
+On 1 November 2026 it found seven import faults, all fixed the same day,
+and every account now agrees with Xero except where noted there. The first
+candidate for journey 3, once the browser driver is shared.
+
 ## What runs when
 
 | When | What | Time |
