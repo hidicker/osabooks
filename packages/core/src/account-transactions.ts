@@ -40,7 +40,7 @@ export interface AccountTransactionRow {
   gross: Cents;
   net: Cents;
   gst: Cents;
-  /** `15` or `0`. */
+  /** The standard rate (`15` in New Zealand) or `0`. */
   gstRate: number;
   gstRateName: string;
   /** The bank account this arrived on, named as a person would recognise it. */
@@ -79,19 +79,34 @@ export interface AccountTransactionsOptions {
   invoiceOf?: (transaction: Transaction) => string;
   /** The chart account GST is posted to, named as the chart names it. */
   gstAccount?: string;
+  /** The books' country, for the names of its rates. New Zealand when not given. */
+  country?: string;
+  /** The standard rate as a percentage. 15 when not given. */
+  standardRate?: number;
 }
 
 /**
  * Xero's own wording for a rate, because the file is read by people and
  * programs that already know these names. Ours would mean re-teaching both.
  */
-export function gstRateName(classification: GstClassification): string {
+export function gstRateName(classification: GstClassification, country = "nz", percent = 15): string {
+  if (country === "au") return auGstRateName(classification);
   if (classification.side === "imports") return "GST on Imports";
   if (classification.treatment === "zero-rated") return "Zero Rated";
   if (classification.treatment === "exempt") return "Exempt";
   if (classification.treatment === "out-of-scope") return "No GST";
   if (classification.side === "none") return "No GST";
-  return classification.side === "sales" ? "15% GST on Income" : "15% GST on Expenses";
+  return classification.side === "sales" ? `${percent}% GST on Income` : `${percent}% GST on Expenses`;
+}
+
+/** Xero Australia's names for the same treatments, which carry no percentage. */
+export function auGstRateName(classification: GstClassification): string {
+  const sales = classification.side === "sales";
+  if (classification.side === "imports") return "GST on Imports";
+  if (classification.treatment === "zero-rated") return sales ? "GST Free Income" : "GST Free Expenses";
+  if (classification.treatment === "exempt") return "Input Taxed";
+  if (classification.treatment !== "standard" || classification.side === "none") return "BAS Excluded";
+  return sales ? "GST on Income" : "GST on Expenses";
 }
 
 const COLUMNS = [
@@ -130,7 +145,7 @@ export function accountTransactionRows(
       const gst = gstWithin(transaction.amount, classification);
       const code = options.codeOf(transaction);
       const rate =
-        classification.treatment === "standard" && classification.side !== "none" ? 15 : 0;
+        classification.treatment === "standard" && classification.side !== "none" ? (options.standardRate ?? 15) : 0;
 
       return {
         transactionId: transaction.id,
@@ -144,7 +159,7 @@ export function accountTransactionRows(
         net: transaction.amount - gst,
         gst,
         gstRate: rate,
-        gstRateName: gstRateName(classification),
+        gstRateName: gstRateName(classification, options.country, options.standardRate),
         account: name(transaction.account),
         // Both sides, the way the report shows them: what it was coded to, and
         // the GST account when any GST was involved. A line with no code says

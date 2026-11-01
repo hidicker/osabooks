@@ -990,13 +990,17 @@ export interface CodingCheckOptions {
  *
  * Compared on the rate itself rather than the wording: `15% GST on Expenses`
  * and `15% GST on Income` are the same rate applied to opposite sides, and the
- * side is already implied by the sign of the amount.
+ * side is already implied by the sign of the amount. The same goes for
+ * `GST on Expenses` and `GST on Income`.
  */
 function sameRate(ours: string, theirs: string): boolean {
   const percent = (text: string): string => {
     const found = /(\d+(?:\.\d+)?)\s*%/.exec(text);
     if (found?.[1]) return String(Number(found[1]));
-    return /no gst|zero|exempt|out of scope/i.test(text) ? "0" : text.trim().toLowerCase();
+    if (/no gst|zero|exempt|out of scope/i.test(text)) return "0";
+    // Rates named without a percentage, Xero Australia's way ("GST on
+    // Expenses", "GST Free Income"): compared on the name less its side.
+    return text.trim().toLowerCase().replace(/[\s-]+/g, " ").replace(/ (income|expenses)$/, "");
   };
   return percent(ours) === percent(theirs);
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { formatAccountTransactions, accountTransactionRows, gstRateName } from "../dist/account-transactions.js";
+import { formatAccountTransactions, accountTransactionRows, gstRateName, auGstRateName } from "../dist/account-transactions.js";
 
 const tx = (over) => ({
   id: "t1", date: "2025-09-26", account: "02-1100-0022001-000", amount: -11500,
@@ -103,4 +103,17 @@ test("rows come out in date order", () => {
     { codeOf: () => "730 - Gear", classify: standard },
   );
   assert.deepEqual(rows.map((r) => r.date), ["2025-09-01", "2025-09-30"]);
+});
+
+test("Australian books name their rates Xero Australia's way, at 10%", () => {
+  assert.equal(auGstRateName({ treatment: "standard", side: "purchases" }), "GST on Expenses");
+  assert.equal(auGstRateName({ treatment: "standard", side: "sales" }), "GST on Income");
+  assert.equal(auGstRateName({ treatment: "zero-rated", side: "purchases" }), "GST Free Expenses");
+  assert.equal(auGstRateName({ treatment: "exempt", side: "none" }), "Input Taxed");
+  assert.equal(auGstRateName({ treatment: "out-of-scope", side: "none" }), "BAS Excluded");
+  const [row] = accountTransactionRows([tx({ amount: -11000, currency: "AUD" })], {
+    codeOf: () => "400 - Advertising", classify: standard, country: "au", standardRate: 10,
+  });
+  assert.equal(row.gstRate, 10);
+  assert.equal(row.gstRateName, "GST on Expenses");
 });
