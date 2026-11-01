@@ -834,9 +834,9 @@ export function markDemoSeeded(): void {
  *
  * Shared by the demo loader and the clear button: loading a demo over a part
  * coded book would leave the old book's decisions attached to transactions
- * that are no longer there.
+ * that are no longer there. False when the store could not be cleared.
  */
-export async function wipe(): Promise<void> {
+export async function wipe(): Promise<boolean> {
   state.ledger = emptyLedger();
   // Cleared on purpose: the books that held the locks are gone with them.
   resetLockBaseline();
@@ -853,7 +853,7 @@ export async function wipe(): Promise<void> {
   // on the next refresh, and a clear that undoes itself is indistinguishable
   // from one that never worked.
   markDemoSeeded();
-  await clearStore();
+  return clearStore();
 }
 
 export async function clearEverything(button: HTMLButtonElement): Promise<void> {

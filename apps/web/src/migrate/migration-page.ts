@@ -2,7 +2,7 @@ import { ASKED, MODULES, moduleOn, modulesPanel, previousSystem } from "../modul
 import { showPage } from "../app.js";
 import { countryBox } from "./setup-wizard.js";
 import { booksCountry, noSalesTax } from "../country.js";
-import { isStarterChart } from "../new-books-country.js";
+import { countryLocked, isStarterChart } from "../new-books-country.js";
 import { gstUsually, saveEntities } from "../books.js";
 import { createBook } from "../cloud.js";
 import { $, state } from "../state.js";
@@ -423,6 +423,32 @@ function summary(step: Step, held: Onboarding): HTMLElement {
 
 // --- 1. where the books are starting from -----------------------------------
 
+/**
+ * Asked as the first thing goes in, while the country can still be changed:
+ * the box above the choices is easy to read past, and after this the country
+ * is fixed. "Change country" goes back to the box.
+ */
+async function countryIsRight(): Promise<boolean> {
+  if (countryLocked()) return true;
+  const here = booksCountry();
+  const the = here.id === "us" ? "the " : "";
+  const right = await askOnPage(
+    `Keep these books in ${the}${here.name}?\n\n` +
+      `Year to ${here.yearEnd.endDay}/${here.yearEnd.endMonth}, ${here.currency}` +
+      (here.salesTax === null ? ", no national sales tax." : `, ${here.salesTax.name} ${Math.round(here.salesTax.rate * 100)}%.`) +
+      " Once anything is in the books the country is fixed.",
+    `Yes, ${here.name}`,
+    "Change country",
+  );
+  if (!right) {
+    // The one on this page: Setup draws the same box, out of sight.
+    const box = [...document.querySelectorAll<HTMLSelectElement>("#setup-country select")].find((one) => one.offsetParent !== null);
+    box?.scrollIntoView({ behavior: "smooth", block: "center" });
+    box?.focus();
+  }
+  return right;
+}
+
 function sourceQuestion(number: number): HTMLElement {
   const [box, inner] = card(number, "Where are these books starting from?");
   // The country first: it decides the chart these books start with, the tax
@@ -439,8 +465,11 @@ function sourceQuestion(number: number): HTMLElement {
   // only in whether there are opening balances, which is the difference
   // between a balance sheet that is a position and one that is a movement.
   const pick = (source: Source, opening: boolean, importFrom: "quickbooks" | null = null): void => {
-    tellSetup(source);
-    answer({ source, opening, importFrom, at: "date" });
+    void countryIsRight().then((right) => {
+      if (!right) return;
+      tellSetup(source);
+      answer({ source, opening, importFrom, at: "date" });
+    });
   };
 
   inner.append(
