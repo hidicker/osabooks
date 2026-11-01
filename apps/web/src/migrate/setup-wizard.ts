@@ -1,6 +1,14 @@
 import { booksCountry } from "../country.js";
 import { jurisdictionOf } from "@nzosa/core";
-import { countryChoices, countryLocked, rememberChosenCountry, starterChartForNewCountry, WORK_IN_PROGRESS } from "../new-books-country.js";
+import {
+  countryChoices,
+  countryLocked,
+  rememberChosenCountry,
+  rememberNewBooksCountry,
+  starterChartForNewCountry,
+  WORK_IN_PROGRESS,
+} from "../new-books-country.js";
+import { downloadBackupNow } from "../backup.js";
 import { redraw, showPage } from "../app.js";
 import { allMyirCards } from "../daily/myir-cards.js";
 import {
@@ -38,7 +46,7 @@ import { addStandardForAll, openStandardAccounts } from "../daily/standard-accou
 import { describeRules } from "../rules-ui.js";
 import type { RuleFileShape } from "../rules-ui.js";
 import { $, state } from "../state.js";
-import { save, switchLedger, writesToFolder } from "../store.js";
+import { backendKind, booksReadOnly, emptyCloudBooks, ledgerName, save, switchLedger, writesToFolder } from "../store.js";
 import type { StoredLedger } from "../store.js";
 import { askOnPage, note, setLoadingStatus, tellOnPage } from "../ui.js";
 import { DEMO_PERSONAS, currentDemoPersona, demoFolder, rememberDemoPersona } from "../demo-personas.js";
@@ -61,7 +69,7 @@ import { DEMO_SEEDED, markDemoSeeded, persistRules, record } from "../books.js";
 import { isDemoBuild } from "../ai-consent.js";
 import { savePart } from "../store.js";
 import { anyModuleOn, applyModules, moduleOn, modulesHere, modulesPanel } from "../modules.js";
-import { booksStartDate, chosenStartDate, onboarding, rememberSource, sourceForTheseBooks } from "./onboarding-state.js";
+import { booksStartDate, chosenStartDate, forgetOnboarding, onboarding, rememberSource, sourceForTheseBooks } from "./onboarding-state.js";
 import { xeroAgentPrompt } from "./xero-agent-prompt.js";
 import { booksLocale, moneyPlaces } from "../country.js";
 import { shipped } from "../shipped.js";
@@ -1551,10 +1559,11 @@ export function countryBox(): HTMLElement | null {
       note(
         `Kept in ${here.id === "us" ? "the " : ""}${here.name}: year to ${here.yearEnd.endDay}/${here.yearEnd.endMonth}, ${here.currency}` +
           (here.salesTax === null ? ", no national sales tax." : `, ${here.salesTax.name} ${Math.round(here.salesTax.rate * 100)}%.`) +
-          " The country can't be changed once the books hold anything. To keep books in another country, " +
-          "start a new set of books on the Books page.",
+          " What is in these books was recorded under this country's rules, so the country can't be changed " +
+          "while it is there.",
       ),
     );
+    if (!booksReadOnly()) box.append(startAgainInCountry(here.id));
     return box;
   }
   const select = document.createElement("select");
@@ -1621,13 +1630,102 @@ The ${to.name} pack is still work in progress: reports and rates may be missing 
   box.append(
     heading,
     note(
-      "The country decides the tax year, the currency, GST or VAT, and which returns these books " +
-        `produce. Now: ${here.name} — year to ${here.yearEnd.endDay}/${here.yearEnd.endMonth}, ${here.currency}` +
+      "Check this first. The country decides the tax year, the currency, GST or VAT, and which returns " +
+        "these books produce, and it is fixed once anything is in them. " +
+        `Now: ${here.name} — year to ${here.yearEnd.endDay}/${here.yearEnd.endMonth}, ${here.currency}` +
         (here.salesTax === null ? ", no national sales tax." : `, ${here.salesTax.name} ${Math.round(here.salesTax.rate * 100)}%.`),
     ),
     select,
   );
   return box;
+}
+
+/**
+ * Start these books again, empty, in another country.
+ *
+ * The country can't be changed under what the books hold, but somebody who
+ * picked the wrong one usually finds out a few minutes into setting up. So
+ * rather than send them to make another set of books, these ones are emptied
+ * and opened in the country chosen, with its starter chart, at the first
+ * question of Start here. The name, and who can open them, stay.
+ *
+ * Nothing is lost for good: books in a folder keep a dated copy, which the
+ * Books page can put back; others are saved to this computer as a backup
+ * first.
+ */
+function startAgainInCountry(current: string): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.className = "start-again-country";
+  const select = document.createElement("select");
+  select.setAttribute("aria-label", "Country to start these books again in");
+  for (const [id, label] of countryChoices(current)) {
+    if (id === current) continue;
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = label;
+    select.append(option);
+  }
+  const go = document.createElement("button");
+  go.type = "button";
+  go.textContent = "Start again in this country";
+  go.addEventListener("click", () => void startAgainIn(select.value, go));
+  const row = document.createElement("div");
+  row.className = "page-actions";
+  row.append(select, go);
+  wrap.append(note("Chose the wrong country? Start these books again in the right one:"), row);
+  return wrap;
+}
+
+async function startAgainIn(country: string, button: HTMLButtonElement): Promise<void> {
+  const to = jurisdictionOf(country);
+  const the = to.id === "us" ? "the " : "";
+  const folder = backendKind() === "folder";
+  const led = state.ledger;
+  const held: string[] = [];
+  const count = (n: number, one: string): void => {
+    if (n > 0) held.push(`${n} ${one}${n === 1 ? "" : "s"}`);
+  };
+  count(led.transactions.length, "bank line");
+  count((led.invoices ?? []).length, "invoice");
+  count((led.manualJournals ?? []).length, "journal");
+  const yes = await askOnPage(
+    `Start these books again in ${the}${to.name}?\n\n` +
+      `They are emptied${held.length > 0 ? ` (${held.join(", ")})` : ""}, with their coding, rules, opening ` +
+      `balances and entities, and open in ${the}${to.name} with its starting accounts, back at the first ` +
+      "question of Start here. Bring your files in again from there.\n\n" +
+      (folder
+        ? "A dated copy of them as they are now is kept, and can be put back from the Books page."
+        : "A backup of them as they are now is saved to this computer first.") +
+      (WORK_IN_PROGRESS.has(country) ? `\n\nThe ${to.name} pack is still work in progress: reports and rates may be missing or wrong.` : ""),
+    `Start again in ${to.name}`,
+    "Keep these books",
+  );
+  if (!yes) return;
+  button.disabled = true;
+  button.textContent = "Starting again…";
+  try {
+    if (!folder) await downloadBackupNow(ledgerName());
+    if (backendKind() === "cloud" && !(await emptyCloudBooks())) {
+      await tellOnPage("These books could not be emptied on the server, so they are as they were or part emptied. Reload to see which, and try again.");
+      button.disabled = false;
+      button.textContent = "Start again in this country";
+      return;
+    }
+    if (!(await wipe())) {
+      await tellOnPage("These books could not be emptied. Nothing has been changed. Try again in a moment.");
+      button.disabled = false;
+      button.textContent = "Start again in this country";
+      return;
+    }
+    forgetOnboarding();
+    // Put on the emptied books as they open, before their starter chart goes in.
+    rememberNewBooksCountry(country);
+    location.reload();
+  } catch (error) {
+    await tellOnPage(`Could not start these books again: ${(error as Error).message}`);
+    button.disabled = false;
+    button.textContent = "Start again in this country";
+  }
 }
 
 export function renderSetup(): void {

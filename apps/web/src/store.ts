@@ -1681,6 +1681,43 @@ async function putCloudPart(part: string, data: unknown): Promise<boolean> {
   return false;
 }
 
+/**
+ * Empty the open books online: every part the server holds is written back
+ * as it is in books just made. The server keeps no copy, so the caller takes
+ * a backup first. False when any part was not written, and then nothing more
+ * is tried: the books are part emptied, which the caller says.
+ */
+export async function emptyCloudBooks(): Promise<boolean> {
+  if (backend !== "cloud" || cloudBook === null || readOnly) return false;
+  const blank: Record<string, unknown> = {
+    transactions: [],
+    decisions: decisionsOf(emptyLedger()),
+    chart: [],
+    entities: { entities: [], accounts: {}, banks: {} },
+    rules: {},
+    rulesarchive: { version: 1, entries: [] },
+    invoices: [],
+    allocations: [],
+    assets: [],
+    journals: [],
+    reference: [],
+    filed: [],
+    events: [],
+    payroll: { employerIrd: "", employees: [], payRuns: [] },
+  };
+  for (const part of FOLDER_PARTS) {
+    if (cloudParts[part] === undefined) continue;
+    const outcome = await sendToCloud(part, blank[part]);
+    if (outcome.kind !== "saved") {
+      markUnsaved(part);
+      tellCloudTrouble(outcome);
+      return false;
+    }
+    markSaved(part);
+  }
+  return true;
+}
+
 /** A part as the server sent it when these books were opened. */
 function cloudPart<T>(part: string): T | null {
   const held = cloudParts[part];
