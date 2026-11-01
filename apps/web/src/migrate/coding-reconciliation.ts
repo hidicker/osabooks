@@ -82,7 +82,7 @@ import { clearCheck } from "../migrate/file-intake.js";
 import { journalLinesFor } from "../daily/balance-diagnostics.js";
 import { settleInvoicesExactly } from "../daily/reconcile-page.js";
 import { accountsForEditing, saveManualJournals, tidyStaleTreatments } from "../books.js";
-import { booksLocale, noSalesTax } from "../country.js";
+import { booksCountry, booksLocale, gstPercent, noSalesTax } from "../country.js";
 import { isUnusedStarterChart } from "../new-books-country.js";
 import { trialBalanceFinding } from "./quickbooks.js";
 import type { CodingComparison, ManualJournal } from "@nzosa/core";
@@ -1498,7 +1498,9 @@ export function renderCheck(): void {
             const said = journal.lines
               .map((l) => `  ${l.code}: ${l.amount >= 0 ? "debit" : "credit"} ${formatAmount(Math.abs(l.amount))}`)
               .join("\n");
-            const taxed = (line.gstRate ?? "").trim() !== "" && !/no gst|exempt|zero/i.test(line.gstRate ?? "");
+            const taxed =
+              accountTreatment({ code: "", name: "", type: "", taxCode: line.gstRate ?? "", description: "" })?.treatment ===
+              "standard";
             if (
               !(await askOnPage(
                 `Add a manual journal dated ${journal.date}?\n\n${said}\n\n` +
@@ -1520,7 +1522,7 @@ export function renderCheck(): void {
                   "with when they were first entered. Include it only for a supply no bank line shows, " +
                   "such as a refund the bank feed missed. With GST, the account takes the amount less " +
                   "GST and the line goes on the GST return.",
-                "Include 15% GST",
+                `Include ${gstPercent()}% GST`,
                 "No GST",
               );
               if (withGst) {
@@ -3202,6 +3204,36 @@ async function acceptCodesBulk(
 }
 
 /**
+ * The GST of one part of a split, from the rate the other system gave it.
+ *
+ * A posting to the GST control account is not an expense carrying GST -- it
+ * is the tax itself, which belongs in Box 13 whole rather than having 3/23
+ * taken out of it. New Zealand's rates name their percentage ("15% GST on
+ * Expenses"); Australia's do not ("GST on Expenses", "GST Free Expenses",
+ * "Input Taxed"), and each of those has its own place on the BAS.
+ */
+function splitPartTreatment(
+  part: ReferencePart,
+  side: "purchases" | "sales",
+): { treatment: GstTreatment; side: GstSide } {
+  const rate = part.gstRate ?? "";
+  if (booksCountry().id !== "nz") {
+    const read = accountTreatment({ code: "", name: "", type: "", taxCode: rate, description: "" });
+    if (read !== null) {
+      if (read.side === "imports") return { treatment: "standard", side: "imports" };
+      if (read.treatment === "out-of-scope") return { treatment: "out-of-scope", side: "none" };
+      return { treatment: read.treatment, side };
+    }
+  }
+  const isTax = /(^|[ ])GST([ ]|$)/i.test(part.code) && !/^15%/.test(rate);
+  const rated = /^15%/.test(rate);
+  return {
+    treatment: isTax || rated ? "standard" : "out-of-scope",
+    side: isTax ? "imports" : rated ? side : "none",
+  };
+}
+
+/**
  * Accept multiple splits recorded by the other system.
  */
 async function acceptSplitsBulk(
@@ -3225,14 +3257,10 @@ async function acceptSplitsBulk(
         unmapped.push(part.code);
         unmappedAll.add(part.code);
       }
-      const isTax = /(^|[ ])GST([ ]|$)/i.test(part.code) && !/^15%/.test(part.gstRate);
-      const rated = /^15%/.test(part.gstRate);
-
       mapped.push({
         amount: part.amount,
         ...(code !== null ? { code } : {}),
-        treatment: isTax || rated ? "standard" : "out-of-scope",
-        side: isTax ? "imports" : rated ? side : "none",
+        ...splitPartTreatment(part, side),
         note: `${Imported()}: ${part.description}`,
       });
     }
@@ -3391,17 +3419,10 @@ async function acceptSplit(transaction: Transaction, parts: readonly ReferencePa
     const code = mapToOurVocabulary(part.code);
     if (code === null) unmapped.push(part.code);
 
-    // A posting to the GST control account is not an expense carrying GST --
-    // it is the tax itself, which belongs in Box 13 whole rather than having
-    // 3/23 taken out of it.
-    const isTax = /(^|[ ])GST([ ]|$)/i.test(part.code) && !/^15%/.test(part.gstRate);
-    const rated = /^15%/.test(part.gstRate);
-
     mapped.push({
       amount: part.amount,
       ...(code !== null ? { code } : {}),
-      treatment: isTax || rated ? "standard" : "out-of-scope",
-      side: isTax ? "imports" : rated ? side : "none",
+      ...splitPartTreatment(part, side),
       note: `${Imported()}: ${part.description}`,
     });
   }

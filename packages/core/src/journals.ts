@@ -60,6 +60,8 @@ export interface JournalProblem {
 export interface JournalImportResult {
   journals: Journal[];
   problems: JournalProblem[];
+  /** The dates the report says it covers ("For the period ... to ..."), where it says. */
+  period?: { from: IsoDate; to: IsoDate };
 }
 
 const REQUIRED = ["Date", "Journal ID", "Account", "Debit", "Credit"];
@@ -125,7 +127,14 @@ export function parseXeroJournalReport(text: string): JournalImportResult {
 
   const journals = [...byId.values()];
   problems.push(...validateJournals(journals));
-  return { journals, problems };
+  let period: { from: IsoDate; to: IsoDate } | undefined;
+  for (const record of records.slice(0, header.index)) {
+    const said = /^For the period (.+?) to (.+)$/.exec((record.fields.find((f) => f.trim() !== "") ?? "").trim());
+    const from = said?.[1] ? parseDate(said[1]) : null;
+    const to = said?.[2] ? parseDate(said[2]) : null;
+    if (from !== null && to !== null) period = { from, to };
+  }
+  return { journals, problems, ...(period !== undefined ? { period } : {}) };
 }
 
 /**

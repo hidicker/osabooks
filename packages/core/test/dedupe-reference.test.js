@@ -63,3 +63,34 @@ test("duplicates are what stop an account being paired at all", () => {
     "deduplicating puts it back",
   );
 });
+
+test("Xero's two Account Transactions reports give the same lines once", () => {
+  // The bank-only report writes "469 - Rent" with no rate and no split; the
+  // full report writes "469 Rent" with both. Loaded together they doubled every
+  // line, and each spare copy showed as missing from the books.
+  const bankOnly = [
+    line({ code: "469 - Rent", label: "469 - Rent", amount: -165000, source: "bank.xlsx" }),
+    line({ code: "477 - Wages and Salaries", label: "477 - Wages and Salaries", amount: -193800, source: "bank.xlsx" }),
+  ];
+  const parts = [
+    { code: "477 Wages and Salaries", label: "477 Wages and Salaries", amount: -250000 },
+    { code: "825 PAYG Withholdings Payable", label: "825 PAYG Withholdings Payable", amount: 56200 },
+  ];
+  const full = [
+    line({ code: "469 Rent", label: "469 Rent", amount: -165000, gstRate: "GST on Expenses", source: "full.xlsx" }),
+    line({ code: "477 Wages and Salaries", label: "477 Wages and Salaries", amount: -193800, gstRate: "BAS Excluded", parts, source: "full.xlsx" }),
+  ];
+  const merged = dedupeReference(bankOnly, full);
+  assert.equal(merged.length, 2);
+  assert.equal(merged[0].gstRate, "GST on Expenses", "the rate is taken from the report that has it");
+  assert.equal(merged[1].parts.length, 2, "and the split");
+});
+
+test("books already holding both reports are put right as they open", () => {
+  const held = [
+    line({ code: "469 - Rent", label: "469 - Rent", source: "bank.xlsx" }),
+    line({ code: "469 Rent", label: "469 Rent", gstRate: "GST on Expenses", source: "full.xlsx" }),
+    line({ code: "469 Rent", label: "469 Rent", gstRate: "GST on Expenses", source: "full.xlsx" }),
+  ];
+  assert.equal(dedupeReference(held).length, 2, "one pair merged; the second payment in one file stays");
+});

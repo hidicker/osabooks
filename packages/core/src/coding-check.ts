@@ -1045,20 +1045,42 @@ function sameRate(ours: string, theirs: string): boolean {
  */
 export function dedupeReference(
   held: readonly ReferenceLine[],
-  incoming: readonly ReferenceLine[] = [],
+  incoming?: readonly ReferenceLine[],
 ): ReferenceLine[] {
+  // Held lines alone: each file's lines against the files before it, so books
+  // that already hold one export twice are put right as they open, and
+  // identical postings within one file are still all kept.
+  if (incoming === undefined) {
+    const bySource = new Map<string, ReferenceLine[]>();
+    for (const line of held) bySource.set(line.source, [...(bySource.get(line.source) ?? []), line]);
+    if (bySource.size < 2) return [...held];
+    let merged: ReferenceLine[] = [];
+    for (const lines of bySource.values()) merged = dedupeReference(merged, lines);
+    return merged;
+  }
   const fieldsKey = (line: ReferenceLine | undefined): string =>
     line?.bankFields === undefined ? "" : JSON.stringify(Object.entries(line.bankFields).sort());
+  // The account by its number where it has one: Xero's two Account
+  // Transactions reports write the same account "469 Rent" and "469 - Rent".
   const keyOf = (line: ReferenceLine): string =>
     [
       line.date,
       line.amount,
-      line.code,
-      line.label,
+      codeIn(line.code) ?? line.code,
       line.account ?? "",
-      line.gstRate ?? "",
-      (line.parts ?? []).length,
     ].join("\u0000");
+  // A rate or split on one and none on the other is the same line from
+  // another report: a bank account's own rows carry neither. Within one file,
+  // they are different lines.
+  const fits = (a: ReferenceLine | undefined, b: ReferenceLine): boolean => {
+    if (a === undefined) return false;
+    const otherReport = a.source !== b.source;
+    const x = (a.gstRate ?? "").trim();
+    const y = (b.gstRate ?? "").trim();
+    const m = (a.parts ?? []).length;
+    const n = (b.parts ?? []).length;
+    return (x === y || ((x === "" || y === "") && otherReport)) && (m === n || ((m === 0 || n === 0) && otherReport));
+  };
 
   const out: ReferenceLine[] = [...held];
   const byKey = new Map<string, number[]>();
@@ -1068,7 +1090,7 @@ export function dedupeReference(
 
   for (const line of incoming) {
     const key = keyOf(line);
-    const ats = (byKey.get(key) ?? []).filter((i) => !taken.has(i));
+    const ats = (byKey.get(key) ?? []).filter((i) => !taken.has(i) && fits(out[i], line));
     // Lines alike in everything else are the same line read twice -- unless
     // the bank's own fields say otherwise: two equal charges on one day, with
     // different serials, are two charges. A line read before the fields were
@@ -1088,6 +1110,9 @@ export function dedupeReference(
           ...(kept.bankAccount === undefined && line.bankAccount !== undefined ? { bankAccount: line.bankAccount } : {}),
           ...(kept.bankFields === undefined && line.bankFields !== undefined ? { bankFields: line.bankFields } : {}),
           ...(kept.contact === undefined && line.contact !== undefined ? { contact: line.contact } : {}),
+          ...((kept.gstRate ?? "") === "" && (line.gstRate ?? "") !== "" ? { gstRate: line.gstRate } : {}),
+          ...((kept.parts ?? []).length === 0 && (line.parts ?? []).length > 0 ? { parts: line.parts } : {}),
+          ...(kept.description === undefined && line.description !== undefined ? { description: line.description } : {}),
         };
       }
       taken.add(at);

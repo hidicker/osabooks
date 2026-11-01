@@ -394,9 +394,14 @@ async function loadEach(
           await loadCheckFiles([file]);
           break;
         case "journal-report":
-        case "general-ledger-detail":
-          await loadJournals(file);
+        case "general-ledger-detail": {
+          const short = await loadJournals(file);
+          if (short !== undefined) {
+            say(`${file.name} — ${short}`);
+            continue;
+          }
           break;
+        }
         case "not-needed":
           say(`${file.name} — ${identified.what}.`);
           continue;
@@ -489,7 +494,12 @@ export function clearCheck(): void {
   redraw("check");
 }
 
-export async function loadJournals(file: File): Promise<void> {
+/**
+ * Read a journal report. Returns what to say about it when it starts after the
+ * books do: the expense claims and manual journals before its first day are
+ * then missing, and nothing else would show it.
+ */
+export async function loadJournals(file: File): Promise<string | undefined> {
   const bytes = new Uint8Array(await file.arrayBuffer());
   const text = await asCsvText(file.name, bytes);
 
@@ -499,8 +509,14 @@ export async function loadJournals(file: File): Promise<void> {
       `${file.name} holds no journals. Export one from Xero as ` +
         "Accounting > Reports > Journal Report.",
     );
-    return;
+    return undefined;
   }
+  const start = state.ledger.openingBalances?.asAt ?? chosenStartDate() ?? "";
+  const short =
+    parsed.period !== undefined && start !== "" && parsed.period.from > start
+      ? `journal report from ${parsed.period.from} to ${parsed.period.to}, but these books start ${start}. ` +
+        `Export it again from ${start}: the expense claims and manual journals before ${parsed.period.from} are not in these books.`
+      : undefined;
   // Two exports of the same journals answer different questions: the Journal
   // Report carries the narration that tells a year-end adjustment from an
   // ordinary posting, and General Ledger Detail values every line -- gross,
@@ -526,7 +542,7 @@ export async function loadJournals(file: File): Promise<void> {
         `${lost.length} that carry a narration:\n\n${listed}${more}\n\n` +
         "These year-end entries cannot be recreated. Load this report anyway?",
     );
-    if (!ok) return;
+    if (!ok) return undefined;
   }
 
   state.ledger = { ...state.ledger, journals: merged.journals };
@@ -547,6 +563,7 @@ export async function loadJournals(file: File): Promise<void> {
     sayNarrationsKept(merged.carried);
   }
   await offerManualJournals(merged.journals);
+  return short;
 }
 
 /**
@@ -742,7 +759,16 @@ async function creditNotesByNumber(): Promise<number> {
     // owing exactly the credit: OpenAI's credit of 37.69 and its one bill of
     // 37.69 open at the start.
     const byAmount = candidates.filter((d) => (balances.get(d.number)?.remaining ?? 0) === credit);
-    const fits = byNumber.length > 0 ? byNumber : byReference.length > 0 ? byReference : byAmount;
+    const first = byNumber.length > 0 ? byNumber : byReference.length > 0 ? byReference : byAmount;
+    // Or, where none of those settles it, Xero's own figures: a document it
+    // calls settled whose payments fall short of its total by exactly the
+    // credit was settled by that credit. ORC1014, 4,620.00 with 4,235.00
+    // paid, and CR1014 for 385.00, while its second instalment was not yet
+    // matched here and so nothing owed exactly the credit.
+    const fits =
+      first.length === 1
+        ? first
+        : candidates.filter((d) => d.outstanding === 0 && d.total - d.paid === credit);
     const only = fits[0];
     if (fits.length !== 1 || only === undefined) continue;
     links[note.number] = only.number;
