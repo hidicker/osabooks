@@ -331,6 +331,14 @@ export function dedupe(
         (candidate) =>
           candidate.date !== transaction.date &&
           Math.abs(daysBetween(candidate.date, transaction.date)) <= adjacentDays &&
+          // Xero's account transactions are its reconciled ledger, not a feed:
+          // one export of them holds no re-dated copy of its own line, and $12
+          // of parking on each of nine days in it is nine days of parking.
+          !(
+            transaction.source.importer === "xero-bank" &&
+            candidate.source.importer === "xero-bank" &&
+            candidate.source.file === transaction.source.file
+          ) &&
           !(feedId(candidate) !== "" && feedId(transaction) !== "" && feedId(candidate) !== feedId(transaction)),
       );
 

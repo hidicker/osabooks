@@ -2216,11 +2216,12 @@ export async function settleInvoicesExactly(transaction: Transaction, said: read
  * where there is one: two open bills from a supplier is a person's question.
  *
  * Several must add up exactly. One may be paid in part: the 900.00 paid on a
- * 1,063.56 bill leaves what Xero says is still owing.
+ * 1,063.56 bill leaves what Xero says is still owing. A document with a
+ * payment already against it can take another while it still owes as much:
+ * an invoice paid in two instalments.
  */
 export function resolveSettlement(transaction: Transaction, said: readonly string[]): string[] | null {
   if (said.length === 0) return null;
-  const elsewhere = new Set(invoiceAssignments().values());
   const invoices = invoicesInPlay();
   const balances = invoiceBalanceMap();
   const owingOn = (invoice: { number: string; total: number }): number =>
@@ -2228,7 +2229,7 @@ export function resolveSettlement(transaction: Transaction, said: readonly strin
   const kind = transaction.amount < 0 ? "purchase" : "sales";
   const paying = Math.abs(transaction.amount);
   const usable = (i: Invoice, taken: readonly string[]): boolean =>
-    i.kind === kind && i.issued <= transaction.date && owingOn(i) > 0 && !elsewhere.has(i.number) && !taken.includes(i.number);
+    i.kind === kind && i.issued <= transaction.date && owingOn(i) > 0 && !taken.includes(i.number);
 
   const numbers: string[] = [];
   for (const number of said) {
@@ -2253,7 +2254,6 @@ export function resolveSettlement(transaction: Transaction, said: readonly strin
     if (pick === undefined) return null;
     numbers.push(pick.number);
   }
-  if (numbers.some((number) => elsewhere.has(number))) return null;
   let owing = 0;
   for (const number of numbers) {
     const invoice = invoices.find((i) => i.number === number);

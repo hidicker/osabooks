@@ -1582,7 +1582,7 @@ export function countryBox(): HTMLElement | null {
     const previous = jurisdictionOf(state.ledger.jurisdiction);
     select.value = previous.id;
     void askOnPage(
-      `Keep these books in ${to.id === "us" ? "the " : ""}${to.name}?
+      `Change these books to ${to.id === "us" ? "the " : ""}${to.name}?
 
 ` +
         "The tax year, the currency, the sales tax and the returns follow the country, and the starter chart " +
@@ -1592,7 +1592,7 @@ export function countryBox(): HTMLElement | null {
 
 The ${to.name} pack is still work in progress: reports and rates may be missing or wrong.`
           : ""),
-      "Change country",
+      `Change to ${to.name}`,
       "Keep " + previous.name,
     ).then((yes) => {
       if (!yes) return;

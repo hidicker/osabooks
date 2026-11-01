@@ -388,3 +388,15 @@ test("two feed lines with the bank's own different ids are two transactions, not
   const fromFile = { ...coffee, date: "2024-07-05", id: "file", extras: {} };
   assert.equal(dedupe([monday, fromFile]).stats.review, 1);
 });
+
+test("daily repeats in one Xero account transactions export are not asked about", () => {
+  const { transactions } = importFile(sample("bnz-card.csv"), { file: "card.csv" });
+  const coffee = transactions.find((t) => t.otherParty === "LOCAL CAFE");
+  const xero = { importer: "xero-bank", file: "Account_Transactions.xlsx", line: 5 };
+  const monday = { ...coffee, id: "mon", source: xero };
+  const tuesday = { ...coffee, date: "2024-07-05", id: "tue", source: { ...xero, line: 6 } };
+  assert.equal(dedupe([monday, tuesday]).stats.review, 0);
+  // From two exports it is still a question.
+  const other = { ...tuesday, id: "other", source: { ...xero, file: "Account_Transactions (2).xlsx" } };
+  assert.equal(dedupe([monday, other]).stats.review, 1);
+});
