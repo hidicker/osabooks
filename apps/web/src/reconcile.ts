@@ -1,5 +1,5 @@
-import { categorise, gstResolver, isGstControlCode, splitAccountLabel } from "@nzosa/core";
-import { booksCountry } from "./country.js";
+import { auGstRateName, categorise, gstResolver, isGstControlCode, splitAccountLabel } from "@nzosa/core";
+import { booksCountry, gstPercent } from "./country.js";
 import type {
   GstClassification,
   RuleFile,
@@ -123,10 +123,12 @@ export function suggest(
 
 /** How a treatment and side read on a return, in the accounting system's words. */
 export function rateLabel(classification: GstClassification): string {
+  if (booksCountry().id === "au") return auGstRateName(classification);
   if (classification.side === "imports") return "GST on Imports";
   if (classification.treatment === "zero-rated") return "Zero Rated";
   if (classification.treatment !== "standard") return "No GST";
-  return classification.side === "sales" ? "15% GST on Income" : "15% GST on Expenses";
+  const percent = gstPercent() || 15;
+  return classification.side === "sales" ? `${percent}% GST on Income` : `${percent}% GST on Expenses`;
 }
 
 /**

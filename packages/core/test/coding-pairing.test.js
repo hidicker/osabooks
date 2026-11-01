@@ -336,3 +336,19 @@ test("a deposit that is several invoice payments says which invoices it paid", (
   assert.deepEqual([...theirs.settles].sort(), ["INV-0051", "INV-0055"]);
   assert.equal(theirs.parts, undefined, "still not offered as a coding: the invoices settle it");
 });
+
+test("Xero Australia's rate names agree with the same treatment named our way", () => {
+  // Australian rates carry no percentage. Compared as text they never agreed,
+  // and every line showed as a GST rate difference that accepting could not clear.
+  const pair = (id, gstRate, ours) => {
+    const t = txn(id, "2026-03-02", -16500, "VICTORIA PROPERTY AGENCY");
+    const ref = { ...line("2026-03-02", -16500, "469", "Victoria Property Agency"), gstRate };
+    const result = compareCodings([{ transaction: t, code: "469" }], [ref], { chart: CHART, gstRateOf: () => ours });
+    return [...result.agreed, ...result.differed][0].gstDiffers;
+  };
+  assert.equal(pair("a", "GST on Expenses", "GST on Expenses"), undefined);
+  assert.equal(pair("b", "GST on Expenses", "GST on Income"), undefined, "the side is the sign's to say");
+  assert.equal(pair("c", "GST Free Expenses", "GST Free Income"), undefined);
+  assert.deepEqual(pair("d", "GST on Expenses", "BAS Excluded"), { ours: "BAS Excluded", theirs: "GST on Expenses" });
+  assert.deepEqual(pair("e", "GST Free Expenses", "GST on Expenses"), { ours: "GST on Expenses", theirs: "GST Free Expenses" });
+});

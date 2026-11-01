@@ -132,7 +132,7 @@ import type {
   Transaction,
 } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearEndShort, taxYearStart, taxYearStartSaid, depreciationRules, monthsOfTaxYear } from "../tax-year.js";
-import { booksCountry, booksLocale, moneyPlaces, booksMoney, noSalesTax, taxTypeLabel, booksCurrency } from "../country.js";
+import { booksCountry, booksLocale, gstPercent, moneyPlaces, booksMoney, noSalesTax, taxTypeLabel, booksCurrency } from "../country.js";
 import { type DownloadKind, hasDownload } from "./report-downloads.js";
 import { balanceSheetLabel } from "./balance-sheet-label.js";
 
@@ -4772,6 +4772,8 @@ function extractFor(year: number) {
     codeOf: (t: Transaction) => engine.codeOf(t) ?? "",
     classify: engine.classify,
     accountName: (id: string) => labels.get(id) ?? id,
+    country: booksCountry().id,
+    standardRate: gstPercent(),
     invoiceOf: (t: Transaction) => {
       const number = settled[t.id];
       return number === undefined ? "" : (invoices.get(number)?.number ?? number);

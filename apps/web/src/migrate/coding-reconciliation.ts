@@ -3171,7 +3171,7 @@ async function acceptCodesBulk(
     const chosenCode = single.kind === "imported" ? (mapToOurVocabulary(single.code) ?? single.code) : single.code;
     await record(
       "coding",
-      `${single.transaction.date} ${formatAmount(single.transaction.amount)} ${single.transaction.otherParty} → ${chosenCode} (accepted the ${single.kind === "imported" ? "${imported()}" : single.kind} coding)`,
+      `${single.transaction.date} ${formatAmount(single.transaction.amount)} ${single.transaction.otherParty} → ${chosenCode} (accepted the ${single.kind === "imported" ? imported() : single.kind} coding)`,
       batchEvents[0].before,
       overrides[single.transaction.id],
       single.transaction.id,

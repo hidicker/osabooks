@@ -341,6 +341,7 @@ export {
   formatAccountTransactions,
   accountTransactionRows,
   gstRateName,
+  auGstRateName,
   EXPORT_MARK,
 } from "./account-transactions.js";
 export type {
