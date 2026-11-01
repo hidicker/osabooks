@@ -17,7 +17,7 @@ import { describeRules } from "./rules-ui.js";
 import { setOptionDescriber } from "./combobox.js";
 import type { OptionInfo } from "./combobox.js";
 import { buildRows } from "./variance.js";
-import type { VarianceInput } from "./variance.js";
+import type { AccrualDocumentLine, VarianceInput } from "./variance.js";
 import type { RuleFileShape } from "./rules-ui.js";
 import { caches, state } from "./state.js";
 import { aiSuggestionFor } from "./ai.js";
@@ -75,6 +75,9 @@ import {
   outsidePurchases,
   outsideSales,
   journalGstFor,
+  accountTreatment as accountTreatmentOfCode,
+  isPosted as documentIsPosted,
+  canonicalCodeFor as canonicalCodeForNumber,
   mapToOurVocabulary as coreMapToOurVocabulary,
   sameEntityBanks as coreSameEntityBanks,
 } from "@nzosa/core";
@@ -981,7 +984,8 @@ export function recomputeVariance(): void {
  * returns listed to be marked as filed, so the figure recorded as filed is the
  * figure the comparison would have produced.
  */
-export function varianceInput(): VarianceInput {
+export function varianceInput(basis: "cash" | "accruals" = gstBasis()): VarianceInput {
+  const accruals = basis === "accruals";
   return {
     transactions: accountingLines(),
     splits: accountingSplitParts(),
@@ -1013,10 +1017,81 @@ export function varianceInput(): VarianceInput {
     // The private use of a vehicle gives back GST once a year, in Box 9 of
     // the return covering the balance date.
     debitAdjustments: vehicleBox9(accountsFor(state.varianceAccounts)),
-    otherPurchases: (period) => [...otherPurchasesFor(period), ...journalGstIn(period).purchases],
-    otherSales: (period) => [...otherSalesFor(period), ...journalGstIn(period).sales],
+    // Documents paid other than through the bank count when paid on the cash
+    // basis. On the accruals basis every document counts when issued, so
+    // their payments are not counted again.
+    otherPurchases: (period) => [...(accruals ? [] : otherPurchasesFor(period)), ...journalGstIn(period).purchases],
+    otherSales: (period) => [...(accruals ? [] : otherSalesFor(period)), ...journalGstIn(period).sales],
     settles: settlementOf,
+    ...(accruals ? { accrualDocuments: accrualDocumentLines() } : {}),
   };
+}
+
+/**
+ * Whether these books report GST on the cash basis or on accruals. Asked of
+ * Australian books only; everywhere else it is cash, as the return is worked.
+ */
+export function gstBasis(): "cash" | "accruals" {
+  if (booksCountry().id !== "au") return "cash";
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const chosen = model.entities.find((e) => e.id === state.entityFilter);
+  if (chosen !== undefined) return chosen.gstBasis ?? "cash";
+  const registered = model.entities.filter((e) => e.gstRegistered !== false && e.kind !== "personal");
+  return registered.some((e) => e.gstBasis === "accruals") ? "accruals" : "cash";
+}
+
+/**
+ * Every line of every invoice, bill, credit note and expense claim the return
+ * covers, as the accruals basis counts it: on the day issued, at the rate the
+ * line carries, a sale or a purchase by the document rather than by the sign.
+ * Drafts are left out, as they are of the books.
+ */
+function accrualDocumentLines(): AccrualDocumentLine[] {
+  const known = knownCodes(state.rules, state.ledger.overrides ?? {});
+  const out: AccrualDocumentLine[] = [];
+  for (const raw of invoicesInPlay()) {
+    if (!documentIsPosted(raw) || !documentCounts(raw)) continue;
+    const doc = accountingDocument(raw);
+    doc.lines.forEach((line, index) => {
+      if (line.gross === 0) return;
+      const read = accountTreatmentOfCode({ code: "", name: "", type: "", taxCode: line.taxType, description: "" });
+      const treatment: GstTreatment = read?.treatment ?? (line.tax !== 0 ? "standard" : "out-of-scope");
+      const side: GstSide =
+        read?.side === "imports"
+          ? "imports"
+          : treatment === "out-of-scope"
+            ? "none"
+            : doc.kind === "sales"
+              ? "sales"
+              : "purchases";
+      out.push({
+        transaction: {
+          id: `doc:${doc.kind}:${doc.number}:${index}`,
+          date: doc.issued,
+          amount: (doc.kind === "sales" ? line.gross : -line.gross) as Cents,
+          currency: doc.currency,
+          serial: "",
+          trn: "",
+          particulars: line.description,
+          code: line.accountCode,
+          reference: doc.number,
+          otherParty: doc.contact,
+          origin: "",
+          type: "",
+          batch: "",
+          otherPartyAccount: "",
+          account: "",
+          occurrence: 1,
+          source: { importer: "document", file: "", line: index },
+          extras: {},
+        } as Transaction,
+        treatment,
+        side,
+        code: canonicalCodeForNumber(line.accountCode, known) ?? line.accountCode,
+      });
+    });
+  }
+  return out;
 }
 
 function gstBelongsTo(): { belongsTo?: (account: string, code: string) => boolean } {

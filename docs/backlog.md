@@ -247,11 +247,6 @@ works).
   the page gets a turn between files. On a copy of those books the page was
   busy 4 s instead of 12, with the books saved identical. Still on the page's
   thread: a single file can hold it for up to a second.
-- **Australian BAS on the accruals basis.** Found comparing Xero's AU demo
-  company: OsaBooks works every BAS on the cash basis, and Xero's demo (like
-  many Australian businesses) reports GST on accruals. The figures agree on
-  the cash basis; an accruals choice would count invoices and bills when
-  issued, as `core/gst.ts` already can by tax point. 1 November 2026.
 - **Expense claims and manual journals from Account Transactions.** They
   come only from Xero's Journal Report, and a report exported for a month
   leaves the rest out (now named when it happens). The full Account
