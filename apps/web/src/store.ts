@@ -1705,8 +1705,9 @@ export async function emptyCloudBooks(): Promise<boolean> {
     events: [],
     payroll: { employerIrd: "", employees: [], payRuns: [] },
   };
+  // Every part, not only those the server held when the page opened: books
+  // made a moment ago held none then, and have been written to since.
   for (const part of FOLDER_PARTS) {
-    if (cloudParts[part] === undefined) continue;
     const outcome = await sendToCloud(part, blank[part]);
     if (outcome.kind !== "saved") {
       markUnsaved(part);
