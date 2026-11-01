@@ -36,7 +36,7 @@ import {
   salesTaxByRate,
 } from "@nzosa/core";
 import type { ContractorPayment, Entity, FormDefinition, FormSchedule, FullBas, IsoDate, Transaction } from "@nzosa/core";
-import { postedJournals, registeredForGst, reportEngine, varianceInput } from "../books.js";
+import { gstBasis, postedJournals, registeredForGst, reportEngine, saveEntities, varianceInput } from "../books.js";
 import { state } from "../state.js";
 import { note } from "../ui.js";
 import { computeOurReturns } from "../variance.js";
@@ -679,6 +679,8 @@ export function renderBas(body: HTMLElement, year: number): void {
   // Each line's account, for capital purchases (G10) and exports (G2).
   const engine = reportEngine();
   const accountOf = (t: Transaction): { type: string; name: string } | undefined => {
+    // An invoice or bill line, on the accruals basis, names its account itself.
+    if (t.source.importer === "document") return state.chart.find((a) => a.code === t.code);
     const label = engine?.codeOf(t) ?? null;
     if (label === null) return undefined;
     const { code, name } = splitAccountLabel(label);
@@ -736,6 +738,38 @@ export function renderBas(body: HTMLElement, year: number): void {
     document.getElementById("report-kind")?.dispatchEvent(new Event("change", { bubbles: true }));
   });
   body.append(formChoice);
+
+  // Cash or accruals: how the business is registered with the ATO. Kept with
+  // the books, on each GST-registered entity, as the frequency is.
+  const basis = gstBasis();
+  const basisChoice = document.createElement("select");
+  basisChoice.setAttribute("aria-label", "GST accounting basis");
+  for (const [value, text] of [
+    ["cash", "Cash basis"],
+    ["accruals", "Accruals basis"],
+  ] as const) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    option.selected = basis === value;
+    basisChoice.append(option);
+  }
+  basisChoice.addEventListener("change", () => {
+    const chosen = basisChoice.value === "accruals" ? "accruals" : "cash";
+    const model = state.ledger.entities;
+    if (model === undefined) return;
+    const which = state.entityFilter;
+    void saveEntities(
+      {
+        ...model,
+        entities: model.entities.map((e) =>
+          (which === "" ? e.gstRegistered !== false && e.kind !== "personal" : e.id === which) ? { ...e, gstBasis: chosen } : e,
+        ),
+      },
+      `GST on the ${chosen} basis`,
+    ).then(() => document.getElementById("report-kind")?.dispatchEvent(new Event("change", { bubbles: true })));
+  });
+  body.append(basisChoice);
 
   const table = document.createElement("table");
   table.className = "report-table";
@@ -821,8 +855,11 @@ export function renderBas(body: HTMLElement, year: number): void {
           "G10 is every purchase coded to a fixed asset account, whatever its tax code; Xero counts only those coded GST on Capital. "
         : "The simpler BAS: G1, 1A and 1B. ") +
         "In whole dollars, rounded down, as the ATO asks the BAS to be completed. " +
-        "Worked on the cash basis: a sale or purchase counts in the quarter it is paid, so an invoice or bill " +
-        "still owing is not here yet, whichever basis the reports show. " +
+        (basis === "accruals"
+          ? "Worked on the accruals basis: an invoice, bill or credit note counts in the quarter it is dated, " +
+            "paid or not, and its payment counts nothing more. Draft invoices are left out. "
+          : "Worked on the cash basis: a sale or purchase counts in the quarter it is paid, so an invoice or bill " +
+            "still owing is not here yet, whichever basis the reports show. ") +
         "G1 includes GST, and GST-free and input taxed sales such as interest. Due dates are for lodging yourself; a registered " +
         "tax agent lodging electronically usually has longer. T1 is the quarter's business and investment income in these books, " +
         "GST out, without salary or capital gains: income from elsewhere goes on top." +

@@ -108,6 +108,12 @@ export interface Entity {
    */
   gstFrequency?: 1 | 2 | 3 | 6;
   /**
+   * When GST falls due on the return: `cash` when the money moves, `accruals`
+   * when the invoice or bill is issued. Undefined is cash. Asked of
+   * Australian books, whose BAS can be lodged either way.
+   */
+  gstBasis?: "cash" | "accruals";
+  /**
    * The GST number, as it goes on an invoice you send somebody.
    *
    * Held rather than derived because nothing else in these books knows it, and

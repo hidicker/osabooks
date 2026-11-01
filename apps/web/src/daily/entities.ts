@@ -892,6 +892,35 @@ export function renderEntities(): void {
     });
     gstWrap.append(frequency);
 
+    // Australia: the BAS can be lodged on the cash or the accruals basis.
+    if (au) {
+      const basis = document.createElement("select");
+      basis.className = "entity-gst-frequency";
+      for (const [value, caption] of [
+        ["cash", "Cash basis"],
+        ["accruals", "Accruals basis"],
+      ] as const) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = caption;
+        option.selected = (entity.gstBasis ?? "cash") === value;
+        basis.append(option);
+      }
+      basis.hidden = !reportsNetOfGst(entity);
+      basis.title =
+        "When GST falls due: when the money moves (cash), or when the invoice or bill is issued (accruals), " +
+        "as the business is registered with the ATO.";
+      basis.addEventListener("change", () => {
+        const live = state.ledger.entities ?? emptyEntityModel();
+        const chosen = basis.value === "accruals" ? "accruals" : "cash";
+        void saveEntities(
+          { ...live, entities: live.entities.map((e) => (e.id === entity.id ? { ...e, gstBasis: chosen } : e)) },
+          `${entity.name} reports GST on the ${chosen} basis`,
+        );
+      });
+      gstWrap.append(basis);
+    }
+
     // Only a residential property is caught by the interest limitation rules,
     // so only one is asked. Exempt means its interest is claimed in full in
     // every year, including the year to 31 March 2025 when others got 80%.

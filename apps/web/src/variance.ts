@@ -23,6 +23,8 @@ import type {
   Settlement,
   Splits,
   Transaction,
+  GstSide,
+  GstTreatment,
   VarianceNote,
 } from "@nzosa/core";
 import { taxWithin } from "@nzosa/core";
@@ -89,6 +91,21 @@ export interface VarianceInput {
   otherPurchases?: (period: { from: string; to: string }) => OtherPurchase[];
   /** Sales in a period no bank line shows -- a manual journal's -- for Box 5. */
   otherSales?: (period: { from: string; to: string }) => OtherPurchase[];
+  /**
+   * On the accruals basis, every invoice, bill, credit note and claim line,
+   * dated as issued. Given, the bank lines that settle documents are left
+   * out -- their GST is these lines' -- and these are counted instead.
+   */
+  accrualDocuments?: readonly AccrualDocumentLine[];
+}
+
+/** One line of an invoice or bill as the return takes it on the accruals basis. */
+export interface AccrualDocumentLine {
+  transaction: Transaction;
+  treatment: GstTreatment;
+  side: GstSide;
+  /** The account it is coded to, as the books label it. */
+  code: string;
 }
 
 export interface VarianceRow {
@@ -168,10 +185,28 @@ export async function readFiledReturns(
  */
 export function computeOurReturns(input: VarianceInput, from: string, to: string): GstReturnResult[] {
   const split = expandSplits(input.transactions, input.splits, input.overrides);
-  // A payment settling an invoice is the sale or purchase it pays for.
-  const expanded = input.settles
-    ? { ...split, ...settledGst(split.transactions, split.overrides, input.settles) }
-    : split;
+  const documents = input.accrualDocuments;
+  const settles = input.settles;
+  // On the payments basis a payment settling an invoice is the sale or
+  // purchase it pays for. On the accruals basis the document itself is, on
+  // the day it was issued, and the payment only clears what is owed.
+  const expanded =
+    documents !== undefined
+      ? {
+          transactions: settles ? split.transactions.filter((t) => settles(t.id) === undefined) : split.transactions,
+          overrides: {
+            ...split.overrides,
+            ...Object.fromEntries(
+              documents.map((d) => [
+                d.transaction.id,
+                { confirmed: true, code: d.code, treatment: d.treatment, side: d.side, note: `document ${d.transaction.reference}` },
+              ]),
+            ),
+          } as typeof split.overrides,
+        }
+      : settles
+        ? { ...split, ...settledGst(split.transactions, split.overrides, settles) }
+        : split;
   const ruleFile = input.rules as RuleFile | undefined;
   const codingRules: RuleSet = { ...(ruleFile ?? {}), overrides: expanded.overrides };
   // Each line's code, worked out once: choosing the lines and resolving their
@@ -183,12 +218,16 @@ export function computeOurReturns(input: VarianceInput, from: string, to: string
   };
 
   const belongs = input.belongsTo;
-  const selected =
-    belongs !== undefined
+  const selected = [
+    ...(belongs !== undefined
       ? expanded.transactions.filter((t) => belongs(t.account, codeFor(t) ?? ""))
       : input.accounts.length === 0
         ? expanded.transactions
-        : expanded.transactions.filter((t) => input.accounts.includes(t.account));
+        : expanded.transactions.filter((t) => input.accounts.includes(t.account))),
+    // Chosen by entity when they were made, not by bank account: a document
+    // goes through no bank account.
+    ...(documents ?? []).map((d) => d.transaction),
+  ];
 
   const resolve = gstResolver({
     ownAccounts: new Set(
