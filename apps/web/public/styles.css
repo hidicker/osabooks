@@ -204,8 +204,12 @@
   font-size: 17px;
   font-weight: 650;
   letter-spacing: 0.04em;
-  color: #fff;
+  color: var(--on-navy);
 }
+/* The logo's own colours for the sidebar it sits on: the light-background
+   ring and tick on the light sidebar, the bright ones on the dark. */
+.wordmark .wordmark-o circle { stroke: var(--mark-ring); }
+.wordmark .wordmark-o path { stroke: var(--mark-tick); }
 
 .sidebar-nav {
   display: flex;
@@ -847,6 +851,8 @@
   --on-navy-dim: #34536a;
   /* Text on the sidebar where it is hovered or chosen. */
   --on-navy-strong: #0b1d29;
+  --mark-ring: #0b3d69;
+  --mark-tick: #c25e1a;
   --in: #0f6b52;
   --out: #b3402c;
   --review: #8a5a12;
@@ -879,6 +885,8 @@
     --on-navy: #e5edf1;
     --on-navy-dim: #96b3c4;
     --on-navy-strong: #ffffff;
+    --mark-ring: #5aa9e6;
+    --mark-tick: #f08a3c;
     --in: #4fbf9b;
     --out: #f08a76;
     --chart-1: #3987e5;
@@ -905,6 +913,8 @@
     --on-navy: #e5edf1;
     --on-navy-dim: #96b3c4;
     --on-navy-strong: #ffffff;
+    --mark-ring: #5aa9e6;
+    --mark-tick: #f08a3c;
     --in: #4fbf9b;
     --out: #f08a76;
     --chart-1: #3987e5;
