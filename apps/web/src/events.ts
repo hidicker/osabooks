@@ -305,12 +305,27 @@ export function canReverse(
 ): { ok: true } | { ok: false; why: string } {
   if (event.reverted === true) return { ok: false, why: "Already undone." };
 
+  // A batch has no single target: it is blocked only by a later change to one
+  // of its own lines, not by every later batch.
+  const batchIds =
+    event.kind === "codingBatch"
+      ? new Set(((event.before ?? []) as CodingBatchEntry[]).map((entry) => entry.id))
+      : null;
+  const touchesBatch = (e: LedgerEvent): boolean => {
+    if (batchIds === null) return false;
+    if (e.kind === "codingBatch") {
+      return ((e.before ?? []) as CodingBatchEntry[]).some((entry) => batchIds.has(entry.id));
+    }
+    if (e.kind === "coding" || e.kind === "split" || e.kind === "invoiceMatch") {
+      return batchIds.has(e.targetId ?? "");
+    }
+    return false;
+  };
   const newer = events.filter(
     (e) =>
       e.id > event.id &&
       e.reverted !== true &&
-      e.kind === event.kind &&
-      e.targetId === event.targetId,
+      (batchIds !== null ? touchesBatch(e) : e.kind === event.kind && e.targetId === event.targetId),
   );
   if (newer.length > 0) {
     const one = newer[newer.length - 1];
