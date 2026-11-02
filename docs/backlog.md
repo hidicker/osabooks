@@ -83,6 +83,21 @@ works).
 
 ## The app
 
+- **"Split 50/50" is the entertainment split, and says nothing of it.** It
+  makes half at 15% GST ("Deductible half") and half with none, whatever the
+  line is. Used to share a personal expense between two people, the 15% half
+  stays at 15% after the person's account is chosen, and the GST posted into
+  another entity's GST account (Larch Street's 820LS, for Hamish's half of a
+  Trip.com charge), though neither person is registered. Two things: name the
+  button for what it does (or make 50/50 plain halves with the line's own GST),
+  and have a part's GST follow its account's entity when that entity is not
+  registered, as a whole line does. Found by the Personal and Rentals test
+  books, 3 November 2026.
+- **History after a restore shows the replaced books' first steps.** Restoring
+  a backup into new books leaves "Started with one entity, XYZ Ltd" and "the
+  standard chart" from the empty books in History, and none of the backup's
+  own (History is not in backups, by design). Clearing History on restore, or
+  one entry "Restored from <file>", would say what happened.
 - **Notes double as a record of how a line was coded.** Reconcile writes
   "Suggestion accepted unchanged" and "Changed by hand, no description given"
   into the note, where the person's own words go, and Coding reconciliation

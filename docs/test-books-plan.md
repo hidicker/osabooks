@@ -1,6 +1,12 @@
 # Plan: four real sets of books as a regular test
 
-Status: plan agreed 2 November 2026, not built yet. Decisions are at the end.
+Status: built 3 November 2026, in `New2/TestBooks` (outside the repo: the
+data is private). How to run it and read the report: its `README.md`.
+All four books pass. Two differences from the plan below: Personal and Rentals
+comes in by restoring the cut backup, not by importing its lines, since its
+owners, shared accounts and rentals were set up by hand and no file holds
+them; and the books are checked to 30 September 2026 (QuickBooks to its own
+15 October), with every file imported as it is. Decisions are at the end.
 
 ## The idea
 
