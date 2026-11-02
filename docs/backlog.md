@@ -83,6 +83,32 @@ works).
 
 ## The app
 
+- **Notes double as a record of how a line was coded.** Reconcile writes
+  "Suggestion accepted unchanged" and "Changed by hand, no description given"
+  into the note, where the person's own words go, and Coding reconciliation
+  still recognises a line kept before 2 November by its note. A separate field
+  for how a line was coded (accepted, changed, kept, imported) would leave the
+  note for words a person typed. Needs a change to old books as they load.
+  From the code check of 2 November 2026 (`review-2026-11-02.md`, 4).
+- **Thirty-three copies of "format money".** Local `money()`, `dollars()` and
+  `formatMoney()` functions across the pages, some on `booksMoney`, some
+  rebuilt with `toLocaleString`, one on `toFixed(2)` (grants), differing on
+  negatives. Two shared ones (screen, and reports in brackets) would do.
+  Code check 2 November 2026, 10.
+- **History's order trusts each computer's clock.** Event ids start with the
+  local time, and Undo's "is there a later change" compares them as text. Two
+  people on two computers with clocks minutes apart can see Undo offered or
+  refused wrongly. Online, the server could stamp the time. Code check
+  2 November 2026, 11.
+- **Very large files.** `reports.ts` (about 6,000 lines),
+  `coding-reconciliation.ts` (4,500), `excel-export.ts`, `reconcile-page.ts`,
+  `store.ts`. The same idea gets built several ways in them (long tables,
+  Accept all). See `refactor-plan.md`. Code check 2 November 2026, 12.
+- **`innerHTML` with values written in.** Safe today (the values are the
+  app's own labels), but one bank payee passed in later would let a file put
+  HTML on the page. `textContent` throughout would remove the risk. Code
+  check 2 November 2026, 13.
+
 - **Wise balances in other currencies.** Only balances in the books' own
   currency can be brought in (`wise-feed.ts`): a KRW or EUR line came in as if
   it were dollars. Bringing others in needs each line converted at the day's

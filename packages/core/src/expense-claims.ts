@@ -74,6 +74,8 @@ export function expenseClaimsFromJournals(
   journals: readonly Journal[],
   from?: IsoDate,
   carriesGst?: CarriesGst,
+  /** The books' own currency: a claim is paid back in it. */
+  currency = "NZD",
 ): Invoice[] {
   const undone = new Set<string>();
   for (const journal of journals) {
@@ -132,7 +134,7 @@ export function expenseClaimsFromJournals(
       // lines matched to it, as for a bill entered in these books.
       paid: 0,
       outstanding: 0,
-      currency: "NZD",
+      currency,
       status: "Awaiting Payment",
       lines,
       claim: true,

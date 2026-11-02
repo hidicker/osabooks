@@ -114,7 +114,7 @@ import type {
   GstSide,
 } from "@nzosa/core";
 import { taxYearEnd, taxYearOf, taxYearStart, depreciationRules } from "./tax-year.js";
-import { booksCountry, booksLocale, moneyPlaces } from "./country.js";
+import { booksCountry, booksCurrency, booksLocale, moneyPlaces } from "./country.js";
 import { tellOnPage } from "./ui.js";
 
 /**
@@ -660,7 +660,7 @@ export async function record(
 ): Promise<void> {
   const event = makeEvent(state.who, kind, summary, before, after, targetId);
   state.events = appendEvent(state.events, event);
-  await saveEvents(state.events);
+  if (!(await saveEvents(state.events))) state.persistent = false;
   // A change into a period that had been locked goes on the books' own record,
   // which lasts as long as they do, where History is only the recent past.
   const moved = takeLockedMove();
@@ -761,13 +761,16 @@ export async function tidyChart(): Promise<void> {
 export async function persistRules(): Promise<void> {
   const file = state.rules as RuleFileShape | undefined;
   if (!file) return;
-  await saveRules({
+  const saved = await saveRules({
     version: 1,
     name: state.rulesName,
     loadedAt: state.rulesLoadedAt,
     rules: file,
   });
-  state.rulesDirty = false;
+  // Not saved stays unsaved, so the rules are still offered to be saved
+  // rather than looking safe when they are not.
+  state.rulesDirty = !saved;
+  if (!saved) state.persistent = false;
   if (state.page === "rules") redraw("rules");
 }
 
@@ -1240,7 +1243,7 @@ export async function syncExpenseClaims(): Promise<boolean> {
   const held = state.ledger.invoices ?? [];
   const start = booksStartKnown();
   const claims =
-    journals.length === 0 ? [] : expenseClaimsFromJournals(journals, start as IsoDate | undefined, claimCarriesGst());
+    journals.length === 0 ? [] : expenseClaimsFromJournals(journals, start as IsoDate | undefined, claimCarriesGst(), booksCurrency());
   const before = held.filter((i) => i.claim === true);
   if (JSON.stringify(before) === JSON.stringify(claims)) return false;
   state.ledger = { ...state.ledger, invoices: [...held.filter((i) => i.claim !== true), ...claims] };

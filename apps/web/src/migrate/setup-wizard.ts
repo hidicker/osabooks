@@ -1,4 +1,4 @@
-import { booksCountry } from "../country.js";
+import { booksCountry, booksCurrency } from "../country.js";
 import { jurisdictionOf, localToday } from "@nzosa/core";
 import {
   countryChoices,
@@ -174,7 +174,7 @@ function startupFiles(): StartupFile[] {
       what: "invoices",
       have: () => (state.ledger.invoices ?? []).length > 0,
       load: async (text) => {
-        const parsed = parseXeroInvoices(text);
+        const parsed = parseXeroInvoices(text, booksCurrency());
         if (parsed.invoices.length === 0) return null;
         const kinds = new Set(parsed.invoices.map((i) => i.kind));
         const kept = (state.ledger.invoices ?? []).filter((i) => !kinds.has(i.kind));
