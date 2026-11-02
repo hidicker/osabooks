@@ -2,7 +2,7 @@ import { moduleOn } from "../modules.js";
 import { asCsvText } from "../books.js";
 import { state } from "../state.js";
 import { note } from "../ui.js";
-import { MYIR_NOTE, emptyEntityModel, readIr3Confirmation, readIrdExport } from "@nzosa/core";
+import { MYIR_NOTE, emptyEntityModel, readIr3Confirmation, readIrdExport, localToday } from "@nzosa/core";
 import type { IrdRecord } from "@nzosa/core";
 import { guessEntity, keepIrdRecord } from "./ird-records.js";
 import { incomeReturnPanel } from "./income-returns.js";
@@ -114,7 +114,7 @@ function fyOf(date: string): number {
 
 /** The years of these books that have ended: the ones a file could be missing for. */
 export function bookYearsEnded(): number[] {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const years = new Set(state.ledger.transactions.map((t) => fyOf(t.date)));
   return [...years].filter((y) => taxYearEnd(y) < today).sort();
 }

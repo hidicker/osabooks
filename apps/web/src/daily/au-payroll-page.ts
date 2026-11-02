@@ -13,6 +13,7 @@ import {
   parseAmount,
   stpYearToDate,
   superDueDate,
+  localToday,
 } from "@nzosa/core";
 import type { Account, AuEmployee, AuPayFrequency, AuPayRun, AuPayroll, IsoDate } from "@nzosa/core";
 
@@ -27,7 +28,7 @@ import type { Account, AuEmployee, AuPayFrequency, AuPayRun, AuPayroll, IsoDate 
  * small employers), with the figures shown here.
  */
 
-const today = (): string => new Date().toLocaleDateString("en-CA");
+const today = (): string => localToday();
 const money = (cents: number): string => booksMoney(cents);
 
 function held(): AuPayroll {

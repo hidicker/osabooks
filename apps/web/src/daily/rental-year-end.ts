@@ -2,7 +2,7 @@ import { showPage } from "../app.js";
 import { bookYears } from "../books.js";
 import { $, state } from "../state.js";
 import { amountCell, nameCell, note } from "../ui.js";
-import { emptyEntityModel, isRental } from "@nzosa/core";
+import { emptyEntityModel, isRental, localToday } from "@nzosa/core";
 import type { Cents, Entity } from "@nzosa/core";
 import { renderAgentStatements, rentalSchedulesFor } from "./reports.js";
 import { tripsPanel, tripsStatus, vehiclesPanel } from "./vehicle-trips-panel.js";
@@ -119,7 +119,7 @@ export function renderRentalYearEnd(): void {
     return;
   }
   // The latest year that has ended, by default: the one whose returns are due.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const ended = years.filter((y) => taxYearEnd(y) < today);
   if (chosenYear === undefined || !years.includes(chosenYear)) chosenYear = ended[0] ?? years[0];
   const year = chosenYear ?? years[0] ?? 0;

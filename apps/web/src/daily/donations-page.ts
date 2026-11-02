@@ -14,6 +14,7 @@ import {
   givingStatementHtml,
   receiptProblems,
   spreadsheetCell,
+  localToday,
 } from "@nzosa/core";
 import type { Cents, DonationReceipt, Entity, IsoDate, Transaction } from "@nzosa/core";
 import { taxYearEndSaid, taxYearOf } from "../tax-year.js";
@@ -49,7 +50,7 @@ function money(cents: number): string {
 }
 
 function today(): IsoDate {
-  return new Date().toISOString().slice(0, 10);
+  return localToday();
 }
 
 function donees(): Entity[] {

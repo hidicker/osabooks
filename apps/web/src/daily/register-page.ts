@@ -18,6 +18,7 @@ import {
   registerProblem,
   registerRows,
   registerTransaction,
+  localToday,
 } from "@nzosa/core";
 import { dateLooksWrong } from "@nzosa/core";
 import type { IsoDate, SplitPart, Transaction } from "@nzosa/core";
@@ -39,7 +40,7 @@ const started = new Map<string, string>();
 /** The line being changed, or null for a new one. */
 let editing: string | null = null;
 
-const today = (): IsoDate => new Date().toLocaleDateString("en-CA") as IsoDate;
+const today = (): IsoDate => localToday() as IsoDate;
 const NOTE = "Entered in the register";
 
 /** Every account a register can show: those holding lines, and those just started. */
@@ -281,7 +282,7 @@ function entryForm(account: string, existing: Transaction | undefined): HTMLElem
       return;
     }
     // A year typed wrong, asked about before it is saved.
-    const slip = existing !== undefined && existing.date === draft.date ? null : dateLooksWrong(draft.date, new Date().toLocaleDateString("en-CA"));
+    const slip = existing !== undefined && existing.date === draft.date ? null : dateLooksWrong(draft.date, localToday());
     if (slip !== null && !(await askOnPage(`${slip}\n\nSave it with this date?`))) return;
     const sign = draft.amount > 0 ? 1 : -1;
     let coding: { code: string } | { parts: SplitPart[] };

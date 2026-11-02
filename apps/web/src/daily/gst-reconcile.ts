@@ -14,6 +14,7 @@ import {
   gstBoxesFrom,
   gstWithin,
   parseAmount,
+  localToday,
 } from "@nzosa/core";
 import type { FiledReturn, GstReturnResult, VarianceNote } from "@nzosa/core";
 import { loadFiledReturns } from "../migrate/file-intake.js";
@@ -332,7 +333,7 @@ function explanationsFor(row: VarianceRow): HTMLElement {
       period: row.periodEnd,
       amount: cents,
       reason: reason.value.trim(),
-      at: new Date().toISOString().slice(0, 10),
+      at: localToday(),
     };
     void saveExplanations(
       [...all, note],
@@ -395,7 +396,7 @@ function filedReturnTools(): HTMLElement {
   const last = dates[dates.length - 1];
   if (first === undefined || last === undefined) return wrap;
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   let ours: GstReturnResult[] = [];
   try {
     ours = computeOurReturns(varianceInput(), first, last);

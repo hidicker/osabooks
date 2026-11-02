@@ -15,6 +15,7 @@ import {
   isNoDepreciation,
   nextAssetNumber,
   parseAmount,
+  localToday,
 } from "@nzosa/core";
 import type { Cents, FixedAsset, IsoDate } from "@nzosa/core";
 import { loadAssets } from "../migrate/file-intake.js";
@@ -274,7 +275,7 @@ interface AssetDraft {
 
 let assetDraft: AssetDraft | null = null;
 
-const today = (): IsoDate => new Date().toISOString().slice(0, 10) as IsoDate;
+const today = (): IsoDate => localToday() as IsoDate;
 const typed = (cents: Cents): string => (cents / 100).toFixed(2);
 
 /**

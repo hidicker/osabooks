@@ -23,6 +23,7 @@ import {
   unknownBlanks,
   WORDING_BLANKS,
   wordingFor,
+  localToday,
 } from "@nzosa/core";
 import type { Contact, ContactKind, Invoice, PaidTo, Wording, WordingKind } from "@nzosa/core";
 import { paidTo } from "@nzosa/core";
@@ -71,7 +72,7 @@ interface Owing {
 }
 
 // The day where the person is: these books are kept in their own country.
-const today = (): string => new Date().toLocaleDateString("en-CA");
+const today = (): string => localToday();
 
 function owing(): Map<string, Owing> {
   const out = new Map<string, Owing>();

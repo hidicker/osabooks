@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dayAfter, dayBefore, parseDate, fromExcelSerial, daysBetween, financialYear, financialYearOf } from "../dist/index.js";
+import { dayAfter, dayBefore, parseDate, fromExcelSerial, daysBetween, financialYear, financialYearOf, localToday, localStamp } from "../dist/index.js";
 
 test("parses ISO dates", () => {
   assert.equal(parseDate("2024-07-01"), "2024-07-01");
@@ -108,4 +108,18 @@ test("dayBefore crosses month, year and leap-day boundaries", () => {
   assert.equal(dayBefore("2026-04-01"), "2026-03-31");
   assert.equal(dayBefore("2027-01-01"), "2026-12-31");
   assert.equal(dayBefore("2028-03-01"), "2028-02-29");
+});
+
+test("localToday is the date on the person's own clock, not in UTC", () => {
+  // 9am on 3 November in New Zealand is still 2 November in UTC.
+  const morning = new Date(2026, 10, 3, 9, 0, 0);
+  assert.equal(localToday(morning), "2026-11-03");
+  assert.equal(localToday(new Date(2026, 0, 5, 23, 59)), "2026-01-05");
+});
+
+test("localStamp shows a moment on the local clock", () => {
+  const at = new Date(2026, 10, 3, 9, 5, 0);
+  assert.equal(localStamp(at), "2026-11-03 09:05");
+  assert.equal(localStamp(at.toISOString()), "2026-11-03 09:05");
+  assert.equal(localStamp("not a time"), "not a time");
 });

@@ -8,6 +8,7 @@ import {
   generateEmployeeDetailsCsv,
   namePartsOf,
   splitName,
+  localToday,
 } from "@nzosa/core";
 import type { Employee, EmployeeDetails, IsoDate } from "@nzosa/core";
 import type { PayrollData } from "../store.js";
@@ -194,7 +195,7 @@ export function employeeDetailsFile(container: HTMLElement, payroll: PayrollData
         "(Payroll → Employees → upload a file). Their details are on each employee's form.",
     ),
   );
-  const today = new Date().toISOString().slice(0, 10) as IsoDate;
+  const today = localToday() as IsoDate;
   chosen ??= new Set(payroll.employees.filter((e) => recent(e, today)).map((e) => e.id));
   const list = document.createElement("div");
   for (const employee of payroll.employees) {

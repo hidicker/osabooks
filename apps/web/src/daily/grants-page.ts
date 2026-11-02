@@ -16,6 +16,7 @@ import {
   parseAmount,
   spreadsheetCell,
   unspentForBooks,
+  localToday,
 } from "@nzosa/core";
 import type { Account, Cents, Entity, Grant, GrantPosition, IsoDate, Transaction } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearOf } from "../tax-year.js";
@@ -47,7 +48,7 @@ function money(cents: number): string {
 }
 
 function today(): IsoDate {
-  return new Date().toISOString().slice(0, 10);
+  return localToday();
 }
 
 function nonProfits(): Entity[] {

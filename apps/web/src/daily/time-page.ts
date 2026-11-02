@@ -4,7 +4,7 @@ import { booksCurrency, booksMoney, noSalesTax, gstPercent } from "../country.js
 import { $, state } from "../state.js";
 import { save as saveLedger, savePart } from "../store.js";
 import { note, tellOnPage } from "../ui.js";
-import { findContact, nextInvoiceNumber, parseAmount, timeInvoiceLines, timeValue, unbilledTime } from "@nzosa/core";
+import { findContact, nextInvoiceNumber, parseAmount, timeInvoiceLines, timeValue, unbilledTime, localToday } from "@nzosa/core";
 import type { Invoice, TimeEntry } from "@nzosa/core";
 
 /**
@@ -16,7 +16,7 @@ import type { Invoice, TimeEntry } from "@nzosa/core";
 const SHOWN = 200;
 
 // The day where the person is: these books are kept in their own country.
-const today = (): string => new Date().toLocaleDateString("en-CA");
+const today = (): string => localToday();
 
 /**
  * The entries, with an invoice that has since been deleted forgotten: its

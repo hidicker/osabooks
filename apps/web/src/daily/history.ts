@@ -10,7 +10,7 @@ import type { Account, Attachment, RuleSet } from "@nzosa/core";
 import { deleteFile } from "../files.js";
 import { renameAccountBack } from "./entities.js";
 import { postedJournals } from "../books.js";
-import { daysWork, formatAmount, localDay, moveStillHolds, sourceIdsOf, transactionIdsIn } from "@nzosa/core";
+import { daysWork, formatAmount, localDay, moveStillHolds, sourceIdsOf, transactionIdsIn, localStamp } from "@nzosa/core";
 import type { MoveSnapshot } from "@nzosa/core";
 import type { PostedJournal } from "@nzosa/core";
 import { amountCell, nameCell } from "../ui.js";
@@ -158,7 +158,7 @@ export function renderHistory(): void {
   for (const event of shown) {
     const tr = document.createElement("tr");
     if (event.reverted === true) tr.className = "event-reverted";
-    const when = event.at.slice(0, 16).replace("T", " ");
+    const when = localStamp(event.at);
     for (const [text, cls] of [
       [when, "report-name"],
       [event.who, "report-name"],

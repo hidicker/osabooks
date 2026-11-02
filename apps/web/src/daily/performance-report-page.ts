@@ -23,6 +23,7 @@ import {
   reportProblems,
   spreadsheetCell,
   accountEntityKey,
+  localToday,
 } from "@nzosa/core";
 import type { Cents, CashAccounts, Entity, PerformanceInputs, PreviousFigures, Tier4Line } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearOf, taxYearStart } from "../tax-year.js";
@@ -143,7 +144,7 @@ export function renderPerformancePage(): void {
     body.append(note("No transactions yet, so there is no year to report on."));
     return;
   }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   if (!years.includes(chosenYear)) chosenYear = years.filter((y) => taxYearEnd(y) < today)[0] ?? years[0] ?? 0;
   const year = chosenYear;
 

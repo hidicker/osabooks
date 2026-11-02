@@ -10,6 +10,7 @@ import {
   gstAccountReconciliation,
   isGstControlCode,
   splitAccountLabel,
+  localToday,
 } from "@nzosa/core";
 import type { Cents } from "@nzosa/core";
 
@@ -90,7 +91,7 @@ export function gstAccountSection(): HTMLElement | null {
     ird,
   });
   // Periods still running are not a period end yet.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const ended = rows.filter((r) => r.periodEnd <= today);
   if (ended.length === 0) return null;
 

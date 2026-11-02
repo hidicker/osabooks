@@ -199,6 +199,8 @@ export {
   financialYear,
   financialYearOf,
   inRange,
+  localToday,
+  localStamp,
 } from "./dates.js";
 export type {
   IsoDate,

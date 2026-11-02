@@ -15,6 +15,7 @@ import {
   entityId,
   ownersTotal,
   parseOwners,
+  localToday,
 } from "@nzosa/core";
 import type { BusinessStructure, Entity, EntityKind, EntityModel } from "@nzosa/core";
 import { borrow, returnBorrowed } from "../borrow.js";
@@ -578,7 +579,7 @@ function dateQuestion(number: number, held: Onboarding): HTMLElement {
   // this one. This year's start was offered, which leaves last year in the
   // old system.
   const moving = held.source === "xero" || held.source === "sheet";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   date.value =
     held.startDate ??
     (earliest !== undefined

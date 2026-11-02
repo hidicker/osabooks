@@ -1,4 +1,4 @@
-import { formatAmount } from "@nzosa/core";
+import { formatAmount, localToday } from "@nzosa/core";
 import type { GstSide, GstTreatment, Transaction } from "@nzosa/core";
 import { loadLedger, saveLedger } from "./ledger.js";
 
@@ -118,7 +118,7 @@ export function runOverride(options: OverrideOptions): number {
         ? { claimIn: existing.claimIn }
         : {}),
     note: options.note ?? existing?.note ?? 'Suggestion confirmed unchanged',
-    at: new Date().toISOString().slice(0, 10),
+    at: localToday(),
   };
 
   saveLedger(options.ledger, { ...ledger, overrides });

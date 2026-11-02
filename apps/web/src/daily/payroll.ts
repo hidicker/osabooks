@@ -2,7 +2,7 @@ import { booksCurrency } from "../country.js";
 import { employeeDetailsFields, employeeDetailsFile } from "./payroll-employee-details.js";
 import { moduleOn } from "../modules.js";
 import { redraw } from "../app.js";
-import { childSupportFromNotices, employerDeductionsByMonth, nextPayPeriod } from "@nzosa/core";
+import { childSupportFromNotices, employerDeductionsByMonth, nextPayPeriod, localToday } from "@nzosa/core";
 import { itemsEditor } from "./payroll-items.js";
 import type { DeductionNotice, PayDeduction, PayItem } from "@nzosa/core";
 import { noticesEditor } from "./payroll-notices.js";
@@ -538,7 +538,7 @@ function renderEmployeeEditor(container: HTMLElement): void {
   // KiwiSaver Employee Rate
   // 3.5% is the default from 1 April 2026; 3% only with IR's approval of a
   // temporary rate reduction.
-  const defaultRate = kiwiSaverDefaultRate(new Date().toISOString().slice(0, 10));
+  const defaultRate = kiwiSaverDefaultRate(localToday());
   const ksSelect = document.createElement("select");
   const ksRates = [
     { rate: 0, label: "0% (not a member, or on a savings suspension)" },
@@ -848,7 +848,7 @@ function renderEmployeesTable(container: HTMLElement): void {
       ? `${percent(emp.kiwiSaverRate)} (employer ${percent(emp.kiwiSaverEmployerRate)})`
       : "Not a member";
 
-    const isFinished = emp.finishDate && emp.finishDate <= new Date().toISOString().slice(0, 10);
+    const isFinished = emp.finishDate && emp.finishDate <= localToday();
     const statusBadge = isFinished
       ? '<span class="payroll-badge finished">Finished</span>'
       : '<span class="payroll-badge active">Active</span>';
@@ -1047,7 +1047,7 @@ function renderPayRunCreator(container: HTMLElement): void {
     payRunDraft.periodEnd = next.periodEnd;
     payRunDraft.payDate = next.payDate;
   }
-  const today = new Date().toISOString().slice(0, 10) as IsoDate;
+  const today = localToday() as IsoDate;
   if (!payRunDraft.payDate) payRunDraft.payDate = today;
   if (!payRunDraft.periodEnd) payRunDraft.periodEnd = today;
   if (!payRunDraft.periodStart) {
@@ -1197,7 +1197,7 @@ function renderPayRunCreator(container: HTMLElement): void {
       const currentCs = payRunDraft.inputs.get(emp.id)?.childSupport;
       csInput.value = currentCs ? (currentCs / 100).toFixed(2) : "";
       // Left empty, the employee's child support notice is what is taken.
-      const noticed = childSupportFromNotices(emp, payRunDraft.payDate || new Date().toLocaleDateString("en-CA"));
+      const noticed = childSupportFromNotices(emp, payRunDraft.payDate || localToday());
       if (noticed > 0) {
         csInput.placeholder = (noticed / 100).toFixed(2);
         csInput.title = "From the employee's child support notice. Type an amount to take something else this pay.";

@@ -60,6 +60,7 @@ import {
   fillWording,
   dateLooksWrong,
   isForeign,
+  localToday,
 } from "@nzosa/core";
 import type {
   SalesTaxRate,
@@ -193,7 +194,7 @@ function suggestInvoiceNumber(kind: InvoiceKind): string {
 }
 
 function blankInvoice(): Invoice {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   if (editorOn === "bills") {
     // The entity chosen at the top, when it keeps bills; the only one that
     // does, when there is one.
@@ -1264,7 +1265,7 @@ async function saveInvoice(built: Invoice, existing: Invoice | undefined): Promi
   }
   // A year typed wrong: asked when the date is new or changed, not of one imported.
   if (existing === undefined || existing.issued !== built.issued) {
-    const slip = dateLooksWrong(built.issued, new Date().toLocaleDateString("en-CA"));
+    const slip = dateLooksWrong(built.issued, localToday());
     if (slip !== null && !(await askOnPage(`${slip}\n\nSave the ${noun} with this date?`))) return;
   }
   if (!(await billReady(built))) return;

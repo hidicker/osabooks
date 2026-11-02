@@ -6,7 +6,7 @@ import { booksCurrency } from "../country.js";
 import { state } from "../state.js";
 import { backendKind, booksReadOnly, openCloudBookId, savePart } from "../store.js";
 import { askOnPage, note, noteBriefly, tellOnPage } from "../ui.js";
-import { formatAmount, isPosted } from "@nzosa/core";
+import { formatAmount, isPosted, localToday } from "@nzosa/core";
 import type { Invoice } from "@nzosa/core";
 
 /**
@@ -108,7 +108,7 @@ export async function payLinkFor(invoice: Invoice): Promise<void> {
       await tellOnPage(`No link was made: ${(error as Error).message}`);
       return;
     }
-    link = { id: made.id, url: made.url, amount: owing, currency, made: new Date().toLocaleDateString("en-CA") };
+    link = { id: made.id, url: made.url, amount: owing, currency, made: localToday() };
     await replaceInvoice(invoice, { ...invoice, payLink: link }, `${invoice.number}: card payment link for ${formatAmount(owing)} ${currency}`);
   }
   try {

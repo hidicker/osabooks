@@ -10,7 +10,7 @@ import { saveRulesArchive } from "../store.js";
 import { askOnPage, download, note } from "../ui.js";
 import { combobox } from "../combobox.js";
 import { knownCodes } from "../reconcile.js";
-import { ruleMatches, ruleSearchText } from "@nzosa/core";
+import { ruleMatches, ruleSearchText, localStamp } from "@nzosa/core";
 import type { CategoryRule } from "@nzosa/core";
 
 /**
@@ -66,7 +66,7 @@ async function replaceRules(): Promise<void> {
       entries: [
         {
           name: state.rulesName,
-          replacedAt: new Date().toISOString().slice(0, 16).replace("T", " "),
+          replacedAt: localStamp(),
           rules: state.rules,
         },
         ...state.rulesArchive.entries,

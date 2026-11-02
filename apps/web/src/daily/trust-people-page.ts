@@ -2,7 +2,7 @@ import { redraw } from "../app.js";
 import { saveEntities } from "../books.js";
 import { $, state } from "../state.js";
 import { askOnPage, note } from "../ui.js";
-import { accountEntityKey, ageOn, emptyEntityModel, emptyTrust } from "@nzosa/core";
+import { accountEntityKey, ageOn, emptyEntityModel, emptyTrust, localToday } from "@nzosa/core";
 import type { Entity, Trust, TrustAppointer, TrustBeneficiary, TrustPerson } from "@nzosa/core";
 
 /**
@@ -168,7 +168,7 @@ export function renderTrustPeoplePage(): void {
     body.append(who);
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   // The trust's own accounts: a beneficiary's current account is the trust's
   // liability, never somebody else's equity. With nothing assigned to the trust
   // yet, every account, rather than an empty list.

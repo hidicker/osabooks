@@ -27,6 +27,7 @@ import {
   trustStatementRows,
   trustStatements,
   trustWorksheet,
+  localToday,
 } from "@nzosa/core";
 import type { Account, BalancePlace, Cents, Entity, ExpensePlacement, SettlementKind, TrustIncomeClass, TrustInputs } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
@@ -153,7 +154,7 @@ export function renderIr6Page(): void {
     body.append(note("No transactions yet, so there is no year to report on."));
     return;
   }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   if (!years.includes(chosenYear)) chosenYear = years.filter((y) => taxYearEnd(y) < today)[0] ?? years[0] ?? 0;
   const year = chosenYear;
   const trust = entity.trust ?? emptyTrust();

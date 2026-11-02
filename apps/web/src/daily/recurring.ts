@@ -11,6 +11,7 @@ import {
   nextDate,
   scheduleFromInvoice,
   scheduleProblem,
+  localToday,
 } from "@nzosa/core";
 import type { RecurringFrequency, RecurringInvoice } from "@nzosa/core";
 
@@ -22,7 +23,7 @@ import type { RecurringFrequency, RecurringInvoice } from "@nzosa/core";
  * in a return, until they are looked at and sent.
  */
 
-const today = (): string => new Date().toISOString().slice(0, 10);
+const today = (): string => localToday();
 
 const schedules = (): RecurringInvoice[] => state.ledger.recurring ?? [];
 

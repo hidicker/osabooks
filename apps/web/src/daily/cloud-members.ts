@@ -1,3 +1,4 @@
+import { localToday } from "@nzosa/core";
 import { callFunction, currentSession, rpc } from "../cloud.js";
 import { usingOwnProject } from "../cloud-config.js";
 import { askOnPage, note } from "../ui.js";
@@ -90,7 +91,7 @@ async function invite(bookId: string, email: string, role: string): Promise<{ ok
 }
 
 function today(): string {
-  return new Date().toLocaleDateString("en-CA");
+  return localToday();
 }
 
 /** "No end", "Until 30 Nov 2026", or "Ended 30 Nov 2026". */
