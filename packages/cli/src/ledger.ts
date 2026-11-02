@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { dedupe, dedupeKey } from "@nzosa/core";
+import { NO_SALES_TAX, dedupe, dedupeKey, jurisdictionOf, setSalesTaxFraction } from "@nzosa/core";
 import type {
   Account,
   DedupeResult,
@@ -26,6 +26,8 @@ import type {
 export interface Ledger {
   /** Bumped when the shape changes so old files can be migrated, not guessed at. */
   version: 1;
+  /** The country the books are kept in ("nz", "au", ...); New Zealand when absent. */
+  jurisdiction?: string;
   /** Dedupe keys the user has confirmed are genuine repeats, not duplicates. */
   legitimateDuplicates: string[];
   /**
@@ -223,7 +225,21 @@ function loadFolder(folder: string): Ledger {
   return ledger as unknown as Ledger;
 }
 
+/**
+ * The ledger at this path, with the books' rate of GST set to match.
+ *
+ * The rate is one setting for everything that works out tax, and New
+ * Zealand's unless something says otherwise: Australian books read here
+ * worked out their GST at 3/23, not 1/11.
+ */
 export function loadLedger(path: string): Ledger {
+  const ledger = readLedger(path);
+  const country = jurisdictionOf(ledger.jurisdiction);
+  setSalesTaxFraction(country.salesTax === null ? NO_SALES_TAX : country.salesTax.fraction);
+  return ledger;
+}
+
+function readLedger(path: string): Ledger {
   if (!existsSync(path)) return emptyLedger();
   if (statSync(path).isDirectory()) return loadFolder(path);
 
@@ -246,8 +262,10 @@ export function loadLedger(path: string): Ledger {
     );
   }
 
+  const jurisdiction = (ledger as { jurisdiction?: unknown }).jurisdiction;
   return {
     version: 1,
+    ...(typeof jurisdiction === "string" ? { jurisdiction } : {}),
     legitimateDuplicates: ledger.legitimateDuplicates ?? [],
     transactions: ledger.transactions ?? [],
     ...(ledger.balances ? { balances: ledger.balances } : {}),
