@@ -680,7 +680,9 @@ export async function loadInvoices(file: File): Promise<string> {
   // what was held of its own kind only: the bills file used to replace the
   // sales invoices already loaded, and the other way round.
   const kinds = new Set(parsed.invoices.map((i) => i.kind));
-  const kept = (state.ledger.invoices ?? []).filter((i) => !kinds.has(i.kind));
+  // Expense claims are bills too, but they come from the journal report, not
+  // this file: a bills export loaded after it used to take them all away.
+  const kept = (state.ledger.invoices ?? []).filter((i) => i.claim === true || !kinds.has(i.kind));
   // The customers and vendors they name, as records with the email Xero
   // gave: nothing else brings them across from Xero.
   const contactsBefore = (state.ledger.contacts ?? []).length;
