@@ -856,12 +856,26 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
 
 async function saveSplit(id: string, parts: SplitPart[] | null): Promise<void> {
   const splits = { ...(state.ledger.splits ?? {}) };
+  const was = splits[id] ?? null;
   if (parts === null) delete splits[id];
   else splits[id] = parts;
   state.ledger = { ...state.ledger, splits };
   const suggested = state.splitSuggested?.id === id ? state.splitSuggested : null;
   state.splitSuggested = null;
   state.persistent = await save(state.ledger);
+  // On History, so a split can be undone like any coding: it was saved
+  // without a word there, and Undo had nothing to take back.
+  if (parts !== null || was !== null) {
+    const line = state.ledger.transactions.find((t) => t.id === id);
+    const said = line === undefined ? id : `${line.date} ${formatAmount(line.amount)} ${line.otherParty}`;
+    await record(
+      "split",
+      parts === null ? `${said}: split removed` : `${said} split into ${parts.length} part${parts.length === 1 ? "" : "s"}`,
+      was,
+      parts,
+      id,
+    );
+  }
   if (parts !== null) suggested?.saved();
   state.splitting = null;
   redraw("reconcile");
