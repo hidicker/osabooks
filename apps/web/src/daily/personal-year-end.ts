@@ -3,7 +3,7 @@ import { myirCard } from "./myir-cards.js";
 import { accountDecided, bookYears } from "../books.js";
 import { $, state } from "../state.js";
 import { download, note } from "../ui.js";
-import { emptyEntityModel, isRental, ownersOf } from "@nzosa/core";
+import { emptyEntityModel, isRental, ownersOf, localToday } from "@nzosa/core";
 import type { Cents } from "@nzosa/core";
 import { ir3Csv, ir3For, renderIr3Details, renderTaxExtras } from "./reports.js";
 import { ir3PackHtml } from "./ir3-pack.js";
@@ -92,7 +92,7 @@ export function renderPersonalYearEnd(): void {
     return;
   }
   // The latest year that has ended, by default: the one whose return is due.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const ended = years.filter((y) => taxYearEnd(y) < today);
   if (chosenYear === undefined || !years.includes(chosenYear)) chosenYear = ended[0] ?? years[0];
   if (!owners.includes(chosenOwner)) chosenOwner = owners[0] ?? "";

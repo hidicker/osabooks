@@ -1,4 +1,4 @@
-import { isGnuCashTransactions, isMyobJournal, parseGnuCashBooks, parseMyobBooks } from "@nzosa/core";
+import { isGnuCashTransactions, isMyobJournal, parseGnuCashBooks, parseMyobBooks, localToday } from "@nzosa/core";
 import { applyDueDates, isIif, isQuickBooksExportJournal, isQuickBooksDesktopDetail, parseQuickBooksDesktopDetailBooks, isQuickBooksTrialBalance, parseQuickBooksTrialBalance, trialBalance, isSlowBooksLedger, mergeContacts, parseDueDates, parseProductList, parseContactList, parseIifBooks, parseSlowBooksBooks, parseQuickBooksBooks, parseQuickBooksLedger, quickBooksChartFrom, splitPartId } from "@nzosa/core";
 import type { Item, ManualJournal, SplitPart } from "@nzosa/core";
 import { asCsvText, hasCoding, postedJournals, reconcileRows, record, reclassify, saveManualJournals } from "../books.js";
@@ -288,7 +288,7 @@ export async function loadProductList(file: File): Promise<string> {
           ...(state.ledger.stockCounts ?? []),
           {
             id: `count-${stamp}`,
-            date: new Date().toLocaleDateString("en-CA"),
+            date: localToday(),
             lines: counted.map((c) => ({ itemId: c.item.id, quantity: c.onHand, unitCost: c.item.unitCost ?? 0 })),
           },
         ];

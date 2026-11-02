@@ -2,7 +2,7 @@ import { record } from "../books.js";
 import { state } from "../state.js";
 import { savePart } from "../store.js";
 import { askOnPage, note } from "../ui.js";
-import { completeTask, taskOpen } from "@nzosa/core";
+import { completeTask, taskOpen, localToday } from "@nzosa/core";
 import type { CareRepeat, CareTask, IsoDate, PropertyCare } from "@nzosa/core";
 import { booksLocale } from "../country.js";
 
@@ -21,7 +21,7 @@ const REPEATS: readonly [CareRepeat | "", string][] = [
 ];
 
 function today(): IsoDate {
-  return new Date().toISOString().slice(0, 10);
+  return localToday();
 }
 
 function said(date: IsoDate | undefined): string {

@@ -1,5 +1,5 @@
 import { booksCurrency } from "../country.js";
-import { formatAmount, parseAmount } from "@nzosa/core";
+import { formatAmount, parseAmount, localToday } from "@nzosa/core";
 import type { DeductionNotice } from "@nzosa/core";
 import { state } from "../state.js";
 
@@ -141,7 +141,7 @@ export function noticesEditor(
   add.className = "small";
   add.textContent = "Add a notice";
   add.addEventListener("click", () => {
-    list = [...list, { id: `notice-${Date.now().toString(36)}`, kind: "ird", reference: "", from: new Date().toLocaleDateString("en-CA") }];
+    list = [...list, { id: `notice-${Date.now().toString(36)}`, kind: "ird", reference: "", from: localToday() }];
     onChange(list);
     draw();
   });

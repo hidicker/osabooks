@@ -12,6 +12,7 @@ import {
   knownCodes,
   parseAmount,
   splitAccountLabel,
+  localToday,
 } from "@nzosa/core";
 import { redraw } from "../app.js";
 import { billEntities, controlAccountFor, record } from "../books.js";
@@ -263,7 +264,7 @@ export function openQuickEntry(kind: InvoiceKind): void {
   actions.append(another, cancel, go);
   box.append(actions);
 
-  const today = new Date().toLocaleDateString("en-CA");
+  const today = localToday();
   addRow(today);
   refreshTotal();
   another.addEventListener("click", () => {
@@ -325,7 +326,7 @@ export function openQuickEntry(kind: InvoiceKind): void {
         return;
       }
       // Years typed wrong, asked about together.
-      const now = new Date().toLocaleDateString("en-CA");
+      const now = localToday();
       const slips = typed.map((t, i) => [i, dateLooksWrong(t.date, now)] as const).filter(([, s]) => s !== null);
       if (slips.length > 0 && !(await askOnPage(`${slips.map(([i, s]) => `Row ${i + 1}: ${s}`).join("\n")}\n\nSave them with these dates?`))) return;
       const owner = entityId();

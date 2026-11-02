@@ -23,6 +23,7 @@ import {
   findContact,
   formatAmount,
   isPosted,
+  localToday,
 } from "@nzosa/core";
 import type { DocumentStatus, Entity, Invoice, InvoiceBalance, OutsidePayment } from "@nzosa/core";
 import { booksCountry, booksMoney, noSalesTax } from "../country.js";
@@ -43,7 +44,7 @@ import { openQuickEntry } from "./quick-entry.js";
 /** The bill whose payment is being recorded, or null. */
 let paying: string | null = null;
 
-const today = (): string => new Date().toISOString().slice(0, 10);
+const today = (): string => localToday();
 
 const money = (cents: number): string =>
   booksMoney(cents);

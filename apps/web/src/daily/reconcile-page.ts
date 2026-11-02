@@ -65,6 +65,7 @@ import {
   splitAccountLabel,
   splitPartId,
   xeroNumberOf,
+  localToday,
 } from "@nzosa/core";
 import type {
   CategoryRule,
@@ -1975,7 +1976,7 @@ async function matchToInvoice(
         side: transaction.amount > 0 ? "sales" : "purchases",
         confirmed: true,
         note: `Settles ${number} (${invoice.contact}). Coded from the invoice.`,
-        at: new Date().toISOString().slice(0, 10),
+        at: localToday(),
       };
       coded = true;
     }
@@ -2441,7 +2442,7 @@ export async function confirmLine(
         : changed
           ? "Changed by hand, no description given"
           : "Suggestion accepted unchanged",
-    at: new Date().toISOString().slice(0, 10),
+    at: localToday(),
   };
   state.ledger = { ...state.ledger, overrides };
   // Saved, and written to History, without waiting for the server before the

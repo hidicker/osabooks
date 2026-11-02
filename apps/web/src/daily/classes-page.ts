@@ -5,7 +5,7 @@ import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { askOnPage, askTextOnPage, note, tellOnPage } from "../ui.js";
 import { taxYearEnd, taxYearOf, taxYearStart } from "../tax-year.js";
-import { classSource } from "@nzosa/core";
+import { classSource, localToday } from "@nzosa/core";
 
 /**
  * Classes: names, and which bank lines, invoices and journals each is given
@@ -171,7 +171,7 @@ export function renderClasses(): void {
     return;
   }
 
-  const thisYear = taxYearOf(new Date().toISOString().slice(0, 10));
+  const thisYear = taxYearOf(localToday());
   if (year === null) year = thisYear;
   const controls = document.createElement("div");
   controls.className = "contacts-controls";

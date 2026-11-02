@@ -1,4 +1,4 @@
-import { explained, formatAmount, parseAmount } from "@nzosa/core";
+import { explained, formatAmount, parseAmount, localToday } from "@nzosa/core";
 import type { VarianceNote } from "@nzosa/core";
 import { loadLedger, saveLedger } from "./ledger.js";
 
@@ -75,7 +75,7 @@ export function runExplain(options: ExplainOptions): number {
     period: options.period,
     amount,
     reason: options.note,
-    at: new Date().toISOString().slice(0, 10),
+    at: localToday(),
   };
   notes.push(note);
   saveLedger(options.ledger, { ...ledger, varianceNotes: notes });

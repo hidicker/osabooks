@@ -5,7 +5,7 @@ import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { taxYearEndShort, taxYearOf } from "../tax-year.js";
 import { note } from "../ui.js";
-import { parseAmount } from "@nzosa/core";
+import { parseAmount, localToday } from "@nzosa/core";
 
 /**
  * Budgets: what each income and expense account is expected to come to in a
@@ -14,7 +14,7 @@ import { parseAmount } from "@nzosa/core";
  */
 
 // The books' year, by the year it ends in, as the Reports page counts it.
-let year = taxYearOf(new Date().toISOString().slice(0, 10));
+let year = taxYearOf(localToday());
 
 const isIncome = (type: string): boolean => /revenue|income|sales/i.test(type);
 const isCost = (type: string): boolean => /expense|overhead|direct|cost/i.test(type);
@@ -30,7 +30,7 @@ export function renderBudgets(): void {
   const controls = document.createElement("div");
   controls.className = "contacts-controls";
   const pick = document.createElement("select");
-  const now = taxYearOf(new Date().toISOString().slice(0, 10));
+  const now = taxYearOf(localToday());
   for (const y of [now - 1, now, now + 1]) {
     const option = document.createElement("option");
     option.value = String(y);

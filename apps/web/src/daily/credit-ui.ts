@@ -4,7 +4,7 @@ import { booksCurrency, booksMoney } from "../country.js";
 import { state } from "../state.js";
 import { save } from "../store.js";
 import { amountCell, nameCell, note, wideTable } from "../ui.js";
-import { allocationProblem, creditsOnAccount, parseAmount, proposeAllocations } from "@nzosa/core";
+import { allocationProblem, creditsOnAccount, parseAmount, proposeAllocations, localToday } from "@nzosa/core";
 import type { CreditAllocation, CreditOnAccount, InvoiceBalance, InvoiceKind, IsoDate } from "@nzosa/core";
 
 /**
@@ -13,7 +13,7 @@ import type { CreditAllocation, CreditOnAccount, InvoiceBalance, InvoiceKind, Is
  * it against their other documents, in whole or in part, when it is wanted.
  */
 
-const today = (): IsoDate => new Date().toLocaleDateString("en-CA") as IsoDate;
+const today = (): IsoDate => localToday() as IsoDate;
 
 /** Credit on account for a page's documents, by contact, with a way to use it. */
 export function creditOnAccountSection(body: HTMLElement, balances: Map<string, InvoiceBalance>, kind: InvoiceKind): void {

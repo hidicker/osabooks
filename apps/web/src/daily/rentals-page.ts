@@ -3,7 +3,7 @@ import { postedJournals, record } from "../books.js";
 import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { amountCell, askOnPage, nameCell, note } from "../ui.js";
-import { accountEntityKey, bondStatus, emptyEntityModel, parseAmount, rentOn, rentPosition, rentSources } from "@nzosa/core";
+import { accountEntityKey, bondStatus, emptyEntityModel, parseAmount, rentOn, rentPosition, rentSources, localToday } from "@nzosa/core";
 import type { Account, Cents, Entity, IsoDate, RentFrequency, RentSource, Tenancy } from "@nzosa/core";
 import { tripsPanel } from "./vehicle-trips-panel.js";
 import { propertyCarePanel } from "./property-care-panel.js";
@@ -437,7 +437,7 @@ export function renderRentalsPage(): void {
     body.append(note("No rental properties. On Entities & accounts, mark a property residential or commercial."));
     return;
   }
-  const asAt = new Date().toISOString().slice(0, 10);
+  const asAt = localToday();
   const year = taxYearOf(asAt);
   const tenancies = state.ledger.tenancies ?? [];
   const shown = entities.filter((e) => state.entityFilter === "" || e.id === state.entityFilter);

@@ -34,6 +34,7 @@ import {
   usIncomeTaxSingle,
   usQbiDeduction,
   salesTaxByRate,
+  localToday,
 } from "@nzosa/core";
 import type { ContractorPayment, Entity, FormDefinition, FormSchedule, FullBas, IsoDate, Transaction } from "@nzosa/core";
 import { gstBasis, postedJournals, registeredForGst, reportEngine, saveEntities, varianceInput } from "../books.js";
@@ -430,7 +431,7 @@ export function renderBudgetVsActual(body: HTMLElement, year: number): void {
     }
   }
   // The months gone: all twelve for a year past, none for one not begun.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const months =
     today > to
       ? 12

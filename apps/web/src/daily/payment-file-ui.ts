@@ -1,4 +1,4 @@
-import { NZ_BANK_FORMATS, abaFile, isAccountNumber, nzPaymentFile } from "@nzosa/core";
+import { NZ_BANK_FORMATS, abaFile, isAccountNumber, nzPaymentFile, localToday } from "@nzosa/core";
 import type { BankPayment, IsoDate, NzBankFormat, PaymentFile } from "@nzosa/core";
 import { bankLabel, banks } from "../books.js";
 import { booksMoney } from "../country.js";
@@ -71,7 +71,7 @@ function remember(payer: string, next: Remembered): void {
   }
 }
 
-const todayIs = (): IsoDate => new Date().toLocaleDateString("en-CA") as IsoDate;
+const todayIs = (): IsoDate => localToday() as IsoDate;
 
 function labelled(text: string, control: HTMLElement, hint?: string): HTMLLabelElement {
   const label = document.createElement("label");

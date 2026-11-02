@@ -7,6 +7,8 @@ import { filedByPeriod, filedKey,
   splitPartId,
   withoutStaleTreatments,
   expenseClaimsFromJournals,
+  localToday,
+  localStamp,
 } from "@nzosa/core";
 import type { CarriesGst } from "@nzosa/core";
 import { appendEvent, makeEvent } from "./events.js";
@@ -926,7 +928,7 @@ export function tidyStaleTreatments(chart: readonly Account[] = state.chart): bo
 export async function useRules(rules: RuleFileShape, name: string, verb: string): Promise<void> {
   state.rules = rules;
   state.rulesName = name;
-  state.rulesLoadedAt = new Date().toISOString().slice(0, 16).replace("T", " ");
+  state.rulesLoadedAt = localStamp();
   state.pendingRules = null;
   state.rulesMessage = `${verb} ${name}: ${describeRules(rules)}.`;
   await saveRules({ version: 1, name, loadedAt: state.rulesLoadedAt, rules });
@@ -1398,7 +1400,7 @@ function exchangeJournals(): PostedJournal[] {
       });
     }
   }
-  const today = new Date().toLocaleDateString("en-CA");
+  const today = localToday();
   const balanceDates = bookYears().map((y) => taxYearEnd(y)).filter((d) => d <= today);
   return [
     ...realisedFxJournals(payments, books, rates, {
@@ -1919,14 +1921,14 @@ export function keepConfirmedGst(): { batch: { id: string; before: TransactionOv
   const found = confirmedGstToStore();
   const first = state.ledger.gstKeptFrom === undefined;
   if (found === null) {
-    if (first) state.ledger = { ...state.ledger, gstKeptFrom: new Date().toISOString().slice(0, 10) };
+    if (first) state.ledger = { ...state.ledger, gstKeptFrom: localToday() };
     return first ? { batch: [], splitIds: [] } : null;
   }
   state.ledger = {
     ...state.ledger,
     overrides: found.overrides,
     splits: found.splits,
-    gstKeptFrom: state.ledger.gstKeptFrom ?? new Date().toISOString().slice(0, 10),
+    gstKeptFrom: state.ledger.gstKeptFrom ?? localToday(),
   };
   return { batch: found.batch, splitIds: found.splitIds };
 }
@@ -2391,7 +2393,7 @@ export function chartBalances(): { yearToDate: Map<string, Cents>; today: Map<st
   ) {
     return balancesCache;
   }
-  const now = new Date().toISOString().slice(0, 10);
+  const now = localToday();
   const yearStart = taxYearStart(taxYearOf(now));
   const opening = state.ledger.openingBalances;
   const yearToDate = new Map<string, Cents>();

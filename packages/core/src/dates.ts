@@ -157,6 +157,26 @@ export function dayAfter(date: IsoDate): IsoDate {
   return at.toISOString().slice(0, 10) as IsoDate;
 }
 
+/**
+ * Today's date where the person is, as YYYY-MM-DD.
+ *
+ * Not `toISOString()`, which is the date in UTC: in New Zealand that is still
+ * yesterday until noon or 1pm, so an invoice made in the morning was dated the
+ * day before.
+ */
+export function localToday(now: Date = new Date()): IsoDate {
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` as IsoDate;
+}
+
+/** A moment as the person's own clock shows it, "2026-11-03 09:15", from a Date or an ISO time. */
+export function localStamp(at: Date | string = new Date()): string {
+  const when = typeof at === "string" ? new Date(at) : at;
+  if (Number.isNaN(when.getTime())) return typeof at === "string" ? at.slice(0, 16).replace("T", " ") : "";
+  const pad = (n: number): string => String(n).padStart(2, "0");
+  return `${localToday(when)} ${pad(when.getHours())}:${pad(when.getMinutes())}`;
+}
+
 /** The day before, the same way as `dayAfter`. */
 export function dayBefore(date: IsoDate): IsoDate {
   const at = new Date(`${date}T00:00:00Z`);

@@ -1,5 +1,5 @@
 import { note } from "../ui.js";
-import { NZ_REGIONS, formatAmount, leaveBalance, ordinaryWeeklyPayOf, workingDaysBetween } from "@nzosa/core";
+import { NZ_REGIONS, formatAmount, leaveBalance, ordinaryWeeklyPayOf, workingDaysBetween, localToday } from "@nzosa/core";
 import type { Cents, IsoDate, LeaveKind, LeaveSettings, LeaveTaken } from "@nzosa/core";
 import type { PayrollData } from "../store.js";
 import { taxYearEnd } from "../tax-year.js";
@@ -35,7 +35,7 @@ function hours(value: number, perUnit: number, unit: string): string {
 
 function defaultAsAt(): IsoDate {
   // The last 31 March that has passed: the balance date an accountant asks about.
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const year = Number(today.slice(0, 4));
   return (today >= taxYearEnd(year) ? taxYearEnd(year) : taxYearEnd(year - 1)) as IsoDate;
 }

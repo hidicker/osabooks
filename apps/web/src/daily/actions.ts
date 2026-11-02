@@ -28,7 +28,7 @@ import { codingReconciliationWaiting, unmatchedReferenceWaiting } from "../migra
 import { bankLinkState, setupSteps } from "../migrate/setup-wizard.js";
 import { $, state } from "../state.js";
 import { amountCell, nameCell, note } from "../ui.js";
-import { banksNeedingOwner, emptyEntityModel, overdrawnCurrentAccounts, owedBetween, gstDueDate, gstPeriods, isCreditNote, isPosted, matchInvoices, overdueTasks, endedWithMoneyLeft, grantOpen, reportsDue } from "@nzosa/core";
+import { banksNeedingOwner, emptyEntityModel, overdrawnCurrentAccounts, owedBetween, gstDueDate, gstPeriods, isCreditNote, isPosted, matchInvoices, overdueTasks, endedWithMoneyLeft, grantOpen, reportsDue, localToday } from "@nzosa/core";
 import type { IsoDate } from "@nzosa/core";
 import { booksLocale, moneyPlaces } from "../country.js";
 import { booksCountry, noSalesTax } from "../country.js";
@@ -264,7 +264,7 @@ export function actionItems(): ActionItem[] {
   // At each year end, a not-for-profit's figures for the year just finished, as
   // its signed statements give them: they decide the standard for the next two.
   {
-    const finished = taxYearOf(new Date().toISOString().slice(0, 10)) - 1;
+    const finished = taxYearOf(localToday()) - 1;
     const orgs = (state.ledger.entities?.entities ?? []).filter((e) => e.kind === "nonprofit" && !societyFiguresEntered(e, finished));
     if (orgs.length > 0) {
       items.push({
@@ -298,7 +298,7 @@ export function actionItems(): ActionItem[] {
   // A company (or trust, or society) owed money by an owner at the year just
   // finished: interest-free, that is a taxable benefit.
   {
-    const finished = taxYearOf(new Date().toISOString().slice(0, 10)) - 1;
+    const finished = taxYearOf(localToday()) - 1;
     const { journals, accounts } = betweenEntities();
     const model = state.ledger.entities ?? emptyEntityModel();
     const overdrawn = overdrawnCurrentAccounts(journals, accounts, taxYearEnd(finished) as IsoDate);

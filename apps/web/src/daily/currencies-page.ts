@@ -5,7 +5,7 @@ import { booksCurrency, booksLocale } from "../country.js";
 import { $, state } from "../state.js";
 import { save, savePart } from "../store.js";
 import { askOnPage, note, tellOnPage } from "../ui.js";
-import { foreignInUse, missingRates } from "@nzosa/core";
+import { foreignInUse, missingRates, localToday } from "@nzosa/core";
 import type { Account } from "@nzosa/core";
 import { exchangeAccounts, fxRates } from "../fx-books.js";
 
@@ -90,8 +90,8 @@ function currencySection(body: HTMLElement, currency: string, use: { from: strin
   fetchButton.title = "The European Central Bank's reference rates, through frankfurter.dev. Only the currencies and the dates are sent.";
   // From its first use, or -- not used yet -- from the start of the books.
   const oldest = bookYears().at(-1);
-  const from = use?.from ?? (oldest !== undefined ? taxYearStart(oldest) : new Date().toLocaleDateString("en-CA"));
-  const today = new Date().toLocaleDateString("en-CA");
+  const from = use?.from ?? (oldest !== undefined ? taxYearStart(oldest) : localToday());
+  const today = localToday();
   fetchButton.addEventListener("click", () => {
     fetchButton.disabled = true;
     fetchButton.textContent = "Fetching…";

@@ -3,7 +3,7 @@ import { applyBetweenNow, betweenEntities, betweenLinesDiffering, saveEntities }
 import { state } from "../state.js";
 import { askOnPage, note, tellOnPage } from "../ui.js";
 import { booksLocale, moneyPlaces } from "../country.js";
-import { emptyEntityModel, isSeparatePerson, owedBetween, pairKey } from "@nzosa/core";
+import { emptyEntityModel, isSeparatePerson, owedBetween, pairKey, localToday } from "@nzosa/core";
 import type { EntityModel, IsoDate } from "@nzosa/core";
 
 /**
@@ -50,7 +50,7 @@ function betweenSettings(model: EntityModel): HTMLElement {
 
   // The pairs money has actually passed between.
   const { journals, accounts } = betweenEntities();
-  const owed = owedBetween(journals, accounts, model, new Date().toISOString().slice(0, 10) as IsoDate);
+  const owed = owedBetween(journals, accounts, model, localToday() as IsoDate);
   const entityOf = new Map(accounts.map((a) => [a.code, a.entityId]));
   const pairs = new Set<string>();
   for (const journal of journals) {

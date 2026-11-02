@@ -1,5 +1,5 @@
 import { booksCountry } from "../country.js";
-import { jurisdictionOf } from "@nzosa/core";
+import { jurisdictionOf, localToday } from "@nzosa/core";
 import {
   countryChoices,
   countryLocked,
@@ -1361,7 +1361,7 @@ export function setupSteps(
   // A not-for-profit's reporting standard turns on its last two years as its
   // signed statements give them: asked for here, not read from books that may
   // not hold the whole of those years.
-  const current = taxYearOf(new Date().toISOString().slice(0, 10));
+  const current = taxYearOf(localToday());
   for (const org of model.entities.filter((e) => e.kind === "nonprofit")) {
     const years = [current - 1, current - 2];
     const have = years.filter((y) => societyFiguresEntered(org, y)).length;

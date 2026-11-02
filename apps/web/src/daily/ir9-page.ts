@@ -14,6 +14,7 @@ import {
   ir9Worksheet,
   parseAmount,
   spreadsheetCell,
+  localToday,
 } from "@nzosa/core";
 import type { Cents, Entity, Ir9Class, Ir9Inputs } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
@@ -100,7 +101,7 @@ export function renderIr9Page(): void {
     body.append(note("No transactions yet, so there is no year to report on."));
     return;
   }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   if (!years.includes(chosenYear)) chosenYear = years.filter((y) => taxYearEnd(y) < today)[0] ?? years[0] ?? 0;
   const year = chosenYear;
   const np = entity.nonprofit;

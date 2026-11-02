@@ -64,6 +64,7 @@ import {
   inferRules,
   labelForChartAccount,
   parseOwners,
+  localToday,
 } from "@nzosa/core";
 import type {
   Account,
@@ -438,7 +439,7 @@ export async function acceptAllShown(): Promise<void> {
   await showWorking(document.getElementById("accept-all"), `Accepting ${lines.length}…`, async () => {
     const overrides = { ...(state.ledger.overrides ?? {}) };
     const batch: CodingBatchEntry[] = [];
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday();
     for (const one of lines) {
       batch.push({ id: one.transaction.id, before: overrides[one.transaction.id] ?? null });
       const code = codeFor(one);
@@ -3139,7 +3140,7 @@ async function acceptCodesBulk(
         stated === null
           ? `Accepted the ${item.kind} coding on the Coding reconciliation page.`
           : `Accepted the ${item.kind} coding and its rate (${item.rate}) on the Coding reconciliation page.`,
-      at: new Date().toISOString().slice(0, 10),
+      at: localToday(),
     };
     batchEvents.push({
       id: item.transaction.id,
@@ -3381,7 +3382,7 @@ async function acceptCode(
       stated === null
         ? `Accepted the ${kindName} coding on the Coding reconciliation page.`
         : `Accepted the ${kindName} coding and its rate (${rate}) on the Coding reconciliation page.`,
-    at: new Date().toISOString().slice(0, 10),
+    at: localToday(),
   };
   const invoiceMatches = { ...(state.ledger.invoiceMatches ?? {}) };
   const off = unmatchForCoding(transaction, chosen, invoiceMatches);
@@ -4456,7 +4457,7 @@ function keptOverride(
     keptAgainstImport: code,
     // A note somebody wrote on the line stays; the flag above says it was kept.
     note: was?.note !== undefined && was.note.trim() !== "" ? was.note : KEPT_NOTE,
-    at: new Date().toISOString().slice(0, 10),
+    at: localToday(),
   };
 }
 

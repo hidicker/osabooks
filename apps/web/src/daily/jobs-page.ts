@@ -5,7 +5,7 @@ import { $, state } from "../state.js";
 import { save } from "../store.js";
 import { askOnPage, askTextOnPage, note, tellOnPage } from "../ui.js";
 import { taxYearEnd, taxYearOf, taxYearStart } from "../tax-year.js";
-import { jobLabel, jobProfits } from "@nzosa/core";
+import { jobLabel, jobProfits, localToday } from "@nzosa/core";
 import type { Job, JobsHeld } from "@nzosa/core";
 import { sources } from "./classes-page.js";
 
@@ -111,7 +111,7 @@ function addSection(body: HTMLElement): void {
       id: `job${Date.now().toString(36)}`,
       name: said,
       customer: whose,
-      started: new Date().toLocaleDateString("en-CA"),
+      started: localToday(),
     };
     open = job.id;
     void keepJobs({ ...held, jobs: [...held.jobs, job] }, `Added job ${jobLabel(job)}`);
@@ -333,7 +333,7 @@ export function renderJobs(): void {
   const controls = document.createElement("div");
   controls.className = "contacts-controls";
   const pick = document.createElement("select");
-  const thisYear = taxYearOf(new Date().toLocaleDateString("en-CA"));
+  const thisYear = taxYearOf(localToday());
   for (const [value, text] of [
     ["all", "Since each job began"],
     ...[thisYear, thisYear - 1, thisYear - 2].map((y) => [String(y), `${taxYearStart(y)} to ${taxYearEnd(y)}`]),

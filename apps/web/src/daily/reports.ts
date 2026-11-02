@@ -1,7 +1,7 @@
 import { renderAuRentalSchedule, renderAuTax, renderBas, renderContractors, renderKrBusiness, renderKrRental, renderKrTax, renderKrVat, renderScheduleC, renderBudgetVsActual, renderProfitByClass, renderProfitByJob, renderPayrollTax, renderSalesTax, renderScheduleE, renderUsTax } from "./country-reports.js";
 import { attachmentsControl } from "./attachments-ui.js";
 import { comparing, drawPeriodControls, earlierRange, periodFileName, periodHeading, reportRange } from "./report-period.js";
-import { cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell } from "@nzosa/core";
+import { cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell, localToday } from "@nzosa/core";
 import type { OwingDocument } from "@nzosa/core";
 import { computeOurReturns } from "../variance.js";
 import { renderCashFlow } from "./cash-flow-report.js";
@@ -446,7 +446,7 @@ export function startNewJournal(): void {
   if (journalDraft === null) {
     const year = Number($<HTMLSelectElement>("report-year").value) || bookYears()[0];
     journalDraft = {
-      date: year === undefined ? new Date().toLocaleDateString("en-CA") : reportRange(year).to,
+      date: year === undefined ? localToday() : reportRange(year).to,
       narration: "",
       lines: [blankJournalLine(), blankJournalLine()],
     };
@@ -781,7 +781,7 @@ function journalEditor(draft: JournalDraft): HTMLElement {
     readRows();
     const { journal, problems } = assemble();
     if (problems.length > 0) return;
-    const slip = dateLooksWrong(journal.date, new Date().toLocaleDateString("en-CA"));
+    const slip = dateLooksWrong(journal.date, localToday());
     if (slip !== null && !(await askOnPage(`${slip}\n\nSave the journal with this date?`))) return;
     journalDraft = null;
     const told = journalSaved;
@@ -2536,7 +2536,7 @@ function chosenGstReturn(year: number): GstReturnResult | undefined {
   const returns = gstReturnsFor(year);
   const chosen = returns.find((r) => r.period.to === gstPeriodChoice);
   if (chosen !== undefined) return chosen;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   return [...returns].reverse().find((r) => r.period.to < today) ?? returns[returns.length - 1];
 }
 
@@ -2557,7 +2557,7 @@ function renderGstReturn(body: HTMLElement, year: number): void {
   const result = chosenGstReturn(year) ?? returns[returns.length - 1];
   if (result === undefined) return;
   gstPeriodChoice = result.period.to;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const entity = reportingEntity();
   const filed = state.filed.find((f) => f.periodEnd === result.period.to);
   const money = (cents: Cents): string =>
@@ -5095,7 +5095,7 @@ function renderCharts(body: HTMLElement, year: number): void {
 
   // Where the bank is heading, from today: with the year we are in, or the
   // latest the books hold.
-  const today = new Date().toLocaleDateString("en-CA");
+  const today = localToday();
   if ((today >= taxYearStart(year) && today <= taxYearEnd(year)) || year === bookYears()[0]) body.append(cashForecastSection(today));
 
   const biggest = [...whole.report.expenses]
@@ -5140,7 +5140,7 @@ function renderCharts(body: HTMLElement, year: number): void {
  */
 function healthTiles(report: ProfitAndLoss, year: number): HTMLElement {
   const grouped = groupProfitAndLoss(report, reportLookups().classOf);
-  const today = new Date().toLocaleDateString("en-CA");
+  const today = localToday();
   const { from, to: end } = reportRange(year);
   const to = today < end ? today : end;
   const days = Math.max(1, Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000) + 1);
@@ -5281,7 +5281,7 @@ export type AnalysisKind = (typeof ANALYSES)[number][0];
  */
 export function analysisPrompt(kind: AnalysisKind): string {
   const year = bookYears()[0];
-  const today = new Date().toLocaleDateString("en-CA");
+  const today = localToday();
   const kindSelect = $<HTMLSelectElement>("report-kind");
   const basisSelect = $<HTMLSelectElement>("report-basis");
   const yearSelect = $<HTMLSelectElement>("report-year");

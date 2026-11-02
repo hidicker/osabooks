@@ -1,4 +1,4 @@
-import { convert, isForeign, rateOn, spreadsheetCell } from "@nzosa/core";
+import { convert, isForeign, rateOn, spreadsheetCell, localToday } from "@nzosa/core";
 import { accountingDocument, fxRates } from "../fx-books.js";
 import { redraw } from "../app.js";
 import {
@@ -44,7 +44,7 @@ let asAtChosen: string | null = null;
 
 function defaultAsAt(year: number): string {
   const end = taxYearEnd(year);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   return today < end ? today : end;
 }
 

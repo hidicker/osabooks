@@ -18,6 +18,7 @@ import {
   ir7Worksheet,
   parseAmount,
   spreadsheetCell,
+  localToday,
 } from "@nzosa/core";
 import type { Account, Cents, Entity, Ir7ExpensePlacement, Ir7Holder, Ir7IncomeClass, Ir7Inputs, Ir7Kind } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
@@ -137,7 +138,7 @@ export function renderIr7Page(): void {
     body.append(note("No transactions yet, so there is no year to report on."));
     return;
   }
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   if (!years.includes(chosenYear)) chosenYear = years.filter((y) => taxYearEnd(y) < today)[0] ?? years[0] ?? 0;
   const year = chosenYear;
 

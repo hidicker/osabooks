@@ -4,7 +4,7 @@ import { booksCountry, booksCurrency, booksMoney, noSalesTax } from "../country.
 import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { askOnPage, download, note, tellOnPage } from "../ui.js";
-import { formatItems, itemKey, lowStock, parseAmount, parseProductList, splitAccountLabel, stockAdjustment, stockAsAt, stockValue } from "@nzosa/core";
+import { formatItems, itemKey, lowStock, parseAmount, parseProductList, splitAccountLabel, stockAdjustment, stockAsAt, stockValue, localToday } from "@nzosa/core";
 import type { Item, StockCount, StockMove } from "@nzosa/core";
 
 /** Products and services: a price list that fills in an invoice line from a name. */
@@ -399,7 +399,7 @@ function stockSection(body: HTMLElement): void {
   // What is on hand, from the bills, invoices and counts: now, or as at a day.
   const tracked = stockTracked();
   if (tracked !== null) {
-    const now = new Date().toLocaleDateString("en-CA");
+    const now = localToday();
     const low = lowStock(stocked, tracked.onHand);
     if (low.length > 0) {
       const warn = document.createElement("p");
@@ -498,7 +498,7 @@ function stockSection(body: HTMLElement): void {
   box.className = "contact-form";
   const date = document.createElement("input");
   date.type = "date";
-  date.value = new Date().toLocaleDateString("en-CA");
+  date.value = localToday();
   const dateLabel = document.createElement("label");
   dateLabel.className = "contact-field";
   dateLabel.append(Object.assign(document.createElement("span"), { textContent: "Counted on" }), date);
