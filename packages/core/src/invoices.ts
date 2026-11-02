@@ -223,7 +223,8 @@ const REQUIRED = ["InvoiceNumber", "InvoiceDate", "Total", "LineAmount", "Accoun
  * mixing those up silently understates every invoice by 13%, so the gross is
  * computed explicitly rather than assumed.
  */
-export function parseXeroInvoices(text: string): InvoiceImportResult {
+/** `currency` is the books' own, for a file with no Currency column. */
+export function parseXeroInvoices(text: string, currency = "NZD"): InvoiceImportResult {
   const records = parseCsvRecords(text);
   const header = findHeaderRow(records, REQUIRED);
 
@@ -284,7 +285,7 @@ export function parseXeroInvoices(text: string): InvoiceImportResult {
         tax: parseAmount(cells.get("TaxTotal")) ?? 0,
         paid: parseAmount(cells.get("InvoiceAmountPaid")) ?? 0,
         outstanding: parseAmount(cells.get("InvoiceAmountDue")) ?? 0,
-        currency: cells.get("Currency") || "NZD",
+        currency: cells.get("Currency") || currency,
         status: cells.get("Status"),
         lines: [],
         ...(email !== null ? { email } : {}),

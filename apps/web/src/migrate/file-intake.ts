@@ -16,6 +16,7 @@ import { askOnPage, tellOnPage } from "../ui.js";
 import { downloadBackupNow, restoreWithConfirm } from "../backup.js";
 import { readFiledReturns } from "../variance.js";
 import { readIrdFiles } from "../daily/ird-records.js";
+import { booksCurrency } from "../country.js";
 import {
   identifyExport,
   isQuickBooksExportStatement,
@@ -667,7 +668,7 @@ export async function loadAssets(file: File): Promise<void> {
 }
 
 export async function loadInvoices(file: File): Promise<string> {
-  const parsed = parseXeroInvoices(await readXeroText(file));
+  const parsed = parseXeroInvoices(await readXeroText(file), booksCurrency());
   if (parsed.invoices.length === 0) {
     const none =
       `${file.name} holds no invoices or bills. Export them from Xero as Business > Invoices > Export, ` +

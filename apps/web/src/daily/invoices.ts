@@ -61,6 +61,7 @@ import {
   dateLooksWrong,
   isForeign,
   localToday,
+  parseAmount,
 } from "@nzosa/core";
 import type {
   SalesTaxRate,
@@ -147,32 +148,36 @@ async function addCashOnHand(): Promise<string> {
   return code === "" ? account.name : `${account.name} - ${code}`;
 }
 
-/** The GST treatments an invoice line can carry, named as Xero names them. */
+/**
+ * The GST treatments an invoice line can carry, named as Xero New Zealand
+ * names them (the page shows each country's own words, `taxTypeLabel`).
+ * Whether a line carries GST is all they say; the rate is the books' own.
+ */
 const INVOICE_TAX_TYPES = [
-  { value: "15% GST on Income", label: "15% GST on Income", rate: 15 },
-  { value: "Zero Rated", label: "Zero rated", rate: 0 },
-  { value: "GST Exempt", label: "Exempt", rate: 0 },
-  { value: "No GST", label: "No GST", rate: 0 },
+  { value: "15% GST on Income", label: "15% GST on Income", taxable: true },
+  { value: "Zero Rated", label: "Zero rated", taxable: false },
+  { value: "GST Exempt", label: "Exempt", taxable: false },
+  { value: "No GST", label: "No GST", taxable: false },
 ] as const;
 
 /** And a bill's, which Xero names for the side of the return they claim on. */
 const BILL_TAX_TYPES = [
-  { value: "15% GST on Expenses", label: "15% GST on Expenses", rate: 15 },
-  { value: "Zero Rated Expenses", label: "Zero rated", rate: 0 },
-  { value: "GST Exempt", label: "Exempt", rate: 0 },
-  { value: "No GST", label: "No GST", rate: 0 },
+  { value: "15% GST on Expenses", label: "15% GST on Expenses", taxable: true },
+  { value: "Zero Rated Expenses", label: "Zero rated", taxable: false },
+  { value: "GST Exempt", label: "Exempt", taxable: false },
+  { value: "No GST", label: "No GST", taxable: false },
 ] as const;
 
 /** The treatments offered for a document of this kind, keeping one it already has. */
-function taxTypesFor(kind: InvoiceKind): readonly { value: string; label: string; rate: number }[] {
+function taxTypesFor(kind: InvoiceKind): readonly { value: string; label: string; taxable: boolean }[] {
   return kind === "purchase" ? BILL_TAX_TYPES : INVOICE_TAX_TYPES;
 }
 
-/** The rate a treatment charges, whichever list it came from. */
-function rateOf(taxType: string): number {
+/** Whether a treatment carries GST, whichever list or country it came from. */
+function isTaxable(taxType: string): boolean {
   // Xero New Zealand writes the rate ("15% GST on Income"); Xero Australia
   // does not ("GST on Income", "GST on Capital"). Both charge the books' rate.
-  return /15%|10%/.test(taxType) || /^\s*gst on (income|expenses|capital)\b/i.test(taxType) ? 15 : 0;
+  return /15%|10%/.test(taxType) || /^\s*gst on (income|expenses|capital)\b/i.test(taxType);
 }
 
 /**
@@ -275,11 +280,22 @@ function quoteWord(): "Quote" | "Estimate" {
   return booksCountry().id === "nz" ? "Quote" : "Estimate";
 }
 
-/** Cents from what someone typed, tolerating commas, spaces and a $ sign. */
+/**
+ * Cents from what someone typed, read the way bank files are: "1,234.50",
+ * "12,50" and "$12.50" all mean what they say, in the books' own currency
+ * places. Nothing typed is 0; something that is not an amount is 0 too, but
+ * saving stops first and says which (`unreadableAmounts`).
+ */
 function parseMoney(text: string): number {
-  const cleaned = text.replace(/[$,\s]/g, "");
-  if (cleaned === "" || !/^-?\d*\.?\d*$/.test(cleaned)) return 0;
-  return Math.round(Number(cleaned) * 100);
+  if (text.trim() === "") return 0;
+  return parseAmount(text, booksCurrency()) ?? 0;
+}
+
+/** Amounts typed in the editor that are not amounts at all, to stop a save that would make them 0. */
+function unreadableAmounts(): string[] {
+  return [...document.querySelectorAll<HTMLInputElement>(".invoice-line .line-gross, .invoice-paid")]
+    .map((input) => input.value.trim())
+    .filter((text) => text !== "" && parseAmount(text, booksCurrency()) === null);
 }
 
 export function renderInvoiceEditor(): void {
@@ -600,6 +616,7 @@ export function renderInvoiceEditor(): void {
   field("Status", status).hidden = asReceipt;
 
   const paid = text((draft.paid / 100).toFixed(2));
+  paid.classList.add("invoice-paid");
   const paidField = field("Already paid", paid, "Leave at 0.00 for a new invoice.");
   // A bill's payments are bank lines matched on Reconcile, or a payment
   // recorded on the Bills page with its date and account. A bare figure here
@@ -774,8 +791,7 @@ export function renderInvoiceEditor(): void {
       const code = splitAccountLabel(account).code || account.trim();
       // The gross is what the customer pays, so the tax is taken out of it
       // rather than added on -- the same 3/23 the returns use.
-      const rate = rateOf(taxType);
-      const tax = rate === 15 && !usTax ? gstContent(gross) : 0;
+      const tax = isTaxable(taxType) && !usTax ? gstContent(gross) : 0;
       // A stocked product's line says which, and how many.
       const item = row.dataset["item"];
       const quantity = Number(row.querySelector<HTMLInputElement>(".line-qty")?.value ?? "");
@@ -851,7 +867,7 @@ export function renderInvoiceEditor(): void {
     // imported bill does not quietly change its GST.
     const treatments = usTax || choices.some((o) => o.value === line.taxType) || line.taxType === ""
       ? choices
-      : [{ value: line.taxType, label: line.taxType, rate: rateOf(line.taxType) }, ...choices];
+      : [{ value: line.taxType, label: line.taxType, taxable: isTaxable(line.taxType) }, ...choices];
     // The names are Xero New Zealand's; the rate shown is the books' country's.
     for (const option of treatments) {
       const item = document.createElement("option");
@@ -905,7 +921,7 @@ export function renderInvoiceEditor(): void {
       asBill
         ? item.unitCost === undefined
           ? undefined
-          : Math.round(item.unitCost * (1 + (rateOf(tax.value) === 15 ? gstPercent() : 0) / 100))
+          : Math.round(item.unitCost * (1 + (isTaxable(tax.value) ? gstPercent() : 0) / 100))
         : item.price;
     qty.addEventListener("input", () => {
       const item = stockedItems.find((i) => i.id === row.dataset["item"]);
@@ -1261,6 +1277,11 @@ async function saveInvoice(built: Invoice, existing: Invoice | undefined): Promi
   const noun = built.kind === "purchase" ? "bill" : "invoice";
   if (built.number === "") {
     await tellOnPage(`Give the ${noun} a number.`);
+    return;
+  }
+  const unreadable = unreadableAmounts();
+  if (unreadable.length > 0) {
+    await tellOnPage(`"${unreadable[0]}" is not an amount. Correct it, and save the ${noun} again.`);
     return;
   }
   // A year typed wrong: asked when the date is new or changed, not of one imported.

@@ -3834,8 +3834,6 @@ function renderRuleSuggestions(body: HTMLElement, withHeading = true): void {
     ),
   );
 
-  if (proposals.length === 0) return;
-
   // A rule codes to an account, so one learned from a name the file uses has
   // to know which account that name is. Accepting one that did not used to do
   // nothing at all, without a word; now it says so and waits for the match.
@@ -3849,6 +3847,15 @@ function renderRuleSuggestions(body: HTMLElement, withHeading = true): void {
       note(
         `${waiting} of these ${waiting === 1 ? "is" : "are"} for a name in the file not matched to ` +
           "an account yet. Match the name in the file's coding table, and the rule can be accepted.",
+      ),
+    );
+  }
+
+  if (proposals.length > 200) {
+    body.append(
+      note(
+        `Showing the first 200 of ${proposals.length}, with the most evidence first. ` +
+          `Accept all takes all ${ready.length} that can be accepted, including those not shown.`,
       ),
     );
   }

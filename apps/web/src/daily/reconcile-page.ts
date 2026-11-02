@@ -2426,7 +2426,14 @@ export async function confirmLine(
 
   const overrides = { ...(state.ledger.overrides ?? {}) };
   const wasCoded = overrides[one.transaction.id];
+  // What this page decides is written afresh; anything else already on the
+  // line (a later return to claim the GST in, say) is kept rather than lost.
+  const {
+    confirmed: _confirmed, code: _code, treatment: _treatment, side: _side,
+    contact: _contact, note: _note, at: _at, ...kept
+  } = wasCoded ?? { note: "" };
   overrides[one.transaction.id] = {
+    ...kept,
     confirmed: true,
     ...(code !== "" ? { code } : {}),
     treatment,
