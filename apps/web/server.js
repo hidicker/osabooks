@@ -62,7 +62,9 @@ import {
 } from "@nzosa/core";
 
 const root = dirname(fileURLToPath(import.meta.url));
-const outdir = join(root, "dist");
+// OSABOOKS_DIST builds (and serves) the app somewhere else: the test books
+// do, so that a copy already running from dist is left alone.
+const outdir = process.env.OSABOOKS_DIST ? resolve(process.env.OSABOOKS_DIST) : join(root, "dist");
 
 const TYPES = {
   ".html": "text/html; charset=utf-8",

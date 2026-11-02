@@ -15,7 +15,9 @@ import { startServer, watch } from "./server.js";
  * who has nowhere to run a backend.
  */
 const root = dirname(fileURLToPath(import.meta.url));
-const outdir = join(root, "dist");
+// OSABOOKS_DIST builds (and serves) the app somewhere else: the test books
+// do, so that a copy already running from dist is left alone.
+const outdir = process.env.OSABOOKS_DIST ? resolve(process.env.OSABOOKS_DIST) : join(root, "dist");
 const serve = process.argv.includes("--serve");
 
 // A port option is not a convenience. Browser storage is per origin, so serving
