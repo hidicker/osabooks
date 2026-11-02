@@ -48,6 +48,12 @@ export interface TransactionOverride {
    * adjustment rather than in Box 5 or Box 11.
    */
   claimIn?: string;
+  /**
+   * The code kept after checking it against an imported coding that differs.
+   * Its own field so that the note can stay whatever the person wrote; once
+   * the code changes, the check no longer applies.
+   */
+  keptAgainstImport?: string;
   /** Why this was overridden. Required. */
   note: string;
   /** ISO date the override was set, for auditing. */

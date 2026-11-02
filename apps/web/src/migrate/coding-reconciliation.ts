@@ -957,9 +957,11 @@ function compareAfresh() {
   // A difference somebody has looked at and settled is no longer a question.
   // Keeping it on the list would make the one action that says "mine is right"
   // do nothing visible, which reads as a broken button rather than a decision.
-  const settled = (r: CodingRow): boolean =>
-    (state.ledger.overrides ?? {})[r.transaction.id]?.note ===
-    "Checked against the imported coding and kept, on the Coding reconciliation page.";
+  const settled = (r: CodingRow): boolean => {
+    const one = (state.ledger.overrides ?? {})[r.transaction.id];
+    return (one?.keptAgainstImport !== undefined && one.keptAgainstImport === one.code) ||
+      one?.note === KEPT_NOTE;
+  };
   const differed = result.differed.filter((r) => !isSplit(r) && !settled(r) && !special(r));
   const kept = result.differed.filter((r) => !isSplit(r) && settled(r) && !special(r)).length;
 
@@ -4435,6 +4437,8 @@ export function wireCodingReconciliation(): void {
  * whole point. A return built afterwards can be defended by pointing at the
  * decision rather than at the absence of one.
  */
+const KEPT_NOTE = "Checked against the imported coding and kept, on the Coding reconciliation page.";
+
 /** The override that records a line's own coding as checked and kept. */
 function keptOverride(
   transaction: Transaction,
@@ -4449,7 +4453,9 @@ function keptOverride(
     code,
     treatment: was?.treatment ?? one?.classification.treatment ?? "standard",
     ...(side !== undefined && side !== "none" ? { side } : {}),
-    note: "Checked against the imported coding and kept, on the Coding reconciliation page.",
+    keptAgainstImport: code,
+    // A note somebody wrote on the line stays; the flag above says it was kept.
+    note: was?.note !== undefined && was.note.trim() !== "" ? was.note : KEPT_NOTE,
     at: new Date().toISOString().slice(0, 10),
   };
 }
