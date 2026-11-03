@@ -121,6 +121,7 @@ import { autoSuggestOnOpen, renderAi } from "./daily/ai-page.js";
 import { installLockGuard, resetLockBaseline } from "./lock.js";
 import { showOtherTabs, watchOtherTabs } from "./other-tabs.js";
 import { renderAiCheck } from "./daily/ai-check-page.js";
+import { renderConnector } from "./daily/own-ai-panel.js";
 import {
   applyChartColumns,
   repairImportedChart,
@@ -215,6 +216,7 @@ async function init(): Promise<void> {
     migration: renderMigration,
     ai: renderAi,
     aiCheck: renderAiCheck,
+    connector: renderConnector,
     openBooks: renderOpenBooks,
     openingBalances: renderOpeningBalances,
     payroll: renderPayrollPage,
