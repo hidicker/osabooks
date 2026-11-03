@@ -59,3 +59,12 @@ test("an undone batch cannot be undone again", () => {
   const early = { ...batch("2026-10-06T09:10:13.213Z-0001", ["a"]), reverted: true };
   assert.equal(canReverse([early], early).ok, false);
 });
+
+test("a later change made on a computer whose clock is behind still blocks Undo", () => {
+  // Newest first in History: the second change was made after the first, on a
+  // computer whose clock says it was earlier.
+  const first = coding("2026-10-07T10:00:00.000Z-0001", "a");
+  const second = coding("2026-10-07T09:55:00.000Z-0001", "a");
+  assert.equal(canReverse([second, first], first).ok, false);
+  assert.deepEqual(canReverse([second, first], second), { ok: true });
+});

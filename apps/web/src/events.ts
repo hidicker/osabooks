@@ -324,9 +324,14 @@ export function canReverse(
     }
     return false;
   };
+  // Later is nearer the front: History is kept newest first, in the order the
+  // changes were made (online, the order they reached the books), so two
+  // computers' clocks disagreeing cannot make an older change look newer.
+  const at = events.findIndex((e) => e.id === event.id);
+  const isLater = (e: LedgerEvent, index: number): boolean => (at === -1 ? e.id > event.id : index < at);
   const newer = events.filter(
-    (e) =>
-      e.id > event.id &&
+    (e, index) =>
+      isLater(e, index) &&
       e.reverted !== true &&
       (batchIds !== null ? touchesBatch(e) : e.kind === event.kind && e.targetId === event.targetId),
   );

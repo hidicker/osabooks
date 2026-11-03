@@ -94,11 +94,6 @@ works).
   rebuilt with `toLocaleString`, one on `toFixed(2)` (grants), differing on
   negatives. Two shared ones (screen, and reports in brackets) would do.
   Code check 2 November 2026, 10.
-- **History's order trusts each computer's clock.** Event ids start with the
-  local time, and Undo's "is there a later change" compares them as text. Two
-  people on two computers with clocks minutes apart can see Undo offered or
-  refused wrongly. Online, the server could stamp the time. Code check
-  2 November 2026, 11.
 - **Very large files.** `reports.ts` (about 6,000 lines),
   `coding-reconciliation.ts` (4,500), `excel-export.ts`, `reconcile-page.ts`,
   `store.ts`. The same idea gets built several ways in them (long tables,
