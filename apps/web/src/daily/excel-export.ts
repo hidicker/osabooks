@@ -3116,7 +3116,7 @@ export function downloadExcelReport(year?: number | "all"): void {
 
   const bytes = buildExcelReport(selectedYear);
   const entity = reportingEntity();
-  const slug = (entity?.name ?? "nzosa").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  const slug = (entity?.name ?? "osabooks").toLowerCase().replace(/[^a-z0-9]+/g, "-");
   const filename =
     selectedYear === "all"
       ? `${slug}-financial-report-all-years.xlsx`

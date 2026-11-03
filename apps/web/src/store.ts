@@ -2192,7 +2192,7 @@ export async function archiveOther(ledger: string): Promise<{ ok: boolean; why: 
         why:
           "This OsaBooks is running an older server, which would clear whichever " +
           "books are open rather than the ones you chose. Nothing has been " +
-          "cleared. Stop NZOSA and start it again, then try once more.",
+          "cleared. Stop OsaBooks and start it again, then try once more.",
       };
     }
     return { ok: true, why: "" };

@@ -13,9 +13,9 @@ It runs on your own machine. Nothing is uploaded, and the app makes no network r
 1. **Install Node.js** — [nodejs.org](https://nodejs.org/), choose the **LTS** build, and accept every default.
 2. **Download & Run**:
    - Click the green **Code** button at the top of this GitHub page, select **Download ZIP**, and extract it anywhere on your computer.
-   - Double-click **`NZOSA.cmd`** (Windows) or **`NZOSA.command`** (Mac).
+   - Double-click **`OsaBooks.cmd`** (Windows) or **`OsaBooks.command`** (Mac).
    - It will install what it needs the first time, then automatically open the app in your browser.
-   - To stop it, double-click **`Stop NZOSA`** in the same folder.
+   - To stop it, double-click **`Stop OsaBooks`** in the same folder.
 
 > **Mac users:** On macOS the first double-click may say it is from an unidentified developer. Right-click the file, choose **Open**, then click **Open** again.
 
@@ -44,7 +44,7 @@ npm install && npm run build
 node packages/mcp/dist/server.js --books "/path/to/your/books"
 ```
 
-For Claude Desktop there is a one-file extension: run `npm run build:mcpb`, then open `packages/mcp/nzosa.mcpb` in Claude Desktop (Settings, Extensions) and choose your books folder when it asks.
+For Claude Desktop there is a one-file extension: run `npm run build:mcpb`, then open `packages/mcp/osabooks.mcpb` in Claude Desktop (Settings, Extensions) and choose your books folder when it asks.
 
 Or, by hand, in Claude Desktop's config, add it as a server with that command and arguments. `--entities a,b` limits it to some of the entities in the books, and `--max-rows` caps how many rows one answer can hold.
 

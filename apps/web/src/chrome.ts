@@ -154,7 +154,7 @@ function sayWhereBooksLive(): void {
   where.textContent =
     kind === "folder"
       ? "These books are the folder on this computer. OsaBooks keeps running after you " +
-        "close this tab; to stop it, double-click Stop NZOSA in the folder you started it from."
+        "close this tab; to stop it, double-click Stop OsaBooks in the folder you started it from."
       : kind === "cloud"
         ? "These books are kept on the server, under the account you are signed in to. " +
           "Download a backup from the Books page to keep a copy of your own."

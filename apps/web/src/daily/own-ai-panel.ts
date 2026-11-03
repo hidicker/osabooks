@@ -14,7 +14,7 @@ import { state } from "../state.js";
  */
 
 /** The extension, built with each release of the site. */
-export const EXTENSION_URL = "https://nbparagliding.nz/osabooks/nzosa.mcpb";
+export const EXTENSION_URL = "https://nbparagliding.nz/osabooks/osabooks.mcpb";
 
 function copyButton(label: string, text: () => string, said: HTMLElement): HTMLButtonElement {
   const button = document.createElement("button");
@@ -71,7 +71,7 @@ function forFolder(inner: HTMLElement): void {
   inner.append(
     heading("Claude Desktop"),
     steps([
-      ["Download the ", Object.assign(document.createElement("a"), { href: EXTENSION_URL, textContent: "OsaBooks extension", download: "nzosa.mcpb" }), "."],
+      ["Download the ", Object.assign(document.createElement("a"), { href: EXTENSION_URL, textContent: "OsaBooks extension", download: "osabooks.mcpb" }), "."],
       ["In Claude Desktop, open Settings, Extensions, and open the file you downloaded."],
       ["When it asks for the books folder, choose this one: ", where],
       ["Turn on Let Claude suggest for codes, splits and journals. Left off, Claude only reads."],
@@ -100,7 +100,7 @@ function forFolder(inner: HTMLElement): void {
     where.textContent = "";
     where.append(code(paths.books), " ", copyButton("Copy", () => paths.books, said));
     if (paths.mcpServer === null) {
-      settings.textContent = "This copy of OsaBooks has no MCP server built. Start OsaBooks with NZOSA.cmd (or NZOSA.command) to build it.";
+      settings.textContent = "This copy of OsaBooks has no MCP server built. Start OsaBooks with OsaBooks.cmd (or OsaBooks.command) to build it.";
       return;
     }
     settings.textContent = JSON.stringify(

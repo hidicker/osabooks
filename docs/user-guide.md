@@ -24,7 +24,7 @@ The important part is the second sentence. Plenty of software will import a bank
 
 Worth understanding before you put a year of your business into it, because it depends on how you opened it.
 
-**If you started it with the launcher** (`NZOSA.cmd` on Windows, `NZOSA.command` on a Mac), your books are **files in a folder on your computer**. One file per part — transactions, decisions, invoices, chart. You can back them up, copy them to another machine, and read them without this software. This is the mode to use for real books.
+**If you started it with the launcher** (`OsaBooks.cmd` on Windows, `OsaBooks.command` on a Mac), your books are **files in a folder on your computer**. One file per part — transactions, decisions, invoices, chart. You can back them up, copy them to another machine, and read them without this software. This is the mode to use for real books.
 
 **If you opened it as a web page** with no launcher running, there is no folder, and your books are kept **inside that browser** on that device. That is fine for trying it out. It is a poor place for anything you care about:
 
@@ -63,20 +63,20 @@ Do not run it from inside the ZIP. Windows will let you open files in a ZIP with
 
 Open the folder and double-click:
 
-* **Windows** — `NZOSA.cmd`
-* **Mac** — `NZOSA.command`
+* **Windows** — `OsaBooks.cmd`
+* **Mac** — `OsaBooks.command`
 
 The first time, it spends a minute or two fetching what it needs and building itself. A black window shows what it is doing; that is normal, and it closes on its own. Your browser then opens at OsaBooks.
 
-To stop it, double-click **`Stop NZOSA`** in the same folder. Closing the browser tab does not stop it.
+To stop it, double-click **`Stop OsaBooks`** in the same folder. Closing the browser tab does not stop it.
 
 ### If something gets in the way
 
 **Windows says it protected your PC.** Click *More info*, then *Run anyway*. This is SmartScreen not recognising a file that few people have downloaded; it is not a virus warning.
 
-**Mac says it is from an unidentified developer.** Right-click `NZOSA.command`, choose **Open**, then **Open** again in the box that appears. You only do this once.
+**Mac says it is from an unidentified developer.** Right-click `OsaBooks.command`, choose **Open**, then **Open** again in the box that appears. You only do this once.
 
-**Mac says it cannot be opened, or opens it in a text editor.** The file lost its permission to run, which happens with some ways of downloading. Open Terminal, type `chmod +x ` (with the space), drag `NZOSA.command` into the window, and press Enter. Then double-click it as normal.
+**Mac says it cannot be opened, or opens it in a text editor.** The file lost its permission to run, which happens with some ways of downloading. Open Terminal, type `chmod +x ` (with the space), drag `OsaBooks.command` into the window, and press Enter. Then double-click it as normal.
 
 **Nothing happens, or the window flashes and vanishes.** Node.js is probably not installed, or was installed after you first tried. Restart the computer and try again.
 

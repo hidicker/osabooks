@@ -327,7 +327,7 @@ export function saveLedger(path: string, ledger: Ledger): void {
   if (since !== null) {
     throw new Error(
       `These books are open in OsaBooks${since ? ` (since ${since})` : ""}, which writes to ` +
-        `them as you work. Close it -- double-click "Stop NZOSA" -- and run this again. ` +
+        `them as you work. Close it -- double-click "Stop OsaBooks" -- and run this again. ` +
         `Writing from both at once would lose whichever change landed first.`,
     );
   }

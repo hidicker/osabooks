@@ -59,6 +59,7 @@ tools/.demo-transactions.json
 
 # Written by the launcher, which has no window to print to.
 nzosa-log.txt
+osabooks-log.txt
 
 # Bank feed credentials. Covered by /ledgers/ below, and named here as well:
 # a token that reaches somebody's bank data should not depend on one rule in
