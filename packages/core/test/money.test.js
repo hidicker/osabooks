@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { parseAmount, formatAmount } from "../dist/index.js";
+import { parseAmount, formatAmount, amountKeyText } from "../dist/index.js";
 
 test("parses plain decimals to minor units", () => {
   assert.equal(parseAmount("25.99"), 2599);
@@ -46,9 +46,22 @@ test("snaps float noise from spreadsheet round-trips", () => {
   assert.equal(parseAmount(0.1 + 0.2), 30);
 });
 
-test("respects currencies with no minor unit", () => {
-  assert.equal(parseAmount("1000", "JPY"), 1000);
-  assert.equal(formatAmount(1000, "JPY"), "1000");
+test("a currency with no minor unit is held in hundredths too, and written without decimals", () => {
+  // The books hold hundredths whatever the currency: 3,300,000 won is 330000000.
+  assert.equal(parseAmount("1000", "JPY"), 100000);
+  assert.equal(parseAmount("12,340", "KRW"), 1234000);
+  assert.equal(parseAmount("3,300,000", "KRW"), 330000000);
+  assert.equal(formatAmount(100000, "JPY"), "1000");
+  assert.equal(formatAmount(330000000, "KRW"), "3300000");
+  assert.equal(formatAmount(-1234000, "KRW"), "-12340");
+  // What the split editor writes and reads back is the same amount.
+  assert.equal(parseAmount((123400000 / 100).toFixed(2), "KRW"), 123400000);
+});
+
+test("duplicate keys write amounts as they always have", () => {
+  assert.equal(amountKeyText(2599, "NZD"), "25.99");
+  assert.equal(amountKeyText(330000000, "KRW"), "330000000");
+  assert.equal(amountKeyText(-5, "NZD"), "-0.05");
 });
 
 test("rejects values that are not numbers", () => {
@@ -78,9 +91,10 @@ test("round-trips every amount in the sample range", () => {
 test("a currency written to three places keeps its third decimal", () => {
   // Dinars and rials have three minor units. Reading the third decimal as the
   // start of a thousands group multiplied every one of them by a thousand.
-  assert.equal(parseAmount("12.345", "BHD"), 12345);
-  assert.equal(parseAmount("12,345", "BHD"), 12345);
-  assert.equal(parseAmount("0.500", "KWD"), 500);
+  // Held in hundredths, as every amount is: 12.345 is 12.35.
+  assert.equal(parseAmount("12.345", "BHD"), 1235);
+  assert.equal(parseAmount("12,345", "BHD"), 1235);
+  assert.equal(parseAmount("0.500", "KWD"), 50);
 });
 
 test("three digits after a separator are still a thousands group where they can be", () => {

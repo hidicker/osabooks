@@ -45,8 +45,22 @@ const MAX_SERIAL = 73415;
  * serial numbers, which is what the source workbook stores. Returns `null` if
  * the value is not a date the caller should trust.
  */
+/**
+ * Whether a date with nothing else to go on is read day first, as the books'
+ * country writes it: set once when the books open (New Zealand's until then).
+ * A file whose own order is known -- a bank file, a QuickBooks export -- says
+ * so through `dayFirst` and is read that way regardless. Exports from an
+ * accounting system (Xero's, the coding to compare, a filed return) follow
+ * the country they were kept in, so a US Xero export's 3/4/2026 is 4 March.
+ */
+let booksDayFirst = true;
+
+export function setBooksDayFirst(dayFirst: boolean): void {
+  booksDayFirst = dayFirst;
+}
+
 export function parseDate(input: unknown, options: DateParseOptions = {}): IsoDate | null {
-  const dayFirst = options.dayFirst ?? true;
+  const dayFirst = options.dayFirst ?? booksDayFirst;
 
   if (input === null || input === undefined) return null;
 
@@ -71,6 +85,16 @@ export function parseDate(input: unknown, options: DateParseOptions = {}): IsoDa
   // ISO first -- it is unambiguous, so it never needs the dayFirst hint.
   const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})(?:[T ].*)?$/);
   if (iso) return build(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+
+  // Eight digits, year first: 20260312, as Korean exports and many systems
+  // write it. Far beyond any Excel serial, so it cannot be one.
+  const compact = text.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (compact) return build(Number(compact[1]), Number(compact[2]), Number(compact[3]));
+
+  // Year first with spaces after the separators, as Korean dates are written
+  // (2026. 3. 12.), with or without the closing point and a time of day.
+  const spaced = text.match(/^(\d{4})\s*[./-]\s*(\d{1,2})\s*[./-]\s*(\d{1,2})\s*\.?(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?$/);
+  if (spaced) return build(Number(spaced[1]), Number(spaced[2]), Number(spaced[3]));
 
   // Textual month: `3 Apr 2024`, `3-Apr-24`, `Apr 3 2024`.
   const textual = text.match(/^(\d{1,2})[\s\-/.]([A-Za-z]{3,9})[\s\-/.](\d{2,4})$/);

@@ -74,8 +74,8 @@ export function parseFixedAssets(text: string): AssetImportResult {
 
     const cost = parseAmount(cells.get("PurchasePrice")) ?? 0;
     const rate = Number(cells.get("Book_Rate"));
-    const purchased = parseDate(cells.get("PurchaseDate"), { dayFirst: true });
-    const from = parseDate(cells.get("Book_DepreciationStartDate"), { dayFirst: true }) ?? purchased;
+    const purchased = parseDate(cells.get("PurchaseDate"));
+    const from = parseDate(cells.get("Book_DepreciationStartDate")) ?? purchased;
 
     if (cost > 0 && from === null) {
       problems.push({ message: `${name}: no depreciation start date`, line: record.line });
@@ -92,7 +92,7 @@ export function parseFixedAssets(text: string): AssetImportResult {
       rate: Number.isFinite(rate) ? rate : 0,
       method: cells.get("Book_DepreciationMethod"),
       averaging: cells.get("Book_AveragingMethod"),
-      disposed: parseDate(cells.get("DisposalDate"), { dayFirst: true }),
+      disposed: parseDate(cells.get("DisposalDate")),
     });
   }
 

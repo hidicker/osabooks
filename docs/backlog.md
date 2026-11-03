@@ -95,13 +95,40 @@ works).
 
 ## The app
 
+- **Bank and AI tokens on Windows rely on a file mode Windows ignores.**
+  `.akahu.json`, `.ai.json`, `.wise.json` and `.simplefin.json` are written
+  with mode 0600 (`apps/web/server.js`, `packages/mcp/src/sandbox.ts`), which
+  on Windows sets nothing: the folder's own permissions are what protect
+  them. Where OsaBooks sits in a synced folder (OneDrive's Documents,
+  Dropbox), the tokens are copied to that cloud. Protect them with the
+  user's DPAPI or `icacls /inheritance:r /grant:r`, and warn when the books
+  folder is inside a synced one. From the DeepSeek code review of 3 November
+  2026, 4.
+- **A test that every ledger field survives a save.** `decisionsOf` in
+  `store.ts` names the fields the decisions part is written from; a field
+  added to `StoredLedger` and not to that list is read on open and erased by
+  the next save. None is missing today. One test filling every optional field,
+  writing each part and reading it back, would catch the next one. DeepSeek
+  review, 6.
+- **Tests on every push, and a linter.** The tests run only when a deploy is
+  started. A `ci.yml` on push running `npm ci && npm test`, and
+  typescript-eslint with no-floating-promises, no-misused-promises and a check
+  against `toISOString().slice(0, 10)` outside dates.ts. Waiting on a
+  decision. DeepSeek review, 7.
+- **The developer guide's counts are out of date**: 579 core tests (now about
+  1,580), three packages (four), `books.ts` at 727 lines (2,600). Generate
+  them, or drop the numbers. DeepSeek review, 8.
+- **Smaller hardening, from the same review:** a size limit on the local
+  server's JSON bodies; the open-books lock (`heldBy`) judged by process id,
+  which a reboot can reuse; and a per-run token for the local API, which any
+  program on the computer can call today.
 - **US meals: half deductible.** The entertainment button in the split editor
   is New Zealand's rule (half deductible, half the GST claimed) and shows only
   where the country pack says `entertainmentHalf`. The US halves business
   meals for income tax only, with no sales tax; a "Meals: half deductible"
   split for US books would need a non-deductible meals account in the chart.
   Canada, if added, has New Zealand's rule.
-- **Very large files.** `reports.ts` (about 6,000 lines),
+- **Very large files.** `books.ts` (2,600 lines and 105 exports, every page imports it), `reports.ts` (about 6,000 lines),
   `coding-reconciliation.ts` (4,500), `excel-export.ts`, `reconcile-page.ts`,
   `store.ts`. The same idea gets built several ways in them (long tables,
   Accept all). See `refactor-plan.md`. Code check 2 November 2026, 12.
