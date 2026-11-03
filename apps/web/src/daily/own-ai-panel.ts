@@ -1,6 +1,7 @@
 import { backendKind, folderPaths, ledgerName, openCloudBookId } from "../store.js";
 import { connectorUrl } from "../cloud.js";
 import { note } from "../ui.js";
+import { state } from "../state.js";
 
 /**
  * Use your own AI app: Claude, Cursor, VS Code, LM Studio and the rest.
@@ -103,7 +104,7 @@ function forFolder(inner: HTMLElement): void {
       return;
     }
     settings.textContent = JSON.stringify(
-      { mcpServers: { "nzosa-books": { command: "node", args: [paths.mcpServer, "--books", paths.books, "--suggest"] } } },
+      { mcpServers: { osabooks: { command: "node", args: [paths.mcpServer, "--books", paths.books, "--suggest"] } } },
       null,
       2,
     );
@@ -147,17 +148,29 @@ function forOnline(inner: HTMLElement, book: string): void {
   );
 }
 
+/** The AI connector page: the panel, and what it means for books with AI suggestions off. */
+export function renderConnector(): void {
+  const body = document.getElementById("connector-body");
+  if (body === null) return;
+  body.textContent = "";
+  if (state.ledger.aiEnabled !== true) {
+    body.append(
+      note(
+        "AI suggestions are off for these books, which keeps OsaBooks itself from sending anything to an AI. A connector " +
+          "is separate: your own AI app reads the books only " +
+          (backendKind() === "cloud" ? "after you sign in to OsaBooks and allow it there." : "once you install the extension and point it at them."),
+      ),
+    );
+  }
+  body.append(ownAiPanel());
+}
+
 export function ownAiPanel(): HTMLElement {
   const box = document.createElement("div");
   box.className = "ai-panel own-ai";
   const inner = document.createElement("div");
   box.append(inner);
-  inner.append(
-    note(
-      "The AI app you already use — Claude, or one of the others below — can read these books and suggest codes, " +
-        "splits and journals for you to check here. It uses your own subscription, not a key in OsaBooks.",
-    ),
-  );
+  inner.append(note("It uses your own AI subscription, not a key in OsaBooks."));
   const kind = backendKind();
   if (kind === "folder") {
     forFolder(inner);

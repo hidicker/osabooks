@@ -11,7 +11,6 @@ import { sayAiTrouble } from "./actions.js";
 import { aiAllowed } from "../ai-consent.js";
 import { aiKeyPanel, refreshAiStatus } from "../ai-key-panel.js";
 import { morningChoice } from "../nightly-ui.js";
-import { ownAiPanel } from "./own-ai-panel.js";
 import { emptyEntityModel } from "@nzosa/core";
 import { ANALYSES, analysisPrompt } from "./reports.js";
 import type { Entity } from "@nzosa/core";
@@ -65,7 +64,7 @@ export function renderAi(): void {
     step("About the figures", "One-click analyses"),
     analysesPanel(),
     step("Or", "Use your own AI app"),
-    ownAiPanel(),
+    connectorPointer(),
   );
 
   if (aiRoute() === "none") {
@@ -217,6 +216,23 @@ function aboutAsking(): HTMLElement[] {
  * of what leaves this machine, and somebody who reads them knows as much about
  * it as the person who wrote the code.
  */
+/** The connector has a page of its own: said here, with the way there. */
+function connectorPointer(): HTMLElement {
+  const wrap = document.createElement("div");
+  wrap.append(
+    note(
+      "Claude, ChatGPT or another AI app you already use can read these books and suggest codes, splits and journals, " +
+        "using your own subscription. Its address and the steps to add it are on the AI connector page.",
+    ),
+  );
+  const go = document.createElement("button");
+  go.type = "button";
+  go.textContent = "Go to the AI connector";
+  go.addEventListener("click", () => showPage("connector"));
+  wrap.append(go);
+  return wrap;
+}
+
 function offerIt(): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "ai-offer";

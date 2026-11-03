@@ -174,6 +174,7 @@ const KEYWORDS: Readonly<Record<string, string>> = {
   entities: "chart of accounts owners company rental gst registered bank links",
   rules: "coding rules automatic",
   ai: "ai gemini suggestions unknown unrecognised model key",
+  connector: "connector claude chatgpt mcp own ai app address extension sign in",
   books: "ledger switch open new set clear archive",
   history: "undo changes log who",
   pl: "profit and loss income statement p&l",
