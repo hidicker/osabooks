@@ -150,7 +150,7 @@ ${message}
 
     const url = `http://127.0.0.1:${wanted}`;
     if (await nzosaIsOn(url)) {
-      process.stdout.write(`\nNZOSA is already running at ${url}\n`);
+      process.stdout.write(`\nOsaBooks is already running at ${url}\n`);
       process.stdout.write("Opening that one. You can close this window.\n");
       if (process.argv.includes("--open")) openBrowser(url);
       await ctx.dispose();
@@ -174,7 +174,7 @@ ${message}
   }
 
   const url = `http://127.0.0.1:${wanted}`;
-  process.stdout.write(`\nNZOSA: ${url}\n`);
+  process.stdout.write(`\nOsaBooks: ${url}\n`);
   process.stdout.write(`Books: ${join(ledgerRoot, ledgerId)}\n`);
   if (process.argv.includes("--open")) openBrowser(url);
   void running;

@@ -3,7 +3,7 @@
 -- Made by tools/own-project-sql.mjs from the migrations in supabase/migrations.
 
 -- ============================================================ 20260916000000_books
--- NZOSA hosted: books, who may see them, and how a part is saved.
+-- OsaBooks hosted: books, who may see them, and how a part is saved.
 --
 -- The local app keeps one folder per set of books and one file per part. This
 -- is the same shape: one row per part, holding the same JSON, so the browser

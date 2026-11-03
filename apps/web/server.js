@@ -127,15 +127,27 @@ function writeNightly(folder, value) {
 }
 
 /** The Windows scheduled task that runs the morning run. One per computer. */
-const MORNING_TASK = "NZOSA morning";
+const MORNING_TASK = "OsaBooks morning";
+/** What the task was called before: still recognised, and replaced when the run is next set up or turned off. */
+const OLD_MORNING_TASK = "NZOSA morning";
 
-function morningTaskExists() {
+function taskExists(name) {
   try {
-    execFileSync("schtasks", ["/Query", "/TN", MORNING_TASK], { stdio: "ignore", windowsHide: true });
+    execFileSync("schtasks", ["/Query", "/TN", name], { stdio: "ignore", windowsHide: true });
     return true;
   } catch {
     return false;
   }
+}
+
+function morningTaskExists() {
+  return taskExists(MORNING_TASK) || taskExists(OLD_MORNING_TASK);
+}
+
+/** The task under its old name, taken off: one task per computer, under the new name. */
+function removeOldMorningTask() {
+  if (!taskExists(OLD_MORNING_TASK)) return;
+  execFileSync("schtasks", ["/Delete", "/F", "/TN", OLD_MORNING_TASK], { stdio: "pipe", windowsHide: true });
 }
 
 /**
@@ -174,18 +186,20 @@ function scheduleMorning(ledgerRoot) {
     </Exec>
   </Actions>
 </Task>`;
-  const file = join(tmpdir(), `nzosa-morning-${process.pid}.xml`);
+  const file = join(tmpdir(), `osabooks-morning-${process.pid}.xml`);
   // Task Scheduler reads its XML as UTF-16, as the declaration says.
   writeFileSync(file, Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(xml, "utf16le")]));
   try {
     execFileSync("schtasks", ["/Create", "/F", "/TN", MORNING_TASK, "/XML", file], { stdio: "pipe", windowsHide: true });
+    removeOldMorningTask();
   } finally {
     rmSync(file, { force: true });
   }
 }
 
 function unscheduleMorning() {
-  execFileSync("schtasks", ["/Delete", "/F", "/TN", MORNING_TASK], { stdio: "pipe", windowsHide: true });
+  removeOldMorningTask();
+  if (taskExists(MORNING_TASK)) execFileSync("schtasks", ["/Delete", "/F", "/TN", MORNING_TASK], { stdio: "pipe", windowsHide: true });
 }
 
 function releaseLock(folder) {
