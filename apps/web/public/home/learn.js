@@ -275,7 +275,7 @@
   ];
   const s1ExtraPool = [
     { payer: "KOWALSKI, ELENA Elena Kowalski", amount: 115.00, net: 100.00, gst: 15.00 },
-    { payer: "MORRISON, TARA Tara Morrison", amount: 230.00, net: 200.00, gst: 30.00 }
+    { payer: "HARLOW, JUNE June Harlow", amount: 230.00, net: 200.00, gst: 30.00 }
   ];
   let s1PoolIdx = 0;
   let s1Txs = [];
