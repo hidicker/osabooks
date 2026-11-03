@@ -103,11 +103,6 @@ works).
   `coding-reconciliation.ts` (4,500), `excel-export.ts`, `reconcile-page.ts`,
   `store.ts`. The same idea gets built several ways in them (long tables,
   Accept all). See `refactor-plan.md`. Code check 2 November 2026, 12.
-- **`innerHTML` with values written in.** Safe today (the values are the
-  app's own labels), but one bank payee passed in later would let a file put
-  HTML on the page. `textContent` throughout would remove the risk. Code
-  check 2 November 2026, 13.
-
 - **Wise balances in other currencies.** Only balances in the books' own
   currency can be brought in (`wise-feed.ts`): a KRW or EUR line came in as if
   it were dollars. Bringing others in needs each line converted at the day's

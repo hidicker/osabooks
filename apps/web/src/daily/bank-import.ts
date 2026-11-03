@@ -1627,7 +1627,7 @@ export function renderTable(): void {
         : "";
 
       return `<tr class="status-${entry.status}">
-        <td class="date">${t.date}</td>
+        <td class="date">${escapeHtml(t.date)}</td>
         <td class="amount ${negative ? "out" : "in"}">${formatAmount(
           t.amount,
           t.currency,
