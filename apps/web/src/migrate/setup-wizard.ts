@@ -1539,9 +1539,9 @@ function renderSetupIntro(): void {
  * returns and pages there are; changing it reloads the app so that everything
  * is drawn again under the new country.
  *
- * New Zealand and the United States are offered to everyone. Australia and
- * South Korea are marked as work in progress, and the international edition
- * (and any books already set to another country) still lists the rest.
+ * New Zealand, the United States, Australia and South Korea are offered to
+ * everyone. The international edition (and any books already set to another
+ * country) still lists the rest.
  */
 
 export function countryBox(): HTMLElement | null {
