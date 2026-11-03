@@ -60,5 +60,5 @@ jobs:
             # The morning run and the sign-up alert are called by the database, which has no user to sign in as.
             flags=""
             if [ "$name" = "nightly" ] || [ "$name" = "signup-alert" ] || [ "$name" = "mcp" ]; then flags="--no-verify-jwt"; fi
-            npx --yes supabase functions deploy "$name" $flags --use-api --project-ref "$PROJECT_REF"
+            npx --yes supabase functions deploy "$name" $flags --use-api --project-ref "$PROJECT_REF" --yes
           done
