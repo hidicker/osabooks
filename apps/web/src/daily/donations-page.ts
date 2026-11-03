@@ -18,7 +18,7 @@ import {
 } from "@nzosa/core";
 import type { Cents, DonationReceipt, Entity, IsoDate, Transaction } from "@nzosa/core";
 import { taxYearEndSaid, taxYearOf } from "../tax-year.js";
-import { booksLocale, moneyPlaces, booksCurrency } from "../country.js";
+import { booksCurrency, booksMoney } from "../country.js";
 import { linesFor } from "./grants-page.js";
 
 /**
@@ -43,10 +43,7 @@ let replacing: DonationReceipt | null = null;
 let summaryYear = 0;
 
 function money(cents: number): string {
-  return (cents / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  });
+  return booksMoney(cents);
 }
 
 function today(): IsoDate {

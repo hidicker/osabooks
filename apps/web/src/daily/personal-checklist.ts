@@ -8,7 +8,7 @@ import { balanceChecksNow } from "./bank-import.js";
 import { dailyFileBalances } from "./opening-balances.js";
 import { rentalSchedulesFor } from "./reports.js";
 import { taxYearEnd, taxYearStart } from "../tax-year.js";
-import { booksMoney } from "../country.js";
+import { signedMoney } from "../country.js";
 
 /**
  * The year-end questions an accountant asks, for a person and their rentals.
@@ -44,7 +44,7 @@ export interface ChecklistQuestion {
 }
 
 function money(cents: number): string {
-  return `$${booksMoney(cents)}`;
+  return signedMoney(cents);
 }
 
 function rentalsOf(owner: string): Entity[] {

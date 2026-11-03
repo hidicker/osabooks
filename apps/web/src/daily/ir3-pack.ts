@@ -2,7 +2,7 @@ import type { Cents, Entity, Ir3Return, OwnerRentalSchedule, TaxExtra } from "@n
 import { emptyEntityModel, returnFingerprint } from "@nzosa/core";
 import { ledgerName } from "../store.js";
 import { state } from "../state.js";
-import { booksLocale, moneyPlaces } from "../country.js";
+import { booksLocale, reportMoney } from "../country.js";
 import { taxYearEndSaid, taxYearStartSaid } from "../tax-year.js";
 
 /**
@@ -26,11 +26,7 @@ function esc(text: string): string {
 
 /** Two decimals with thousands separators; negative in brackets, as the accounts show them. */
 function money(cents: number): string {
-  const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  });
-  return cents < 0 ? `(${text})` : text;
+  return reportMoney(cents);
 }
 
 function row(label: string, amount: number | string | null, cls = ""): string {

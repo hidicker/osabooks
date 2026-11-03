@@ -22,7 +22,7 @@ import {
 } from "@nzosa/core";
 import type { Account, Cents, Entity, ReportingStandard, SocietyInputs, SocietyYearFigures, Tier3Inputs } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
-import { booksLocale, moneyPlaces, booksCurrency } from "../country.js";
+import { booksCurrency, reportMoney } from "../country.js";
 import { inputsFor as performanceInputs, legalFormOf, statementFor } from "./performance-report-page.js";
 
 /**
@@ -43,11 +43,7 @@ function inputsFor(entity: Entity, year: number): SocietyInputs {
 }
 
 function money(cents: number): string {
-  const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  });
-  return cents < 0 ? `(${text})` : text;
+  return reportMoney(cents);
 }
 
 async function saveInputs(entity: Entity, year: number, next: SocietyInputs, what: string): Promise<void> {

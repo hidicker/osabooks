@@ -105,3 +105,12 @@ test("the rows follow the form's order", () => {
   const rows = ir9Rows(ir9Worksheet({ income, expenses, inputs: emptyIr9Inputs() }));
   assert.deepEqual(rows.map((r) => r.box), ["14", "14A", "14B", "14C", "14D", "14E", "14F", "15", "16", "17", "18", "19"]);
 });
+
+test("an unincorporated body's tax is worked out at individual rates for the year", () => {
+  const income = [{ code: "270", name: "Interest received", amount: 2_000_000 }];
+  const sheet = ir9Worksheet({ income, expenses: [], inputs: emptyIr9Inputs(), year: 2026 });
+  // $20,000 at the 2026 rates: 10.5% of $15,600 and 17.5% of $4,400.
+  assert.equal(sheet.tax, 163_800 + 77_000);
+  assert.match(sheet.taxNote, /individual tax rates/);
+  assert.equal(ir9Worksheet({ income, expenses: [], inputs: emptyIr9Inputs() }).tax, null);
+});

@@ -22,7 +22,7 @@ import {
 } from "@nzosa/core";
 import type { Account, Cents, Entity, Ir7ExpensePlacement, Ir7Holder, Ir7IncomeClass, Ir7Inputs, Ir7Kind } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
-import { booksLocale, moneyPlaces, booksCurrency } from "../country.js";
+import { booksCurrency, booksMoney } from "../country.js";
 
 /**
  * The IR7: a partnership or look-through company's income tax return, worked
@@ -45,11 +45,7 @@ function inputsFor(entity: Entity, year: number): Ir7Inputs {
 }
 
 function money(cents: number): string {
-  const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  });
-  return cents < 0 ? `-${text}` : text;
+  return booksMoney(cents);
 }
 
 async function saveInputs(entity: Entity, year: number, next: Ir7Inputs, what: string): Promise<void> {

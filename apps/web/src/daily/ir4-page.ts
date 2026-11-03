@@ -22,7 +22,7 @@ import {
 } from "@nzosa/core";
 import type { Account, Cents, Entity, Ir4ExpensePlacement, Ir4IncomeClass, Ir4Inputs } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
-import { booksLocale, moneyPlaces, booksCurrency } from "../country.js";
+import { booksCurrency, booksMoney } from "../country.js";
 
 /**
  * The IR4: a company's income tax return and its imputation credit account,
@@ -50,11 +50,7 @@ function inputsFor(entity: Entity, year: number): Ir4Inputs {
 }
 
 function money(cents: number): string {
-  const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  });
-  return cents < 0 ? `-${text}` : text;
+  return booksMoney(cents);
 }
 
 async function saveInputs(entity: Entity, year: number, next: Ir4Inputs, what: string): Promise<void> {

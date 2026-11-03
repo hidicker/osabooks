@@ -18,7 +18,7 @@ import {
   readIncomeReturn,
 } from "@nzosa/core";
 import type { Cents, Entity, FiledIncomeReturn, FiledIr3, FiledIr4, IncomeReturnForm } from "@nzosa/core";
-import { booksLocale, moneyPlaces } from "../country.js";
+import { signedMoney } from "../country.js";
 
 /**
  * Last year's income tax return, read in from myIR.
@@ -38,10 +38,7 @@ let chosenOwner = "";
 let asking = "";
 
 function dollars(cents: Cents): string {
-  return `${cents < 0 ? "−" : ""}$${(Math.abs(cents) / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  })}`;
+  return signedMoney(cents);
 }
 
 /** Entities that file an IR4: businesses that are companies, or not yet said. */

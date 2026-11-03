@@ -9,7 +9,7 @@ import { tripsPanel } from "./vehicle-trips-panel.js";
 import { propertyCarePanel } from "./property-care-panel.js";
 import { vehiclesBox } from "./rental-year-end.js";
 import { taxYearEndSaid, taxYearOf } from "../tax-year.js";
-import { booksLocale, moneyPlaces, booksCurrency } from "../country.js";
+import { booksCurrency, reportMoney } from "../country.js";
 
 /**
  * Rental information: each tenancy's rent, its changes and its bond, and
@@ -23,11 +23,7 @@ import { booksLocale, moneyPlaces, booksCurrency } from "../country.js";
 let editing: Tenancy | null = null;
 
 function money(cents: Cents): string {
-  const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  });
-  return cents < 0 ? `(${text})` : text;
+  return reportMoney(cents);
 }
 
 function rentals(): Entity[] {
