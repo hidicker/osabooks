@@ -75,7 +75,7 @@ import { chosenStartDate } from "../migrate/onboarding-state.js";
 import { renderWise } from "./wise-feed.js";
 import { renderSimpleFin } from "./simplefin-feed.js";
 import { autoLinkBankRows } from "./entities.js";
-import { booksCountry, booksCurrency, booksLocale, moneyPlaces } from "../country.js";
+import { booksCountry, booksCurrency, booksLocale, moneyPlaces, booksMoney } from "../country.js";
 
 /**
  * Getting bank data in, by file or by feed.
@@ -2204,10 +2204,7 @@ async function leaveOutAfterAll(line: Transaction): Promise<void> {
 
 /** An amount for a sentence. */
 function formatMoney(cents: number): string {
-  return (cents / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  });
+  return booksMoney(cents);
 }
 
 /** Bring one in, dated the day the books start, or leave it out for good. */

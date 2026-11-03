@@ -48,9 +48,6 @@ works).
 
 ## Tax and returns
 
-- **IR9 for an unincorporated club works out no tax.** It is assessed at
-  individual rates, and the page says to work it out. `individualRates()` in
-  `trust.ts` already holds the bands by year, so the IR9 could do it.
 - **The minor beneficiary rule assumes the settlor was a relative.** The rule
   applies only to property settled by a relative or legal guardian of the child
   (or someone associated with one). The app applies it to every child under 16,
@@ -89,11 +86,6 @@ works).
   meals for income tax only, with no sales tax; a "Meals: half deductible"
   split for US books would need a non-deductible meals account in the chart.
   Canada, if added, has New Zealand's rule.
-- **Thirty-three copies of "format money".** Local `money()`, `dollars()` and
-  `formatMoney()` functions across the pages, some on `booksMoney`, some
-  rebuilt with `toLocaleString`, one on `toFixed(2)` (grants), differing on
-  negatives. Two shared ones (screen, and reports in brackets) would do.
-  Code check 2 November 2026, 10.
 - **Very large files.** `reports.ts` (about 6,000 lines),
   `coding-reconciliation.ts` (4,500), `excel-export.ts`, `reconcile-page.ts`,
   `store.ts`. The same idea gets built several ways in them (long tables,

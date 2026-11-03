@@ -1,3 +1,4 @@
+import { booksMoney } from "../country.js";
 import { redraw } from "../app.js";
 import { addTransactions } from "../daily/bank-import.js";
 import { bankLabel, banks } from "../books.js";
@@ -74,7 +75,7 @@ function button(label: string, onClick: () => void, primary = false): HTMLButton
 }
 
 function dollars(cents: number): string {
-  return (cents / 100).toLocaleString("en-NZ", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return booksMoney(cents);
 }
 
 /** A workbook's tabs, or a CSV as one tab, as rows of cells numbered as the sheet numbers them. */

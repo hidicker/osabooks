@@ -4,7 +4,7 @@ import { note } from "../ui.js";
 import { cashFlowStatement, emptyEntityModel, isLoanBank } from "@nzosa/core";
 import type { CashFlowStatement, DateRange } from "@nzosa/core";
 import { taxYearEndSaid, monthsOfTaxYear } from "../tax-year.js";
-import { booksLocale, moneyPlaces } from "../country.js";
+import { booksLocale, reportMoney } from "../country.js";
 import { periodHeading, reportRange, wholeYear } from "./report-period.js";
 
 /** A day in words: "1 April 2025". */
@@ -22,8 +22,7 @@ function daySaid(date: string): string {
  */
 
 function money(cents: number): string {
-  const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), { minimumFractionDigits: moneyPlaces(), maximumFractionDigits: moneyPlaces() });
-  return cents < 0 ? `(${text})` : text;
+  return reportMoney(cents);
 }
 
 function statementFor(period: DateRange, banks: ReadonlySet<string>): CashFlowStatement | null {

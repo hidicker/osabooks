@@ -152,6 +152,30 @@ export function booksMoney(cents: number): string {
   return shown.toLocaleString(booksLocale(), { minimumFractionDigits: places, maximumFractionDigits: places });
 }
 
+/** An amount as reports show it, a negative in brackets: "1,234.50", "(12.00)". */
+export function reportMoney(cents: number): string {
+  const text = booksMoney(Math.abs(cents));
+  return cents < 0 && text !== booksMoney(0) ? `(${text})` : text;
+}
+
+/**
+ * An amount with the books' currency sign, for sentences and cards: "$1,234.50",
+ * "-$12.00", "₩5,000". The sign is the currency's own, not always a dollar.
+ */
+export function signedMoney(cents: number): string {
+  const text = booksMoney(Math.abs(cents));
+  let symbol = "$";
+  try {
+    symbol =
+      new Intl.NumberFormat(booksLocale(), { style: "currency", currency: booksCurrency(), currencyDisplay: "narrowSymbol" })
+        .formatToParts(0)
+        .find((part) => part.type === "currency")?.value ?? "$";
+  } catch {
+    // An unknown currency code: the dollar sign, as before.
+  }
+  return `${cents < 0 && text !== booksMoney(0) ? "-" : ""}${symbol}${text}`;
+}
+
 /**
  * New Zealand's returns out of the report list for books kept anywhere else.
  * Hiding them is not enough -- a hidden option is still in the list, and some

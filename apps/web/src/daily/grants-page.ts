@@ -20,7 +20,7 @@ import {
 } from "@nzosa/core";
 import type { Account, Cents, Entity, Grant, GrantPosition, IsoDate, Transaction } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearOf } from "../tax-year.js";
-import { booksLocale, moneyPlaces, booksCurrency } from "../country.js";
+import { booksCurrency, reportMoney } from "../country.js";
 
 /**
  * The grant register: each grant, what has come in against it, what has been
@@ -40,11 +40,7 @@ let finding = "";
 const reporting = new Set<string>();
 
 function money(cents: number): string {
-  const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  });
-  return cents < 0 ? `(${text})` : text;
+  return reportMoney(cents);
 }
 
 function today(): IsoDate {

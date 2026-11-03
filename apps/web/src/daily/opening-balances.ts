@@ -9,14 +9,14 @@ import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { chosenStartDate, sourceForTheseBooks, startOfFinancialYear } from "../migrate/onboarding-state.js";
 import { amountCell, nameCell, note } from "../ui.js";
-import { accountEntityKey, emptyEntityModel, financialYearBalances, parseAmount } from "@nzosa/core";
+import { accountEntityKey, emptyEntityModel, financialYearBalances, localToday, parseAmount } from "@nzosa/core";
 import type { Account, Cents, FinancialYearBalances, IsoDate, OpeningBalances } from "@nzosa/core";
 import { asCsvText } from "../books.js";
 import { checkDailyBalances, dayAfter, daysBetween, formatAmount, openingBalancesFrom, parseTrialBalance, isQuickBooksTrialBalance, parseQuickBooksTrialBalance } from "@nzosa/core";
 import type { BalanceCheck } from "@nzosa/core";
 import { diagnoseAccountDailyBalances, journalLinesFor, openBankReconcileReport } from "./balance-diagnostics.js";
 import { taxYearEndSaid, taxYearEndShort, taxYearOf, taxYearStart, yearEnd } from "../tax-year.js";
-import { booksCountry, booksLocale, moneyPlaces, booksMoney, noSalesTax, booksCurrency } from "../country.js";
+import { booksCountry, booksLocale, moneyPlaces, booksMoney, noSalesTax, booksCurrency, signedMoney } from "../country.js";
 
 /**
  * Where each year started.
@@ -401,7 +401,7 @@ let bankDraft: BankDraft | null = null;
 
 /** Today, as a New Zealand date, which is how transactions are dated. */
 function todayInNz(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+  return localToday();
 }
 
 /** The equity accounts a starting balance can be balanced to, with whose each is. */
@@ -504,10 +504,7 @@ function balanceAtStart(bank: string, balance: Cents, on: string, start: string)
 }
 
 function dollars(cents: Cents): string {
-  return `${cents < 0 ? "−" : ""}$${(Math.abs(cents) / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  })}`;
+  return signedMoney(cents);
 }
 
 /**
@@ -519,7 +516,7 @@ async function bankAgainstTrialBalance(accounts: Record<string, Cents>, start: s
   const status = await feedStatus().catch(() => null);
   const latest = status?.balances?.[status.balances.length - 1];
   if (status === null || !status.configured || latest === undefined) return "";
-  const on = new Date(latest.at).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+  const on = localToday(new Date(latest.at));
   const lines: string[] = [];
   for (const [akahuId, ours] of Object.entries(status.accounts ?? {})) {
     const balance = latest.balances[akahuId];
@@ -786,7 +783,7 @@ async function fillFromFeed(draft: BankDraft): Promise<void> {
     draft.feedSaid = "No bank feed balances yet. Connect the feed and fetch it on the Bank import page first.";
     return;
   }
-  draft.on = new Date(latest.at).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+  draft.on = localToday(new Date(latest.at));
   const byAccount = new Map(
     Object.entries(status.accounts ?? {})
       .filter(([, ours]) => ours !== "")
@@ -989,7 +986,7 @@ export async function feedTieOut(): Promise<FeedTie | null> {
   const status = await feedStatus().catch(() => null);
   const latest = status?.balances?.[status.balances.length - 1];
   if (status === null || !status.configured || latest === undefined) return null;
-  const on = new Date(latest.at).toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+  const on = localToday(new Date(latest.at));
   const heldBanks = new Set(state.ledger.transactions.map((t) => t.account));
   const rows: FeedTie["rows"] = [];
   for (const [akahuId, ours] of Object.entries(status.accounts ?? {})) {

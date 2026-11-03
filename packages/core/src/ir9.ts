@@ -2,6 +2,7 @@ import type { Cents } from "./money.js";
 import type { IsoDate } from "./dates.js";
 import type { Account } from "./chart.js";
 import type { PostedJournal } from "./posting.js";
+import { individualTax } from "./trust.js";
 
 /**
  * The IR9: the income tax return of a club or society.
@@ -30,8 +31,7 @@ import type { PostedJournal } from "./posting.js";
  *   to its income after expenses.
  * - Losses brought forward come off next; what is left is taxable income.
  * - An incorporated body pays 28 cents in the dollar. An unincorporated one
- *   is assessed at individual rates, which change year to year and are not
- *   worked out here.
+ *   is assessed at individual rates, worked out for the year when it is given.
  *
  * Nothing here decides what a payment was -- that is a judgement about the
  * organisation, and the worksheet shows each choice and lets it be changed.
@@ -146,7 +146,7 @@ export interface Ir9Worksheet {
     lossBroughtForward: Cents;
     taxableIncome: Cents;
   };
-  /** At 28%, for an incorporated body; null where individual rates apply. */
+  /** At 28% for an incorporated body, or at individual rates for the year; null when no year was given for those. */
   tax: Cents | null;
   taxNote: string;
   /** Tax already paid or credited, and what that leaves, for an incorporated body. */
@@ -165,8 +165,10 @@ export function ir9Worksheet(options: {
   income: readonly AccountAmount[];
   expenses: readonly AccountAmount[];
   inputs: Ir9Inputs;
+  /** The tax year (2026 for the year to 31 March 2026), for an unincorporated body's individual rates. */
+  year?: number;
 }): Ir9Worksheet {
-  const { income, expenses, inputs } = options;
+  const { income, expenses, inputs, year } = options;
   if (inputs.exemptKind === true && inputs.privateBenefit !== true) {
     const zero = { notIncome: 0, interest: 0, dividends: 0, other: 0 } as Record<Ir9Class, Cents>;
     return {
@@ -212,7 +214,11 @@ export function ir9Worksheet(options: {
   const taxableIncome = (netIncome - loss) as Cents;
 
   const incorporated = inputs.incorporated === true;
-  const tax = incorporated ? (Math.round(floor0(taxableIncome) * INCORPORATED_RATE) as Cents) : null;
+  const tax = incorporated
+    ? (Math.round(floor0(taxableIncome) * INCORPORATED_RATE) as Cents)
+    : year !== undefined
+      ? individualTax(floor0(taxableIncome) as Cents, year)
+      : null;
   const credits = ((inputs.imputationCredits ?? 0) + (inputs.rwt ?? 0)) as Cents;
   return {
     exempt: false,
@@ -236,7 +242,9 @@ export function ir9Worksheet(options: {
     tax,
     taxNote: incorporated
       ? "Taxed at 28 cents in the dollar, as an incorporated body."
-      : "An unincorporated body is assessed at individual tax rates, which change from year to year: work the tax out from Inland Revenue's rates for the year.",
+      : year !== undefined
+        ? `Assessed at individual tax rates, as an unincorporated body: the rates for the year to 31 March ${year}.`
+        : "An unincorporated body is assessed at individual tax rates, which change from year to year: work the tax out from Inland Revenue's rates for the year.",
     credits,
     toPay: tax === null ? null : ((tax - credits) as Cents),
   };

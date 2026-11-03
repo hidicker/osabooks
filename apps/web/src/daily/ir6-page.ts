@@ -31,7 +31,7 @@ import {
 } from "@nzosa/core";
 import type { Account, BalancePlace, Cents, Entity, ExpensePlacement, SettlementKind, TrustIncomeClass, TrustInputs } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
-import { booksLocale, moneyPlaces, booksCurrency } from "../country.js";
+import { booksCurrency, booksMoney } from "../country.js";
 
 /**
  * The IR6: a trust or estate's income tax return, worked out from the books in
@@ -51,11 +51,7 @@ function inputsFor(entity: Entity, year: number): TrustInputs {
 }
 
 function money(cents: number): string {
-  const text = (Math.abs(cents) / 100).toLocaleString(booksLocale(), {
-    minimumFractionDigits: moneyPlaces(),
-    maximumFractionDigits: moneyPlaces(),
-  });
-  return cents < 0 ? `-${text}` : text;
+  return booksMoney(cents);
 }
 
 async function saveInputs(entity: Entity, year: number, next: TrustInputs, what: string): Promise<void> {

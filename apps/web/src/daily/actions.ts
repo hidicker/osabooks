@@ -30,7 +30,7 @@ import { $, state } from "../state.js";
 import { amountCell, nameCell, note } from "../ui.js";
 import { banksNeedingOwner, emptyEntityModel, overdrawnCurrentAccounts, owedBetween, gstDueDate, gstPeriods, isCreditNote, isPosted, matchInvoices, overdueTasks, endedWithMoneyLeft, grantOpen, reportsDue, localToday } from "@nzosa/core";
 import type { IsoDate } from "@nzosa/core";
-import { booksLocale, moneyPlaces } from "../country.js";
+import { booksLocale, moneyPlaces, signedMoney } from "../country.js";
 import { booksCountry, noSalesTax } from "../country.js";
 import { societyFiguresEntered } from "./society-report-page.js";
 import { taxYearEnd, taxYearEndSaid, taxYearOf } from "../tax-year.js";
@@ -72,13 +72,12 @@ export function sayAiTrouble(said: string): void {
 }
 
 function today(): IsoDate {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" }) as IsoDate;
+  return localToday() as IsoDate;
 }
 
 /** Dollars as a person reads them: $1,234.50. */
 function dollars(cents: number): string {
-  return (cents < 0 ? "-$" : "$") +
-    (Math.abs(cents) / 100).toLocaleString(booksLocale(), { minimumFractionDigits: moneyPlaces(), maximumFractionDigits: moneyPlaces() });
+  return signedMoney(cents);
 }
 
 function plural(n: number, one: string, many = `${one}s`): string {
