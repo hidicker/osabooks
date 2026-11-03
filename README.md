@@ -1,6 +1,6 @@
 # OsaBooks
 
-Free, open-source bookkeeping and tax for small businesses, rental properties and personal books, in Australia, New Zealand, the United States and South Korea. Bank files in; a coded double-entry ledger, GST returns, income tax figures and financial reports out.
+Free, open-source bookkeeping and tax for businesses, rental properties and personal books, in Australia, New Zealand, the United States and South Korea. Bank files in; a coded double-entry ledger, GST returns, income tax figures and financial reports out.
 
 **[Home page](https://nbparagliding.nz/osabooks/home/)** · **[Try the demo](https://nbparagliding.nz/osabooks_demo/)** (sample books in your browser, nothing to install)
 
