@@ -1,12 +1,16 @@
 # OsaBooks
 
-Free accounting for New Zealand. Bank files in; a coded double-entry ledger, GST returns and financial reports out.
+Free, open-source bookkeeping and tax for small businesses, rental properties and personal books, in Australia, New Zealand, the United States and South Korea. Bank files in; a coded double-entry ledger, GST returns, income tax figures and financial reports out.
+
+**[Home page](https://nbparagliding.nz/osabooks/home/)** · **[Try the demo](https://nbparagliding.nz/osabooks_demo/)** (sample books in your browser, nothing to install)
 
 Help keep this project moving and free: [![Donate a coffee](https://img.shields.io/badge/Donate-a%20coffee-orange?logo=stripe)](https://buy.stripe.com/28EaEX2sY2Ar7vy49pd7q00)
 
-Point it at your bank exports and, if you have them, the exports from whatever accounting system you keep today. It codes transactions from your own past decisions rather than from keywords you type, matches receipts to the invoices they settle, and keeps a ledger that has to balance — so a mistake shows up as a figure that does not add up, rather than as a report that quietly reads wrong.
+Point it at your bank exports and, if you have them, the exports from Xero or QuickBooks. It codes transactions from your own past decisions rather than from keywords you type, matches receipts to the invoices they settle, and keeps a ledger that has to balance — so a mistake shows up as a figure that does not add up, rather than as a report that quietly reads wrong.
 
-It runs on your own machine. Nothing is uploaded, and the app makes no network requests of its own.
+**Your books, where you choose to keep them.** On your own computer, they are files in a folder you can back up and read without this software, and nothing from them leaves the computer unless you connect a bank feed or an AI. Or online, on your own Supabase project, to work on from any device and share with a bookkeeper or accountant ([how](docs/self-hosting.md)).
+
+**AI is optional.** Without it, OsaBooks codes from your rules and your own past decisions. With it, it can suggest codes for the lines nothing recognises, check a finished year against the [OpenAccountants](https://github.com/openaccountants/openaccountants) guides (New Zealand books, for now), and connect to Claude, ChatGPT or another AI app through an MCP connector, so the AI can read your books and suggest entries. Whatever it suggests waits in OsaBooks until you accept it.
 
 ## Running it
 
@@ -18,8 +22,6 @@ It runs on your own machine. Nothing is uploaded, and the app makes no network r
    - To stop it, double-click **`Stop OsaBooks`** in the same folder.
 
 > **Mac users:** On macOS the first double-click may say it is from an unidentified developer. Right-click the file, choose **Open**, then click **Open** again.
-
-> **Online demo:** Want to try it first with sample data without installing anything? Visit the [online demo](https://nbparagliding.nz/osabooks_demo/). More about OsaBooks on its [home page](https://nbparagliding.nz/osabooks/home/).
 
 ### For developers / terminal
 
