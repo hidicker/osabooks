@@ -240,6 +240,25 @@ export interface EntityModel {
    * owed back. Owed, by default.
    */
   ownerGifts?: boolean;
+  /**
+   * Bank accounts said to be a loan (money owed, not cash) or not, by account.
+   * An account not listed is judged by its name: see `isLoanBank`.
+   */
+  loans?: Readonly<Record<string, boolean>>;
+}
+
+/** Whether a bank account's name says it is a loan: a home loan, a mortgage, TotalMoney, a line of credit. */
+export function looksLikeLoan(name: string): boolean {
+  return /\bloans?\b|mortgage|total ?money|line of credit/i.test(name);
+}
+
+/**
+ * Whether a bank account is a loan rather than cash, for the cash flow
+ * statement: as ticked on Entities & accounts, or else by its name.
+ */
+export function isLoanBank(model: EntityModel | undefined, account: string, name: string): boolean {
+  const said = model?.loans?.[account];
+  return said ?? looksLikeLoan(`${name} ${account}`);
 }
 
 export function emptyEntityModel(): EntityModel {

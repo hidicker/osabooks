@@ -64,6 +64,7 @@ import {
   recodeElsewhere,
   splitAccountLabel,
   isGstControlCode,
+  isLoanBank,
 } from "@nzosa/core";
 import type { Account, BusinessStructure, Cents, EntityKind, EntityModel, NonProfitForm, RuleSet } from "@nzosa/core";
 import { booksCountry, booksLocale, moneyPlaces, noSalesTax, gstPercent, invoiceDetailWords } from "../country.js";
@@ -280,7 +281,9 @@ function bankTable(model: EntityModel): HTMLElement {
   bankHead.innerHTML =
     "<tr><th>Bank account</th><th>Belongs to</th>" +
     (chartBanks.length > 0 ? "<th>In the chart</th>" : "") +
-    "<th>Lines</th><th></th></tr>";
+    "<th>Lines</th>" +
+    '<th title="Money owed, such as a home loan: not counted as cash in the cash flow statement">A loan</th>' +
+    "<th></th></tr>";
   const bankBody = document.createElement("tbody");
 
   for (const account of accounts) {
@@ -338,6 +341,25 @@ function bankTable(model: EntityModel): HTMLElement {
     lines.textContent = `${onIt.length}${latest !== "" ? `, latest ${latest}` : ""}`;
     lines.title = "Bank lines in these books for this account, and the date of the newest";
     tr.append(lines);
+
+    // Whether the account is money owed rather than cash. Starts as its name
+    // suggests; ticking either way is kept.
+    const loanCell = document.createElement("td");
+    const loan = document.createElement("input");
+    loan.type = "checkbox";
+    loan.className = "bank-loan";
+    loan.checked = isLoanBank(model, account, `${bankLabel(account)} ${named ?? ""}`);
+    loan.title = "A loan (money owed, such as a home loan), not cash. Money paid into or drawn from it is financing in the cash flow statement.";
+    loan.setAttribute("aria-label", `${bankLabel(account)} is a loan`);
+    loan.addEventListener("change", () => {
+      const live = state.ledger.entities ?? emptyEntityModel();
+      void saveEntities(
+        { ...live, loans: { ...(live.loans ?? {}), [account]: loan.checked } },
+        `${bankLabel(account)} ${loan.checked ? "is a loan, not cash" : "is cash, not a loan"}`,
+      );
+    });
+    loanCell.append(loan);
+    tr.append(loanCell);
 
     const said = document.createElement("td");
     said.className = "cell-said-elsewhere";

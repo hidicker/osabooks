@@ -1,7 +1,7 @@
 import { accountsForEditing, bankLabel, reportEngine } from "../books.js";
 import { state } from "../state.js";
 import { note } from "../ui.js";
-import { cashFlowStatement, emptyEntityModel } from "@nzosa/core";
+import { cashFlowStatement, emptyEntityModel, isLoanBank } from "@nzosa/core";
 import type { CashFlowStatement, DateRange } from "@nzosa/core";
 import { taxYearEndSaid, monthsOfTaxYear } from "../tax-year.js";
 import { booksLocale, moneyPlaces } from "../country.js";
@@ -48,11 +48,11 @@ function statementFor(period: DateRange, banks: ReadonlySet<string>): CashFlowSt
 }
 
 /**
- * Whether a bank account is a loan rather than cash: a home loan, a term loan
- * or a mortgage, fed in like an account, by what it is called.
+ * Whether a bank account is a loan rather than cash: as ticked on Entities &
+ * accounts, or else by what it is called (a home loan, a mortgage, TotalMoney).
  */
 function isLoanAccount(account: string): boolean {
-  return /loan|mortgage|total ?money|line of credit/i.test(`${bankLabel(account)} ${account}`);
+  return isLoanBank(state.ledger.entities, account, bankLabel(account));
 }
 
 /** The bank accounts the page's entity holds money in, or every one. */
