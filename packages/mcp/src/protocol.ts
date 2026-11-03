@@ -36,6 +36,49 @@ function toolsFor(context: ToolContext) {
 
 const SUPPORTED = ["2025-06-18", "2025-03-26", "2024-11-05"];
 
+/** The books' own name, or "" where they cannot be opened (the tools then say why). */
+function booksName(context: ToolContext): string {
+  try {
+    return context.shelf.get().name.trim();
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Tools that make a suggestion, or show a page, in these books. Each says
+ * which books it is for, and is refused for any other: with a connector per
+ * set of books, an AI holding two of them could otherwise send one the
+ * other's suggestion.
+ */
+const namesItsBooks = (name: string): boolean => name.startsWith("suggest_") || name === "show_in_app";
+
+interface Listed {
+  name: string;
+  description: string;
+  inputSchema: Record<string, unknown>;
+}
+
+/** A tool as listed: its description names the books, and a suggesting tool asks for them. */
+function listed(tool: Listed, books: string): Listed {
+  if (books === "") return { name: tool.name, description: tool.description, inputSchema: tool.inputSchema };
+  const description = `${tool.description} Books: ${books}.`;
+  if (!namesItsBooks(tool.name)) return { name: tool.name, description, inputSchema: tool.inputSchema };
+  const schema = tool.inputSchema as { properties?: Record<string, unknown>; required?: string[] };
+  return {
+    name: tool.name,
+    description,
+    inputSchema: {
+      ...schema,
+      properties: {
+        books: { type: "string", description: `The books this is for, by name: "${books}". Refused for any other.` },
+        ...(schema.properties ?? {}),
+      },
+      required: ["books", ...(schema.required ?? [])],
+    },
+  };
+}
+
 export interface Message {
   jsonrpc: "2.0";
   id?: string | number | null;
@@ -53,30 +96,51 @@ export function handle(message: Message, context: ToolContext): unknown {
 
   switch (method) {
     case "initialize": {
+      const books = booksName(context);
       const asked = String(message.params?.["protocolVersion"] ?? "");
       const client = (message.params?.["clientInfo"] as { name?: unknown } | undefined)?.name;
       if (typeof client === "string") context.client = client.slice(0, 60);
       return reply({
         protocolVersion: SUPPORTED.includes(asked) ? asked : (SUPPORTED[0] as string),
         capabilities: { tools: {} },
-        serverInfo: { name: "nzosa-mcp", version: "0.1.0" },
-        instructions: context.suggest === true ? `${INSTRUCTIONS}\n${SUGGEST_INSTRUCTIONS}` : INSTRUCTIONS,
+        serverInfo: { name: "osabooks", title: books === "" ? "OsaBooks" : `OsaBooks: ${books}`, version: "0.2.0" },
+        instructions:
+          (books === "" ? "" : `These are the books called "${books}", and only those: another connector is other books.\n`) +
+          (context.suggest === true ? `${INSTRUCTIONS}\n${SUGGEST_INSTRUCTIONS}` : INSTRUCTIONS),
       });
     }
     case "ping":
       return reply({});
     case "tools/list":
       return reply({
-        tools: toolsFor(context).map(({ name, description, inputSchema }) => ({ name, description, inputSchema })),
+        tools: toolsFor(context).map((tool) => listed(tool as Listed, booksName(context))),
       });
     case "tools/call": {
       const name = String(message.params?.["name"] ?? "");
       const tool = toolsFor(context).find((t) => t.name === name);
       if (tool === undefined) return fail(-32602, `No tool called ${name}.`);
-      const args = (message.params?.["arguments"] ?? {}) as Record<string, unknown>;
+      const { books: said, ...args } = (message.params?.["arguments"] ?? {}) as Record<string, unknown>;
       try {
+        const books = booksName(context);
+        if (namesItsBooks(name) && books !== "") {
+          const given = typeof said === "string" ? said.trim() : "";
+          if (given.toLowerCase() !== books.toLowerCase()) {
+            throw new ToolError(
+              given === ""
+                ? `books: say which books this is for. This connector is "${books}".`
+                : `This connector is "${books}", not "${given}". Nothing was suggested: use the connector for "${given}".`,
+            );
+          }
+        }
         const result = tool.run(args, context);
-        return reply({ content: [{ type: "text", text: JSON.stringify(result, null, 2) }] });
+        // Every answer says whose books it is from, so a mix-up shows.
+        const named =
+          books === ""
+            ? result
+            : result !== null && typeof result === "object" && !Array.isArray(result)
+              ? { books, ...(result as Record<string, unknown>) }
+              : { books, result };
+        return reply({ content: [{ type: "text", text: JSON.stringify(named, null, 2) }] });
       } catch (error) {
         // A refusal the model can act on is a result, not a protocol failure.
         const known = error instanceof ToolError;

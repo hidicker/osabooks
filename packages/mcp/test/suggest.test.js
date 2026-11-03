@@ -49,8 +49,10 @@ function context(folder, extra = {}) {
   };
 }
 
+/** A tool call; one that suggests says it is for these books, as the server asks. */
 function call(ctx, name, args = {}) {
-  const out = handle({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }, ctx).result;
+  const forBooks = name.startsWith("suggest_") || name === "show_in_app" ? { books: ctx.shelf.get().name, ...args } : args;
+  const out = handle({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: forBooks } }, ctx).result;
   const body = out.content[0].text;
   return out.isError ? { error: body } : JSON.parse(body);
 }
@@ -192,7 +194,7 @@ test("books handed over by the server answer the same, and suggestions come back
   assert.equal(JSON.parse(listed.reply.result.content[0].text).books, "Online co");
   assert.equal(listed.suggested, undefined);
 
-  const made = ask({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "suggest_codes", arguments: { lines: [{ transaction: "fuel", account: "449", because: "fuel" }] } } });
+  const made = ask({ jsonrpc: "2.0", id: 2, method: "tools/call", params: { name: "suggest_codes", arguments: { books: "Online co", lines: [{ transaction: "fuel", account: "449", because: "fuel" }] } } });
   assert.equal(JSON.parse(made.reply.result.content[0].text).from, "Claude");
   assert.equal(made.suggested.sets[0].from, "Claude");
   assert.equal(made.suggested.sets[0].items[0].code, "Motor Vehicle Expenses - 449");
@@ -205,4 +207,27 @@ test("books handed over by the server answer the same, and suggestions come back
   const batch = ask([{ jsonrpc: "2.0", method: "notifications/initialized" }, { jsonrpc: "2.0", id: 4, method: "ping" }]);
   assert.deepEqual(batch.reply, [{ jsonrpc: "2.0", id: 4, result: {} }]);
   assert.equal(ask({ jsonrpc: "2.0", method: "notifications/initialized" }).reply, undefined);
+});
+
+test("a connector names its books, and refuses a suggestion meant for other books", () => {
+  const folder = books();
+  const ctx = context(folder);
+  const name = ctx.shelf.get().name;
+  const hello = handle({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: "2025-06-18" } }, ctx).result;
+  assert.equal(hello.serverInfo.title, `OsaBooks: ${name}`);
+  assert.match(hello.instructions, new RegExp(`books called "${name}"`));
+  const tools = handle({ jsonrpc: "2.0", id: 2, method: "tools/list" }, ctx).result.tools;
+  const codes = tools.find((tool) => tool.name === "suggest_codes");
+  assert.ok(codes.inputSchema.required.includes("books"));
+  assert.ok(tools.every((tool) => tool.description.endsWith(`Books: ${name}.`)));
+  // Every answer says which books it is from.
+  assert.equal(call(ctx, "list_accounts").books, name);
+  const asked = (args) =>
+    handle({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "suggest_codes", arguments: args } }, ctx).result;
+  const lines = [{ transaction: "fuel", account: "449", because: "fuel" }];
+  const wrong = asked({ books: "Other books", lines });
+  assert.equal(wrong.isError, true);
+  assert.match(wrong.content[0].text, /This connector is ".*", not "Other books". Nothing was suggested/);
+  assert.equal(asked({ lines }).isError, true);
+  assert.equal(existsSync(join(folder, "suggested.json")), false);
 });
