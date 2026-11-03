@@ -177,6 +177,8 @@ export {
   bankOwner,
   suggestedBankOwner,
   banksNeedingOwner,
+  isLoanBank,
+  looksLikeLoan,
 } from "./entities.js";
 export type {
   Entity,

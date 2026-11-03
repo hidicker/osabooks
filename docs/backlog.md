@@ -212,13 +212,6 @@ works).
   settled within 365 days), and on the invoice basis a payment received
   before the invoice is issued makes the GST due when paid. Both rare for the
   businesses OsaBooks is for; the GST return takes neither into account yet.
-- **The cash flow statement never recognises a bank account named "loan".**
-  Its pattern in `apps/web/src/daily/cash-flow-report.ts` (`isLoanAccount`)
-  has held a backspace character where a word boundary was meant, since the
-  first commit, so only "mortgage", "total money" and "line of credit"
-  accounts are treated as loans (financing) rather than cash. Fixing it moves
-  any other loan account out of cash in New Zealand's cash flow statements
-  too, so it waits for a decision. Found 17 October 2026.
 - **SimpleFIN for books kept online.** The SimpleFIN feed works on the
   desktop app only: its Access URL is kept in `.simplefin.json` by the local
   server. Books kept online need it in Supabase Vault with an edge function
