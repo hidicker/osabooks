@@ -67,5 +67,5 @@ if [ "$TARGET" = "app" ] || [ "$TARGET" = "both" ]; then
   send_folder "${WEBDISK_APP_USER:?WEBDISK_APP_USER is not set}" "apps/web/dist" "https://nbparagliding.nz/osabooks"
 fi
 if [ "$TARGET" = "demo" ] || [ "$TARGET" = "both" ]; then
-  send_folder "${WEBDISK_DEMO_USER:?WEBDISK_DEMO_USER is not set}" "online-demo" "https://nbparagliding.nz/nzosa_demo"
+  send_folder "${WEBDISK_DEMO_USER:?WEBDISK_DEMO_USER is not set}" "online-demo" "https://nbparagliding.nz/osabooks_demo"
 fi

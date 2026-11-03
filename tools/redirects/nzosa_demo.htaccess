@@ -1,0 +1,6 @@
+# For the old demo folder, nbparagliding.nz/nzosa_demo/, once the demo lives
+# at nbparagliding.nz/osabooks_demo/. Uploaded there by hand as ".htaccess"
+# (the deploy no longer reaches that folder). Every old address goes to the
+# same place at the new one, its query kept.
+RewriteEngine On
+RewriteRule ^(.*)$ https://nbparagliding.nz/osabooks_demo/$1 [R=301,L,QSA]
