@@ -113,8 +113,8 @@ works).
 - **Tests on every push, and a linter.** The tests run only when a deploy is
   started. A `ci.yml` on push running `npm ci && npm test`, and
   typescript-eslint with no-floating-promises, no-misused-promises and a check
-  against `toISOString().slice(0, 10)` outside dates.ts. Waiting on a
-  decision. DeepSeek review, 7.
+  against `toISOString().slice(0, 10)` outside dates.ts. Not wanted for now
+  (3 November 2026): the tests run before each deploy and when asked. DeepSeek review, 7.
 - **The developer guide's counts are out of date**: 579 core tests (now about
   1,580), three packages (four), `books.ts` at 727 lines (2,600). Generate
   them, or drop the numbers. DeepSeek review, 8.
