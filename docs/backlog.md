@@ -6,6 +6,23 @@ the commit. The larger, planned work is in [roadmap.md](roadmap.md).
 
 ## Waiting on a decision
 
+- **Partnering with OpenAccountants.** Michael (OpenAccountants) suggested
+  working together: OsaBooks showing their guides in use, and a business in
+  installing and maintaining OsaBooks with the guides rather than a
+  subscription. Asked him (3 November 2026) what it would look like, who would
+  deliver installs (a first few done by the owner as a pilot), and whether his
+  accountants would try it on a few clients' books. Until then: the pull
+  request adding OsaBooks to their README's Related open-source projects (one
+  line, CLA box to tick by hand) and the update to their Slack are held.
+- **One connector for all of a person's books.** Today each set of books has
+  its own connector address. One address with a "list my books" tool, each
+  other tool taking which books, would mean one sign-in; the per-book
+  addresses would stay for giving a tool one set only. Kept per book for now
+  (3 November 2026).
+- **Rename the local folder `Documents\nzosa` to OsaBooks.** This project's
+  Claude Code history and memory, the extension's books folder, the test
+  books and DeepSeek's setup all point at the path, and it cannot be done
+  from a session running in it. Needs a checklist and a quiet moment.
 - **`supabase db push` does not know the live database's history.** The
   migrations were applied in the SQL editor, so the project's migration record
   is empty and `db push` starts again from the first one (it fails at once on
@@ -95,6 +112,14 @@ works).
 
 ## The app
 
+- **No Korean test book.** The Korean pack (won, VAT, income tax, the AI
+  check's prompt) is checked by unit tests only; nothing takes Korean books
+  through the screens. A public Korean sample file, or invented books, would
+  close it.
+- **Filed returns to compare with, outside New Zealand.** New Zealand books
+  load what was filed from myIR and show each GST period beside it. An
+  Australian BAS, a Korean VAT return or a US sales tax return filed
+  elsewhere cannot be loaded to compare yet.
 - **Bank and AI tokens on Windows rely on a file mode Windows ignores.**
   `.akahu.json`, `.ai.json`, `.wise.json` and `.simplefin.json` are written
   with mode 0600 (`apps/web/server.js`, `packages/mcp/src/sandbox.ts`), which
