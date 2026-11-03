@@ -14,6 +14,7 @@ import { downloadExcelReport } from "./excel-export.js";
 import { IRD_FORMS_INDEX, IRD_GUIDES, guidePrompt, guidesForBooks } from "../ai-guides.js";
 import type { GuideId } from "../ai-guides.js";
 import { taxYearEndSaid } from "../tax-year.js";
+import { booksCountry, noSalesTax } from "../country.js";
 
 /**
  * A year-end check of the accounts, against New Zealand tax rules.
@@ -70,11 +71,12 @@ export function renderAiCheck(): void {
   }
 
   body.append(
-    step("What this is", "Year-end review against New Zealand tax rules"),
+    step("What this is", `Year-end review against ${booksCountry().id === "generic" ? "the" : `${booksCountry().name}'s`} tax rules`),
     note(
-      "Reviews the finished year: whether each account holds what belongs in it, whether " +
-        "GST treatments match each entity's registration, which deductions need records, and " +
-        "what is usually present but missing. It reads the year's totals, not its transactions.",
+      "Reviews the finished year: whether each account holds what belongs in it, " +
+        (noSalesTax() ? "" : `whether ${booksCountry().salesTax?.name ?? "GST"} treatments match each entity's registration, `) +
+        "which deductions need records, and what is usually present but missing. It reads the " +
+        "year's totals and the reports these books draw, not its transactions.",
     ),
     sourceNote(),
   );
@@ -90,8 +92,10 @@ export function renderAiCheck(): void {
     step("Take it to OpenAccountants", "Download, copy, paste back"),
     openAccountantsLogo(),
     carryPanel(pickYear.pick),
-    step("Or check against Inland Revenue's own guides", "Attach the guide, copy, paste back"),
-    guidePanel(pickYear.pick),
+    // Inland Revenue's own return guides, attached by hand: New Zealand's only.
+    ...(booksCountry().id === "nz"
+      ? [step("Or check against Inland Revenue's own guides", "Attach the guide, copy, paste back"), guidePanel(pickYear.pick)]
+      : []),
   );
 
   if (result !== null) body.append(answerPanel(result));
@@ -160,7 +164,7 @@ function sourceNote(): HTMLElement {
   why.append(
     document.createTextNode(
       "The rules come from OpenAccountants — tax guides written against primary sources, " +
-        "the Acts and Inland Revenue's own material — rather than from the model's memory. " +
+        `the law and ${booksCountry().taxAuthority.name}'s own material — rather than from the model's memory. ` +
         "For more information on OpenAccountants: ",
     ),
   );
@@ -307,8 +311,9 @@ function carryPanel(pickYear: HTMLSelectElement): HTMLElement {
     fileHeading,
     note(
       "Attach it to the same message as the prompt. It holds the trial balance, general " +
-        "ledger, every transaction and its coding, the depreciation schedule and the GST " +
-        "returns, so the assistant can check the transactions, not just the totals. It is " +
+        "ledger, every transaction and its coding, the depreciation schedule" +
+        (noSalesTax() ? "" : ` and the ${booksCountry().salesTax?.name ?? "GST"} returns`) +
+        ", so the assistant can check the transactions, not just the totals. It is " +
         "your books in full: send it only where you would send the books.",
     ),
     actions([workbook]),
