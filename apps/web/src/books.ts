@@ -2181,7 +2181,7 @@ function depreciationJournals(): PostedJournal[] {
     transactions: accountingLines(),
     chart: state.chart,
     // Today where the books are kept: the year in progress is posted month by month.
-    today: new Date().toLocaleDateString("en-CA", booksCountry().id === "nz" ? { timeZone: "Pacific/Auckland" } : {}),
+    today: localToday(),
     ...depreciationRules(),
   });
 }
@@ -2274,6 +2274,48 @@ export function ledgerFromStart(): boolean {
   return state.ledger.transactions.some((t) =>
     /^(quickbooks-ledger|quickbooks-iif|quickbooks-desktop-detail|quickbooks-export|slowbooks-ledger|myob-journal|gnucash-transactions)$/.test(t.source?.importer ?? ""),
   );
+}
+
+/**
+ * The years whose figures a change to the books would move, earliest first.
+ *
+ * Depreciation and pay runs are worked out from the register and Payroll each
+ * time, so editing an asset or the payroll accounts moves every year they
+ * reach. Asked before saving, so the years are said rather than found later.
+ */
+export function yearsChangedBy(next: StoredLedger, from: StoredLedger = state.ledger): number[] {
+  const totals = (): Map<string, number> => {
+    const out = new Map<string, number>();
+    for (const journal of postedJournals()) {
+      for (const line of journal.lines) {
+        const key = `${taxYearOf(journal.date)}|${line.accountCode !== "" ? line.accountCode : line.accountName}`;
+        out.set(key, (out.get(key) ?? 0) + line.amount);
+      }
+    }
+    return out;
+  };
+  const was = state.ledger;
+  let before: Map<string, number>;
+  let after: Map<string, number>;
+  try {
+    state.ledger = from;
+    before = totals();
+    state.ledger = next;
+    after = totals();
+  } finally {
+    state.ledger = was;
+  }
+  const years = new Set<number>();
+  for (const key of new Set([...before.keys(), ...after.keys()])) {
+    if ((before.get(key) ?? 0) !== (after.get(key) ?? 0)) years.add(Number(key.split("|")[0]));
+  }
+  return [...years].sort((x, y) => x - y);
+}
+
+/** "FY2025 and FY2026": years as the books name them. */
+export function yearsSaid(years: readonly number[]): string {
+  const named = years.map((y) => `FY${y}`);
+  return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
 }
 
 export function postedJournals(): PostedJournal[] {

@@ -101,3 +101,22 @@ test("only a line a lock covers is held back: a finished year, or GST filed for 
   assert.equal(heldByLock(locks, model, { date: "2026-04-01", account: "trading" }), false, "after both locks");
   assert.equal(heldByLock(locks, { ...model, entities: [model.entities[1]] }, { date: "2026-02-01", account: "unknown" }), false);
 });
+
+test("an opening balance on or before the year lock is locked with it", () => {
+  const locks = { year: "2026-03-31" };
+  const opening = { asAt: "2025-03-31", accounts: { "090": 50000, "970": -50000 } };
+  const before = lockedFigures(locks, books, returns, opening);
+  const changed = lockedFigures(locks, books, returns, { ...opening, accounts: { "090": 60000, "970": -60000 } });
+  assert.match(lockBroken(locks, before, changed) ?? "", /locked as a finished year/);
+  const later = { asAt: "2026-04-01", accounts: { "090": 50000 } };
+  assert.equal(lockBroken(locks, lockedFigures(locks, books, returns, later), lockedFigures(locks, books, returns, { ...later, accounts: { "090": 1 } })), null);
+});
+
+test("changing a locked account's type or entity is a change to the locked year", () => {
+  const locks = { year: "2026-03-31" };
+  const as = (said) => (code) => (code === "429" ? said : "Bank");
+  const before = lockedFigures(locks, books, returns, undefined, as("Expense, Arrow Rock"));
+  assert.equal(lockBroken(locks, before, lockedFigures(locks, books, returns, undefined, as("Expense, Arrow Rock"))), null);
+  assert.match(lockBroken(locks, before, lockedFigures(locks, books, returns, undefined, as("Current Asset, Arrow Rock"))) ?? "", /finished year/);
+  assert.match(lockBroken(locks, before, lockedFigures(locks, books, returns, undefined, as("Expense, Larch Street"))) ?? "", /finished year/);
+});

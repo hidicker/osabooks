@@ -4,9 +4,9 @@ import { rpc } from "../cloud.js";
 import { state } from "../state.js";
 import { backendKind, openCloudBookId, save } from "../store.js";
 import { addTransactions } from "./bank-import.js";
-import { nameCell, note } from "../ui.js";
+import { askOnPage, nameCell, note, tellOnPage } from "../ui.js";
 import { booksLocale, moneyPlaces, noSalesTax } from "../country.js";
-import { firstOpenDay, furthestLocks } from "@nzosa/core";
+import { firstOpenDay, furthestLocks, localToday } from "@nzosa/core";
 import { numberPadSettings } from "../number-pad.js";
 import { stripeSettings } from "./stripe-ui.js";
 import type { IsoDate, LockDates, LockedChange, Transaction } from "@nzosa/core";
@@ -21,7 +21,7 @@ import type { IsoDate, LockDates, LockedChange, Transaction } from "@nzosa/core"
  */
 
 function today(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Pacific/Auckland" });
+  return localToday();
 }
 
 /** For books online, an owner or the accountant moves a lock. Elsewhere there is one person. */
@@ -35,6 +35,34 @@ async function mayMoveLocks(): Promise<boolean> {
 /** Lines dated up to `day` still waiting to be confirmed on Reconcile. */
 function unconfirmedThrough(day: string): number {
   return reconcileRows().all.filter((one) => one.transaction.date <= day && !settledAlready(one)).length;
+}
+
+/**
+ * Offered once a GST return is marked as filed: lock GST up to the end of its
+ * period, so nothing can change a return already with the tax office. Asked,
+ * not done, and only where the lock is not already that far.
+ */
+export async function offerGstLock(periodEnd: string): Promise<void> {
+  const locks = state.ledger.lockDates ?? {};
+  if (locks.gst !== undefined && locks.gst >= periodEnd) return;
+  if (!(await mayMoveLocks())) return;
+  const open = unconfirmedThrough(periodEnd);
+  if (open > 0) {
+    await tellOnPage(
+      `Marked as filed. To lock GST up to ${periodEnd} as well, confirm the ${open} line${open === 1 ? "" : "s"} ` +
+        "still waiting on Reconcile up to that date, then set the GST lock under Lock dates.",
+    );
+    return;
+  }
+  if (
+    !(await askOnPage(
+      `Lock GST up to ${periodEnd} as well? A change that would alter a return up to then is refused. ` +
+        "The lock can be moved back later, and that is recorded.",
+    ))
+  ) {
+    return;
+  }
+  await setLocks({ ...locks, gst: periodEnd as IsoDate });
 }
 
 export function renderLockDates(): void {

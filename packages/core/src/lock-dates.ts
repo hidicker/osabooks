@@ -1,6 +1,7 @@
 import type { IsoDate } from "./dates.js";
 import type { GstReturnResult } from "./gst.js";
 import type { PostedJournal } from "./posting.js";
+import type { OpeningBalances } from "./balance-sheet.js";
 import type { EntityModel } from "./entities.js";
 import { reportsNetOfGst } from "./entities.js";
 import { formatAmount } from "./money.js";
@@ -82,16 +83,41 @@ export function lockedFigures(
   locks: LockDates | undefined,
   journals: readonly PostedJournal[],
   returns: readonly GstReturnResult[],
+  /**
+   * Opening balances, which are not postings: those dated on or before the
+   * year lock are part of the finished books as much as any journal is.
+   */
+  opening?: OpeningBalances,
+  /**
+   * What else about an account a finished year depends on: its type (which
+   * decides profit and loss or balance sheet) and its entity. Added to each
+   * account's figures, so changing either for an account with history in a
+   * locked year is refused as a change to that year.
+   */
+  describe?: (code: string) => string,
 ): LockedFigures {
   let year = "";
   if (locks?.year) {
     const totals = new Map<string, number>();
+    const add = (date: string, account: string, amount: number): void => {
+      if (date > locks.year!) return;
+      const key = `${date}|opening ${account}`;
+      totals.set(key, (totals.get(key) ?? 0) + amount);
+    };
+    if (opening !== undefined) {
+      for (const [account, amount] of Object.entries(opening.accounts ?? {})) add(opening.asAt, account, amount);
+      for (const [date, accounts] of Object.entries(opening.byDate ?? {})) {
+        for (const [account, amount] of Object.entries(accounts)) add(`${date}`, `${account} (year end)`, amount);
+      }
+    }
     for (const journal of journals) {
       if (journal.date > locks.year) continue;
       for (const line of journal.lines) {
         // By code alone: renaming an account changes no figure. The name stands
         // in only where a line has no code.
-        const key = `${journal.date}|${line.accountCode !== "" ? line.accountCode : line.accountName}`;
+        const account = line.accountCode !== "" ? line.accountCode : line.accountName;
+        const more = describe?.(account) ?? "";
+        const key = `${journal.date}|${account}${more === "" ? "" : `|${more}`}`;
         totals.set(key, (totals.get(key) ?? 0) + line.amount);
       }
     }
@@ -177,8 +203,8 @@ export function lockedDifferences(before: LockedFigures, after: LockedFigures): 
     const a = was.get(key) ?? 0;
     const b = now.get(key) ?? 0;
     if (a === b) continue;
-    const [day, account] = key.split("|");
-    out.push(`${day} ${account}: ${formatAmount(a)} to ${formatAmount(b)}`);
+    const [day, account, more] = key.split("|");
+    out.push(`${day} ${account}${more === undefined ? "" : ` (${more})`}: ${formatAmount(a)} to ${formatAmount(b)}`);
   }
   const returns = (text: string): Map<string, Record<string, number>> =>
     new Map(
