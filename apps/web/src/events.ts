@@ -122,6 +122,8 @@ export type EventKind =
   | "aiAutoSuggest"
   /** Getting the books ready every morning, on or off. */
   | "nightly"
+  /** The books replaced by a backup. Not undone here: the earlier backup is restored instead. */
+  | "restore"
   /** The GST and year lock dates. */
   | "lockDates"
   /** How confirmed lines' money between entities is recorded, applied to them deliberately. */
@@ -304,6 +306,7 @@ export function canReverse(
   event: LedgerEvent,
 ): { ok: true } | { ok: false; why: string } {
   if (event.reverted === true) return { ok: false, why: "Already undone." };
+  if (event.kind === "restore") return { ok: false, why: "A restore is undone by restoring the backup from before it." };
 
   // A batch has no single target: it is blocked only by a later change to one
   // of its own lines, not by every later batch.
@@ -346,6 +349,8 @@ export function canReverse(
  */
 export function reverse(ledger: StoredLedger, event: LedgerEvent): StoredLedger {
   switch (event.kind) {
+    case "restore":
+      return ledger;
     case "stock":
       return { ...ledger, stockCounts: (event.before ?? []) as NonNullable<StoredLedger["stockCounts"]> };
     case "time":
@@ -723,6 +728,7 @@ export const KIND_LABELS: Record<EventKind, string> = {
   xeroBankNumbers: "Xero bank account numbers",
   aiAutoSuggest: "AI suggestions when the books open",
   nightly: "Ready every morning",
+  restore: "Restored from a backup",
   lockDates: "Lock dates",
   betweenLines: "Money between entities on confirmed lines",
   openingDocuments: "Invoices and bills open at the start",

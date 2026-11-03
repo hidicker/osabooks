@@ -1,4 +1,5 @@
 import type { LedgerEvent } from "./events.js";
+import { appendEvent, makeEvent } from "./events.js";
 import { resetLockBaseline } from "./lock.js";
 import { state } from "./state.js";
 import {
@@ -172,7 +173,18 @@ export async function restoreBackup(
   const saved = await save(state.ledger);
   if (parsed.rules) await saveRules(parsed.rules);
   if (parsed.rulesArchive) await saveRulesArchive(parsed.rulesArchive);
-  if (Array.isArray(parsed.events)) await saveEvents(parsed.events);
+  // History becomes the backup's own, so nothing from the books it replaced is
+  // left there, and it ends with the restore itself. An old ledger file has no
+  // history: what was here is kept, and the restore added to it.
+  const restored = makeEvent(
+    state.who,
+    "restore",
+    `Restored from ${file.name}${isBackup && typeof parsed.takenAt === "string" ? `, a backup taken ${parsed.takenAt.slice(0, 10)}` : ""}`,
+    null,
+    null,
+  );
+  const history = isBackup ? (Array.isArray(parsed.events) ? parsed.events : []) : await loadEvents();
+  await saveEvents(appendEvent(history, restored));
   rememberRestoredName(isBackup && typeof parsed.books === "string" ? parsed.books : "");
   return saved
     ? { ok: true }
