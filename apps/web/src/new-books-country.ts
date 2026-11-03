@@ -20,8 +20,9 @@ const PENDING = "nzosa.newBooksCountry";
 /** Long enough to make the books and open them; short enough not to land on some other set later. */
 const FRESH_FOR = 10 * 60 * 1000;
 
-export const WORK_IN_PROGRESS = new Set(["us", "au", "kr"]);
-const OFFERED = new Set(["nz", "us", ...WORK_IN_PROGRESS]);
+/** Countries whose pack is still being built: named so, and warned about when chosen. None at present. */
+export const WORK_IN_PROGRESS = new Set<string>();
+const OFFERED = new Set(["nz", "us", "au", "kr", ...WORK_IN_PROGRESS]);
 const ORDER = (id: string): number => ["nz", "us", "au", "kr"].indexOf(id) + 1 || 99;
 
 /** The countries a set of books can be kept in, as [id, what to call it], in the order offered. */

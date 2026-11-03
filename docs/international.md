@@ -18,8 +18,9 @@ books, word for word.
   - Unset is New Zealand, so every set kept before the country work is New Zealand's.
 - **It is chosen as a new set of books is made**, and under Setup → Country until the books hold
   anything; after that it is fixed, and another country needs a new set of books.
-- **Offered to everyone:** New Zealand, the United States, Australia and South Korea. The last
-  three are marked work in progress (`WORK_IN_PROGRESS` in `apps/web/src/new-books-country.ts`).
+- **Offered to everyone:** New Zealand, the United States, Australia and South Korea. A country
+  whose pack is still being built can be marked work in progress (`WORK_IN_PROGRESS` in
+  `apps/web/src/new-books-country.ts`, empty at present): it is named so and warned about when chosen.
 - **New books start in the country last chosen**, or before any is, the one the browser's time
   zone suggests.
 - **"Anywhere"** (calendar year, USD, no sales tax) is listed only in the international build:
