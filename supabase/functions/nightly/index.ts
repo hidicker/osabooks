@@ -173,9 +173,19 @@ async function logFailure(book: string, message: string): Promise<void> {
   }
 }
 
+/** Whether the key given is the morning run's, compared in the same time whatever it holds. */
+function isNightlyKey(given: string | null): boolean {
+  if (NIGHTLY_KEY === "" || given === null) return false;
+  const a = new TextEncoder().encode(given);
+  const b = new TextEncoder().encode(NIGHTLY_KEY);
+  let differ = a.length ^ b.length;
+  for (let i = 0; i < b.length; i++) differ |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  return differ === 0;
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return reply({ error: "POST only" }, 405);
-  if (NIGHTLY_KEY === "" || request.headers.get("x-nightly-key") !== NIGHTLY_KEY) {
+  if (!isNightlyKey(request.headers.get("x-nightly-key"))) {
     return reply({ error: "not the morning run" }, 403);
   }
   const body = (await request.json().catch(() => ({}))) as { book?: string };
