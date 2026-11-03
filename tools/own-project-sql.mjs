@@ -42,7 +42,14 @@ export function ownProjectSql() {
   ];
   for (const name of MIGRATIONS) {
     out.push(`-- ============================================================ ${name}`);
-    out.push(readFileSync(join(root, "supabase", "migrations", `${name}.sql`), "utf8").replace(/\r\n/g, "\n").trimEnd());
+    // The migrations as applied keep the old name in their comments; the
+    // script a person pastes calls the product what it is called now.
+    out.push(
+      readFileSync(join(root, "supabase", "migrations", `${name}.sql`), "utf8")
+        .replace(/\r\n/g, "\n")
+        .replace(/^(--.*)\bNZOSA\b/gm, "$1OsaBooks")
+        .trimEnd(),
+    );
     out.push("");
   }
   out.push("-- ============================================================ parts added later");
