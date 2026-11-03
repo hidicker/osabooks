@@ -104,6 +104,8 @@ If one set of books holds several things — a company and two rental properties
 
 A rental property is an entity of its own. Give it its kind (residential or commercial), whether it is registered for GST, and its owners with their shares — "Ana Whitcombe 50%; Tom Whitcombe 50%" — then assign its income and expense accounts to it. An entity that is not registered for GST charges and claims none, so anything coded to its accounts stays off every GST return whatever the account's tax code says. Household spending can be an entity too, which keeps it out of every figure rather than mixed into one.
 
+When the owners or their shares change, you are asked whether the new shares apply from a date or correct every year. From a date, the years before keep the shares they had, and a year the change falls in counts each set of shares for its days. Changing only one name is offered as the same person renamed: their shares, own accounts, returns and tax details move to the new name.
+
 If your coded history uses its own categories — "Totara Rent", say — rename the category on **Entities & accounts** to the account it really is, by its code or its name. The two are merged: every line coded to the category moves to the account, the account keeps its own GST treatment and entity, and the imported file's lines count as agreeing with it.
 
 ### 2. Fetch your files, all at once

@@ -23,6 +23,7 @@ import {
 import type { Account, Cents, Entity, Ir7ExpensePlacement, Ir7Holder, Ir7IncomeClass, Ir7Inputs, Ir7Kind } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
 import { booksCurrency, booksMoney } from "../country.js";
+import { ownersInYear } from "../owners.js";
 
 /**
  * The IR7: a partnership or look-through company's income tax return, worked
@@ -197,14 +198,17 @@ export function renderIr7Page(): void {
   const to = taxYearEnd(year);
   const { income, expenses } = incomeAndExpenses({ journals: postedJournals(), chart: state.chart, from, to, only });
 
-  const people = kind === "ltc" ? (entity.shareholders ?? []) : (entity.owners ?? []);
+  // A partnership whose shares changed in the year has them weighted by days
+  // already (ownersInYear), so the periods typed here would count twice.
+  const dated = kind !== "ltc" && (entity.earlierOwners ?? []).some((e) => e.until >= from);
+  const people = kind === "ltc" ? (entity.shareholders ?? []) : ownersInYear(entity, year);
   const holders: Ir7Holder[] = people.map((p) => ({
     id: p.name,
     name: p.name,
     percent: p.percent,
     irdNumber: entity.holderIrd?.[p.name],
-    from: inputs.periods?.[p.name]?.from,
-    to: inputs.periods?.[p.name]?.to,
+    from: dated ? undefined : inputs.periods?.[p.name]?.from,
+    to: dated ? undefined : inputs.periods?.[p.name]?.to,
   }));
   const sheet = ir7Worksheet({ income, expenses, holders, inputs, kind, period: { from, to } });
 

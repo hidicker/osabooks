@@ -1,5 +1,6 @@
 import type { Cents } from "./money.js";
 import type { Entity } from "./entities.js";
+import { ownersOver } from "./entities.js";
 import type { ProfitAndLoss, TaxExtra } from "./reports.js";
 
 /**
@@ -67,6 +68,8 @@ export interface RentalSchedule {
   totalIncome: Cents;
   totalExpenses: Cents;
   net: Cents;
+  /** The period the schedule covers, so each owner's share is the one for it. */
+  period?: { from: string; to: string } | undefined;
 }
 
 /** Whether an entity is a rental property, residential or not. */
@@ -102,7 +105,7 @@ export function rentalSchedule(
   expenses.sort(byName);
   const totalIncome = income.reduce((sum, line) => sum + line.amount, 0);
   const totalExpenses = expenses.reduce((sum, line) => sum + line.amount, 0);
-  return { entity, income, expenses, totalIncome, totalExpenses, net: totalIncome - totalExpenses };
+  return { entity, income, expenses, totalIncome, totalExpenses, net: totalIncome - totalExpenses, period: report.period };
 }
 
 /**
@@ -159,7 +162,13 @@ export function ownerRentalSchedule(
    */
   year?: number,
 ): OwnerRentalSchedule | null {
-  const share = (schedule.entity.owners ?? []).find((o) => o.name === owner);
+  // The shares of the period the schedule covers: a change of shares since
+  // does not rewrite a year already past.
+  const owners =
+    schedule.period === undefined
+      ? (schedule.entity.owners ?? [])
+      : ownersOver(schedule.entity, schedule.period.from, schedule.period.to);
+  const share = owners.find((o) => o.name === owner);
   // A share with no usable percentage -- an owner saved before shares were
   // percentages -- is no share at all, rather than NaN on every line of a return.
   if (share === undefined || !Number.isFinite(share.percent) || share.percent <= 0) return null;
@@ -212,7 +221,7 @@ export function ownerRentalSchedule(
   return {
     property: schedule.entity.name,
     owner,
-    percent: share.percent,
+    percent: Math.round(share.percent * 100) / 100,
     residential: schedule.entity.kind === "residential",
     rents,
     otherIncome,

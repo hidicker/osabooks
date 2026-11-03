@@ -65,8 +65,12 @@ import {
   splitAccountLabel,
   isGstControlCode,
   isLoanBank,
+  localToday,
+  ownerRenamed,
+  renameOwnerInModel,
+  sharesFrom,
 } from "@nzosa/core";
-import type { Account, BusinessStructure, Cents, EntityKind, EntityModel, NonProfitForm, RuleSet } from "@nzosa/core";
+import type { Account, BusinessStructure, Cents, Entity, EntityKind, EntityModel, IsoDate, NonProfitForm, Owner, RuleSet } from "@nzosa/core";
 import { booksCountry, booksLocale, moneyPlaces, noSalesTax, gstPercent, invoiceDetailWords } from "../country.js";
 
 /**
@@ -696,15 +700,7 @@ export function renderEntities(): void {
     sayOwners(owners.value);
 
     owners.addEventListener("input", () => sayOwners(owners.value));
-    owners.addEventListener("change", () => {
-      const live = state.ledger.entities ?? emptyEntityModel();
-      void saveEntities({
-        ...live,
-        entities: live.entities.map((e) =>
-          e.id === entity.id ? { ...e, owners: parseOwners(owners.value) } : e,
-        ),
-      });
-    });
+    owners.addEventListener("change", () => void changeOwners(entity.id, parseOwners(owners.value)));
     ownersWrap.append(owners, said);
 
     // A company's shareholders, for the IR4's split of the current account.
@@ -2723,4 +2719,118 @@ function rentalLossWords(): string {
     default:
       return "Whether it is a business, a rental or a person's own affairs decides which schedule its figures go on.";
   }
+}
+
+/**
+ * New owners or shares for an entity.
+ *
+ * Shares apply from a date: the years before it keep the shares they had, so
+ * a change made today does not rewrite a return already filed. Asked only
+ * where the entity already has history and owners; a correction can still
+ * apply to every year. One name changed and nothing else is offered as the
+ * same person renamed, carried everywhere their name is kept.
+ */
+async function changeOwners(entityId: string, next: Owner[]): Promise<void> {
+  const live = state.ledger.entities ?? emptyEntityModel();
+  const now = live.entities.find((e) => e.id === entityId);
+  if (now === undefined) return;
+  const was = now.owners ?? [];
+  if (formatOwners(was) === formatOwners(next)) return;
+
+  const renamed = ownerRenamed(was, next);
+  if (
+    renamed !== null &&
+    (await askOnPage(
+      `Is ${renamed.to} the same person as ${renamed.from}, renamed? OK renames them everywhere: their shares in every ` +
+        "entity and year, their own accounts, and their returns and tax details. Cancel treats them as someone new.",
+    ))
+  ) {
+    await renameOwner(renamed.from, renamed.to);
+    return;
+  }
+
+  const save = async (entity: Entity, what: string): Promise<void> => {
+    const latest = state.ledger.entities ?? emptyEntityModel();
+    await saveEntities({ ...latest, entities: latest.entities.map((e) => (e.id === entityId ? entity : e)) }, what);
+  };
+  const lines = state.ledger.transactions.filter((t) => t.date < localToday());
+  if (was.length === 0 || lines.length === 0) {
+    await save({ ...now, owners: next }, `${now.name} owners set to ${formatOwners(next) || "none"}`);
+    return;
+  }
+  const how = await askChoiceOnPage(
+    `${now.name}: do the new shares apply from a date, or correct the shares for every year?`,
+    [
+      ["date", `From a date (the years before keep ${formatOwners(was)})`],
+      ["all", "For every year: the old shares were wrong"],
+    ],
+    "date",
+  );
+  if (how === null) {
+    redraw("entities");
+    return;
+  }
+  if (how === "all") {
+    const { earlierOwners: _gone, ...rest } = now;
+    await save({ ...rest, owners: next }, `${now.name} owners corrected for every year to ${formatOwners(next) || "none"}`);
+    return;
+  }
+  const from = await askTextOnPage("From what date? (YYYY-MM-DD, the first day of the new shares)", localToday());
+  if (from === null || !/^\d{4}-\d{2}-\d{2}$/.test(from.trim())) {
+    if (from !== null) await tellOnPage(`"${from}" is not a date written as YYYY-MM-DD. Nothing was changed.`);
+    redraw("entities");
+    return;
+  }
+  await save(
+    sharesFrom(now, from.trim() as IsoDate, next),
+    `${now.name} owners from ${from.trim()}: ${formatOwners(next) || "none"} (before: ${formatOwners(was)})`,
+  );
+}
+
+/** Someone's name changed in every place it is kept, and their own accounts renamed with it. */
+async function renameOwner(from: string, to: string): Promise<void> {
+  const same = (name: string | undefined): boolean => (name ?? "").trim() === from;
+  const answers = state.ledger.personalYearAnswers;
+  const tripLog = state.ledger.tripLog;
+  state.ledger = {
+    ...state.ledger,
+    entities: renameOwnerInModel(state.ledger.entities ?? emptyEntityModel(), from, to),
+    ...(state.ledger.taxExtras ? { taxExtras: state.ledger.taxExtras.map((x) => (same(x.owner) ? { ...x, owner: to } : x)) } : {}),
+    ...(state.ledger.ir3Details ? { ir3Details: state.ledger.ir3Details.map((x) => (same(x.owner) ? { ...x, owner: to } : x)) } : {}),
+    ...(state.ledger.incomeReturns
+      ? { incomeReturns: state.ledger.incomeReturns.map((x) => (same(x.owner) ? { ...x, owner: to } : x)) }
+      : {}),
+    ...(state.ledger.irdRecords ? { irdRecords: state.ledger.irdRecords.map((x) => (same(x.owner) ? { ...x, owner: to } : x)) } : {}),
+    ...(answers
+      ? {
+          personalYearAnswers: Object.fromEntries(
+            Object.entries(answers).map(([key, value]) => {
+              const [who, ...rest] = key.split("\u0000");
+              return [same(who) ? [to, ...rest].join("\u0000") : key, value];
+            }),
+          ),
+        }
+      : {}),
+    ...(tripLog ? { tripLog: { ...tripLog, vehicles: tripLog.vehicles.map((v) => (same(v.owner) ? { ...v, owner: to } : v)) } } : {}),
+  };
+  state.persistent = await save(state.ledger);
+  await record("entities", `${from} renamed ${to} everywhere`, null, { from, to });
+
+  // Their own accounts: funds introduced, drawings, a current account.
+  const theirs = (name: string): string | null => {
+    for (const [pattern, make] of [
+      [`${from}: funds introduced`, `${to}: funds introduced`],
+      [`${from}: capital introduced`, `${to}: capital introduced`],
+      [`${from}: drawings`, `${to}: drawings`],
+      [`Current account: ${from}`, `Current account: ${to}`],
+    ] as const) {
+      if (name === pattern) return make;
+    }
+    return null;
+  };
+  for (const row of accountsForEditing()) {
+    const name = theirs(row.account.name.trim());
+    if (name !== null) await renameChartAccount(row.account, row.label, { code: row.account.code, name });
+  }
+  redraw("entities");
 }

@@ -158,10 +158,16 @@ export {
   parseOwners,
   ownersTotal,
   shareOf,
+  ownersOn,
+  ownersOver,
+  everyOwner,
+  sharesFrom,
+  ownerRenamed,
+  renameOwnerInModel,
   sameEntityBanks,
   BUSINESS_STRUCTURES,
 } from "./entities.js";
-export type { Owner, EntityKind, BusinessStructure } from "./entities.js";
+export type { Owner, EarlierOwners, EntityKind, BusinessStructure } from "./entities.js";
 
 export {
   accountEntityKey,

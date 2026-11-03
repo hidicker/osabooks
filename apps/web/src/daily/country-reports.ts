@@ -44,6 +44,7 @@ import { computeOurReturns } from "../variance.js";
 import { entityPeriodReport, entityYearReport, scheduleName } from "./reports.js";
 import { taxYearEnd, taxYearEndShort, taxYearStart } from "../tax-year.js";
 import { booksMoney } from "../country.js";
+import { ownersInYear, percentInYear } from "../owners.js";
 
 /**
  * The United States' and Australia's forms, as reports.
@@ -1026,7 +1027,7 @@ function netSmallBusinessIncome(owner: string, year: number): number {
   let total = 0;
   for (const entity of entities()) {
     if ((entity.kind ?? "business") !== "business" || entity.structure === "company" || isRental(entity)) continue;
-    const percent = (entity.owners ?? []).find((o) => o.name === owner)?.percent ?? 0;
+    const percent = percentInYear(entity, owner, year);
     if (percent === 0) continue;
     const report = entityYearReport(entity, year);
     if (report === null) continue;
@@ -1073,7 +1074,7 @@ function ownerIncome(
     if (!isRental(entity) && entity.structure === "company") continue;
     const report = entityYearReport(entity, year);
     if (report === null) continue;
-    for (const owner of entity.owners ?? []) {
+    for (const owner of ownersInYear(entity, year)) {
       const list = byOwner.get(owner.name) ?? [];
       list.push({
         entity: entity.name,

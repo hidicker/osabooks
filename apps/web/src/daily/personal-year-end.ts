@@ -12,6 +12,7 @@ import { checklistHtml, checklistOpen, checklistPanel } from "./personal-checkli
 import { tripsStatus } from "./vehicle-trips-panel.js";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
 import { signedMoney } from "../country.js";
+import { percentInYear } from "../owners.js";
 
 /**
  * A person's year end: what their return needs, and the return.
@@ -161,7 +162,7 @@ export function renderPersonalYearEnd(): void {
   // Rentals and their owners.
   const rentals = model.entities.filter(isRental);
   const unowned = rentals.filter((e) => (e.owners ?? []).length === 0);
-  const mine = rentals.filter((e) => (e.owners ?? []).some((o) => o.name === owner));
+  const mine = rentals.filter((e) => percentInYear(e, owner, year) > 0);
   list.append(
     item(
       rentals.length === 0 ? null : unowned.length === 0,
@@ -174,7 +175,7 @@ export function renderPersonalYearEnd(): void {
             ? `${owner} owns none of the rentals here.`
             : `${owner}: ` +
               mine
-                .map((e) => `${e.name} ${(e.owners ?? []).find((o) => o.name === owner)?.percent ?? 0}%`)
+                .map((e) => `${e.name} ${Math.round(percentInYear(e, owner, year) * 100) / 100}%`)
                 .join(", ") +
               ".",
       unowned.length > 0 ? link("Entities & accounts", "entities") : undefined,

@@ -1,7 +1,7 @@
 import type { Cents } from "./money.js";
 import type { IsoDate } from "./dates.js";
 import type { Entity, EntityModel } from "./entities.js";
-import { accountEntityKey } from "./entities.js";
+import { accountEntityKey, everyOwner, ownersOn } from "./entities.js";
 import type { PostedJournal, PostedLine } from "./posting.js";
 
 /**
@@ -117,8 +117,14 @@ interface Share {
   percent: number;
 }
 
-function sharesOf(entity: Entity): Share[] {
-  const owners = (entity.owners ?? []).filter((o) => o.percent > 0);
+/**
+ * The owners' shares on a day, or with no day everyone who has ever owned a
+ * share (for the accounts each needs, whose share is then beside the point).
+ */
+function sharesOf(entity: Entity, date?: string): Share[] {
+  const owners = (date === undefined ? everyOwner(entity).map((o) => ({ ...o, percent: o.percent || 1 })) : ownersOn(entity, date)).filter(
+    (o) => o.percent > 0,
+  );
   return owners.length > 0 ? owners : [{ name: entity.name, percent: 100 }];
 }
 
@@ -247,6 +253,7 @@ export function betweenAccountPlan(
 function sideLines(
   x: Entity,
   y: Entity,
+  date: string,
   amount: number,
   kind: SideKind,
   find: (entityId: string, role: BetweenRole, who: string, fallback: BetweenAccount) => BetweenAccount | undefined,
@@ -275,7 +282,7 @@ function sideLines(
       counterparty: y.id,
     }, amount);
   } else if (kind === "loan-per-owner") {
-    const shares = sharesOf(y);
+    const shares = sharesOf(y, date);
     split(amount, shares).forEach((part, i) => {
       const person = shares[i]!.name;
       line("current", person, {
@@ -291,7 +298,7 @@ function sideLines(
   } else {
     // A debit takes money out to the owners; a credit is them putting it in.
     const role: BetweenRole = amount > 0 ? "drawings" : "introduced";
-    const shares = sharesOf(x);
+    const shares = sharesOf(x, date);
     split(amount, shares).forEach((part, i) => {
       const person = shares[i]!.name;
       line(role, person, {
@@ -368,8 +375,8 @@ export function betweenEntityJournals(
       const setting: BetweenSetting = stored?.with[whose] ?? options.overrides?.[pairKey(anchor, whose)] ?? "usual";
       choice.with[whose] = setting;
       // The other entity is brought back to balance; the anchor takes the opposite.
-      const theirs = sideLines(other, home, -amount, sideKind(other, home, options.overrides, setting), find, used);
-      const mine = sideLines(home, other, amount, sideKind(home, other, options.overrides, setting), find, used);
+      const theirs = sideLines(other, home, journal.date, -amount, sideKind(other, home, options.overrides, setting), find, used);
+      const mine = sideLines(home, other, journal.date, amount, sideKind(home, other, options.overrides, setting), find, used);
       if (theirs === null || mine === null) {
         complete = false;
         break;
@@ -441,7 +448,7 @@ export function personPositions(
       }
       const entity = byId.get(account.entityId);
       if (entity === undefined || isSeparatePerson(entity)) continue;
-      const shares = sharesOf(entity);
+      const shares = sharesOf(entity, journal.date);
       split(-line.amount, shares).forEach((part, i) => add(shares[i]!.name, part));
     }
   }
