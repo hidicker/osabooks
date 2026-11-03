@@ -1,7 +1,7 @@
 import type { Cents } from "./money.js";
 import type { Transaction } from "./types.js";
 import type { Overrides } from "./overrides.js";
-import { overrideFor } from "./overrides.js";
+import { overrideFor, overrideSaid } from "./overrides.js";
 import { normaliseAccountNumber } from "./accounts.js";
 
 /**
@@ -187,7 +187,7 @@ export function categorise(transaction: Transaction, ruleSet: RuleSet): Categori
       code: override.code,
       matchedBy: "override",
       confirmed: override.confirmed ?? true,
-      reason: `Manual override: ${override.note}`,
+      reason: overrideSaid(override) === "" ? "Manual override" : `Manual override: ${overrideSaid(override)}`,
     };
   }
   const confirmed = override?.confirmed ?? false;

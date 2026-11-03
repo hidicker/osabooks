@@ -54,10 +54,72 @@ export interface TransactionOverride {
    * the code changes, the check no longer applies.
    */
   keptAgainstImport?: string;
-  /** Why this was overridden. Required. */
+  /**
+   * How the line came to be coded, where nobody wrote why: a suggestion
+   * accepted, changed by hand, accepted with others, or an AI suggestion
+   * accepted. Kept apart from the note, which is for a person's own words.
+   */
+  how?: CodedHow;
+  /** A model's own reason for its suggestion, when one was accepted. */
+  why?: string;
+  /** Why this was overridden, in the person's words; empty when they gave none. */
   note: string;
   /** ISO date the override was set, for auditing. */
   at?: string;
+}
+
+/** How a line came to be coded, where nobody wrote why. */
+export type CodedHow = "accepted" | "changed" | "accepted-all" | "ai";
+
+const HOW_SAID: Readonly<Record<CodedHow, string>> = {
+  accepted: "Suggestion accepted unchanged",
+  changed: "Changed by hand",
+  "accepted-all": "Suggestion accepted unchanged, with others",
+  ai: "AI suggestion accepted unchanged, with others",
+};
+
+/**
+ * What to say of how a line was coded: the person's note if they wrote one,
+ * otherwise how it was coded (and the model's reason, for an AI suggestion).
+ */
+export function overrideSaid(override: Pick<TransactionOverride, "note" | "how" | "why">): string {
+  const note = (override.note ?? "").trim();
+  if (note !== "") return note;
+  if (override.how === undefined) return "";
+  const why = (override.why ?? "").trim();
+  return why === "" ? HOW_SAID[override.how] : `${HOW_SAID[override.how]} — ${why}`;
+}
+
+/**
+ * Books from before 3 November 2026 wrote how a line was coded into its note.
+ * The words the app wrote, and only those, are moved to `how` (and an AI's
+ * reason to `why`), leaving the note empty for the person's own.
+ */
+export function separateCodingNote(override: TransactionOverride): TransactionOverride {
+  const note = override.note ?? "";
+  const plain: Readonly<Record<string, CodedHow>> = {
+    "Suggestion accepted unchanged": "accepted",
+    "Suggestion confirmed unchanged": "accepted",
+    "Changed by hand, no description given": "changed",
+    "Suggestion accepted unchanged, with others": "accepted-all",
+  };
+  const how = plain[note];
+  if (how !== undefined) return { ...override, how, note: "" };
+  const ai = /^AI suggestion accepted unchanged, with others(?: \([^)]*\))? — (.*)$/s.exec(note);
+  if (ai !== null) return { ...override, how: "ai", why: note.slice(note.indexOf(" — ") + 3), note: "" };
+  return override;
+}
+
+/** Every override's note separated, as `separateCodingNote`; the same object when none changed. */
+export function separateCodingNotes(overrides: Overrides): Overrides {
+  let changed = false;
+  const out: Record<string, TransactionOverride> = {};
+  for (const [id, override] of Object.entries(overrides)) {
+    const next = separateCodingNote(override);
+    if (next !== override) changed = true;
+    out[id] = next;
+  }
+  return changed ? out : overrides;
 }
 
 /** Overrides keyed by transaction id. */
@@ -87,6 +149,6 @@ export function gstOverride(
   return {
     treatment: override.treatment,
     side: override.side ?? (transaction.amount < 0 ? "purchases" : "sales"),
-    reason: `Manual override: ${override.note}`,
+    reason: overrideSaid(override) === "" ? "Manual override" : `Manual override: ${overrideSaid(override)}`,
   };
 }

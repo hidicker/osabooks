@@ -464,12 +464,17 @@ export async function acceptAllShown(): Promise<void> {
         // are not the same answer. Written down at the moment it stops being a
         // suggestion, because the suggestion itself is only in memory and does
         // not survive the reload.
-        note:
-          said === undefined
-            ? (one.description ?? "Suggestion accepted unchanged, with others")
-            : "AI suggestion accepted unchanged, with others" +
-              (said.via === undefined ? "" : ` (${said.via})`) +
-              ` — ${Math.round(said.confidence * 100)}% sure: ${said.because}`,
+        // The rule's own description, if it has one, is the line's words;
+        // how it was coded, and a model's reason, are kept apart from them.
+        note: said === undefined ? (one.description ?? "") : "",
+        how: said === undefined ? "accepted-all" : "ai",
+        ...(said === undefined
+          ? {}
+          : {
+              why:
+                (said.via === undefined ? "" : `(${said.via}) `) +
+                `${Math.round(said.confidence * 100)}% sure: ${said.because}`,
+            }),
         at: today,
       };
     }
