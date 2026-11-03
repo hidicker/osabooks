@@ -30,33 +30,22 @@ works).
   or before a lock is not refused by the server. Doing it there means
   comparing the locked figures (`lockedFigures` in core's lock-dates.ts) in the
   database, or in an edge function every save goes through.
-- **Changing an account's type or entity says what it reaches, and asks.** A
-  type change moves all its history between the profit and loss and the balance
-  sheet and can move confirmed lines between Box 5 and Box 11; an entity change
-  moves all its history to the other entity. The year lock should compare by
-  type and entity as well as code, so a finished year refuses either.
 - **Owners and shares with a date.** A change of shares rewrites past years'
   Income by owner, IR3 shares and the owner split of money between entities.
   Each confirmed line should keep the shares it was confirmed with, and owner
   accounts be found by a stable id rather than the owner's name.
-- **Asset and payroll changes say which years they will change** before saving:
-  depreciation is worked out from the register every time, and pay runs from
-  the accounts chosen on Payroll.
-- **Opening balances are not covered by the year lock.**
-- **A prompt to lock a year once its return is filed**, so lock dates are the
-  usual backstop rather than an option few set.
-
 ## Tax and returns
 
-- **The minor beneficiary rule assumes the settlor was a relative.** The rule
-  applies only to property settled by a relative or legal guardian of the child
-  (or someone associated with one). The app applies it to every child under 16,
-  which is the cautious answer but not always the right one. A tick on the
-  beneficiary, "settled by someone unrelated", would let the trustees say so.
 - **A shared bank account is held under the GST lock even for an unregistered
   entity's line.** A line on an account that pays for a GST-registered entity
   and an unregistered one cannot be told apart until it is coded, so it is held
   back. Coding it first, then deciding, would be more precise.
+- **Two New Zealand GST invoice-basis rules not applied** (from the
+  OpenAccountants NZ GST guide, checked 16 October 2026): a single supply over
+  $225,000 must go on the invoice basis whatever basis is chosen (unless
+  settled within 365 days), and on the invoice basis a payment received
+  before the invoice is issued makes the GST due when paid. Both rare for the
+  businesses OsaBooks is for; the GST return takes neither into account yet.
 
 ## QuickBooks and the United States
 
@@ -77,6 +66,36 @@ works).
 - **US income tax** stops at the single filer with the standard deduction: no
   QBI deduction, credits, other filing statuses or state tax.
 - **Form 941/940, W-2 and sales tax payable reports**: none yet.
+
+## Imports from other software
+
+- **MYOB import: what it does not bring yet.** The accounts list and journal
+  entries come across (`packages/core/src/myob.ts`): every posting, bank lines
+  coded, the rest as journals. MYOB's sales and purchases exports (open
+  invoices and bills, with due dates), its cards (customers and suppliers) and
+  items are not read, so invoices and bills arrive as journals rather than as
+  documents to be paid. The reader follows MYOB's published export layouts;
+  no real MYOB file has been tried yet. 26 October 2026.
+- **Imports from Sage 50, Wave, Zoho Books and the Transaction Pro bank
+  sheet.** GnuCash is read (`packages/core/src/gnucash.ts`:
+  the account tree and the transactions CSV, both layouts). The other four
+  export formats vary by version and country and none was in hand to build
+  against; each needs a real export (with invented figures) to write its
+  reader and test it. Like MYOB, no real GnuCash file has been tried yet.
+  27 October 2026.
+- **Expense claims and manual journals from Account Transactions.** They
+  come only from Xero's Journal Report, and a report exported for a month
+  leaves the rest out (now named when it happens). The full Account
+  Transactions export, which every Xero move loads, holds them too
+  ("Expense Claim", "Manual Journal" rows), so the second export could be
+  unnecessary. 1 November 2026.
+- **Warnings about a file are folded away.** An aged report or journal
+  report dated wrongly for the books is said under "What was read", which
+  is closed; it should be said where it is seen. 1 November 2026.
+- **A single large import file holds the page for up to a second.** Reading,
+  matching and posting run on the page's own thread. A full Xero move went from
+  minutes to about 4 s busy on 31 October 2026 (one save at the end, pages not
+  on screen left alone); moving the reading to a worker would take the rest.
 
 ## The app
 
@@ -129,17 +148,30 @@ works).
   years and 11,800 bank lines: with lock dates set, about 230 ms a save (525
   ms the save that sets them); with none, nothing. Noticeable, not the slow
   part (below). Working out only the periods up to the lock would cut it.
-- **Reconcile on large books with many lines still to code.** On invented
-  books of eight years (11,800 lines, none coded at first) a tick took
-  18-23 s, nearly all of it in the redraw: each row worked out every line in
-  the books again (how its payee was coded before, and its usual transfer
-  partner), and the transfer search compared every line with every other.
-  Fixed 24 Oct 2026 -- worked out once per redraw, and transfers searched by
-  amount -- with the page shown identical before and after; a tick there is
-  now about 2 s, most of it the full redraw (Reconcile tick, stage 2).
-  Accept all of 8,321 lines there went from 57 s to 6 s (the account list
-  was rebuilt for every line), and its button now says "Accepting 8321…"
-  while it runs.
+- **Bank payment files for ASB and Kiwibank.** The Bank file button
+  (`packages/core/src/payment-files.ts`) writes BNZ, ANZ and Westpac files,
+  each checked against the bank's published guide. ASB's guide (MT9, fixed 160
+  characters, or CSV) refused to download (403) and Kiwibank publishes none
+  that could be found. Add each once its guide is in hand; until then an ASB
+  or Kiwibank customer could try the ANZ file,
+  but that is untested. 25 October 2026.
+- **Undoing a merge of two accounts.** Undoing a rename now renames the account
+  back, carrying everything with it. Undoing a merge only puts the merged
+  account back in the chart: its codings, rules and documents stay on the
+  account it was merged into, because once merged they cannot be told apart.
+  A merge would need to record which items it moved to be undone fully.
+  26 October 2026.
+- **Foreign currencies: what the first version leaves out.**
+  (`packages/core/src/fx.ts`, Currencies page.) Documents
+  and bank lines in another currency count at their dates' rates, payments
+  realise the exchange difference, conversions between own accounts post the
+  spread, and foreign bank accounts are revalued at each balance date. Not
+  yet: foreign receivables and payables still open at a balance date are not
+  revalued (they stay at the document's rate); credit notes and credit used
+  across currencies are not converted; quick entry and sales receipts are in
+  the books' currency only; with several entities the exchange accounts are
+  one pair for all; and Reconcile shows a foreign line in its own currency
+  with no converted figure beside it. 27 October 2026.
 
 ## Online books
 
@@ -165,58 +197,12 @@ works).
   there would need the person's own Akahu and AI keys, and a guided set-up.
 - **The morning run starts every set of books at once.** Fine for a few dozen;
   with hundreds it should go in batches.
-- **The morning run's key is compared with `!==`.** A constant-time comparison
-  would be better practice, though the key is long and random.
-- **Two New Zealand GST invoice-basis rules not applied** (from the
-  OpenAccountants NZ GST guide, checked 16 October 2026): a single supply over
-  $225,000 must go on the invoice basis whatever basis is chosen (unless
-  settled within 365 days), and on the invoice basis a payment received
-  before the invoice is issued makes the GST due when paid. Both rare for the
-  businesses OsaBooks is for; the GST return takes neither into account yet.
 - **SimpleFIN for books kept online.** The SimpleFIN feed works on the
   desktop app only: its Access URL is kept in `.simplefin.json` by the local
   server. Books kept online need it in Supabase Vault with an edge function
   (`supabase/functions/simplefin`, a `simplefin_secret` table and RPCs), as
   `supabase/functions/wise` does for Wise. Left because it changes the
   production database. 18 October 2026.
-- **Bank payment files for ASB and Kiwibank.** The Bank file button
-  (`packages/core/src/payment-files.ts`) writes BNZ, ANZ and Westpac files,
-  each checked against the bank's published guide. ASB's guide (MT9, fixed 160
-  characters, or CSV) refused to download (403) and Kiwibank publishes none
-  that could be found. Add each once its guide is in hand; until then an ASB
-  or Kiwibank customer could try the ANZ file,
-  but that is untested. 25 October 2026.
-- **Undoing a merge of two accounts.** Undoing a rename now renames the account
-  back, carrying everything with it. Undoing a merge only puts the merged
-  account back in the chart: its codings, rules and documents stay on the
-  account it was merged into, because once merged they cannot be told apart.
-  A merge would need to record which items it moved to be undone fully.
-  26 October 2026.
-- **MYOB import: what it does not bring yet.** The accounts list and journal
-  entries come across (`packages/core/src/myob.ts`): every posting, bank lines
-  coded, the rest as journals. MYOB's sales and purchases exports (open
-  invoices and bills, with due dates), its cards (customers and suppliers) and
-  items are not read, so invoices and bills arrive as journals rather than as
-  documents to be paid. The reader follows MYOB's published export layouts;
-  no real MYOB file has been tried yet. 26 October 2026.
-- **Imports from Sage 50, Wave, Zoho Books and the Transaction Pro bank
-  sheet.** GnuCash is read (`packages/core/src/gnucash.ts`:
-  the account tree and the transactions CSV, both layouts). The other four
-  export formats vary by version and country and none was in hand to build
-  against; each needs a real export (with invented figures) to write its
-  reader and test it. Like MYOB, no real GnuCash file has been tried yet.
-  27 October 2026.
-- **Foreign currencies: what the first version leaves out.**
-  (`packages/core/src/fx.ts`, Currencies page.) Documents
-  and bank lines in another currency count at their dates' rates, payments
-  realise the exchange difference, conversions between own accounts post the
-  spread, and foreign bank accounts are revalued at each balance date. Not
-  yet: foreign receivables and payables still open at a balance date are not
-  revalued (they stay at the document's rate); credit notes and credit used
-  across currencies are not converted; quick entry and sales receipts are in
-  the books' currency only; with several entities the exchange accounts are
-  one pair for all; and Reconcile shows a foreign line in its own currency
-  with no converted figure beside it. 27 October 2026.
 - **Card payments with Stripe: what the first version leaves out.**
   (`supabase/functions/stripe`, `apps/web/src/daily/stripe-ui.ts`). Books kept
   online only: books in a folder or the browser have nowhere safe for the key
@@ -226,24 +212,3 @@ works).
   the amount owing when it was made; after a part payment a new one is made
   and the old one closed. The money reaches the books with Stripe's payout,
   as before. 27 October 2026.
-- **A full Xero move holds the page for minutes.** Found starting a set of
-  books online from the Xero exports with the bank feed and Wise connected
-  (1,168 bank lines, 1,508 journals, 135 invoices). Reading the files took
-  about four minutes, and for most of it the page did not answer clicks or
-  scroll: the reading, matching and posting all run on the page's own thread.
-  The figures came out right. 31 October 2026. Fixed the same day: the load
-  saved the books 187 times, and online each save was a trip to the server
-  the next step waited for; they now go as one save at the end ("Saving the
-  books…"). Pages not on screen are no longer redrawn after every file, and
-  the page gets a turn between files. On a copy of those books the page was
-  busy 4 s instead of 12, with the books saved identical. Still on the page's
-  thread: a single file can hold it for up to a second.
-- **Expense claims and manual journals from Account Transactions.** They
-  come only from Xero's Journal Report, and a report exported for a month
-  leaves the rest out (now named when it happens). The full Account
-  Transactions export, which every Xero move loads, holds them too
-  ("Expense Claim", "Manual Journal" rows), so the second export could be
-  unnecessary. 1 November 2026.
-- **Warnings about a file are folded away.** An aged report or journal
-  report dated wrongly for the books is said under "What was read", which
-  is closed; it should be said where it is seen. 1 November 2026.
