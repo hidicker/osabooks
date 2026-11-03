@@ -9,7 +9,8 @@ import { noticesEditor } from "./payroll-notices.js";
 import { renderLeave } from "./payroll-leave.js";
 import { emailPayslip, employerName, openPayslips, payslipsFor } from "./payslips-ui.js";
 import { openPaymentFile } from "./payment-file-ui.js";
-import { payrollAccounts, reclassify, record } from "../books.js";
+import { payrollAccounts, reclassify, record, yearsChangedBy, yearsSaid } from "../books.js";
+import { taxYearOf } from "../tax-year.js";
 import { $, state } from "../state.js";
 import { savePart, partChanged } from "../store.js";
 import { askOnPage, download, escapeHtml, note, tellOnPage } from "../ui.js";
@@ -106,6 +107,22 @@ function getPayroll(): PayrollData {
 
 async function commitPayroll(payroll: PayrollData, what = "Payroll changed"): Promise<void> {
   const before = committed === null ? null : (JSON.parse(committed) as PayrollData);
+  // Pay runs post to the accounts chosen here each time the books are worked
+  // out, so choosing another moves every pay run already posted.
+  if (what === "Payroll accounts chosen" && before !== null) {
+    const thisYear = taxYearOf(localToday());
+    const past = yearsChangedBy({ ...state.ledger, payroll }, { ...state.ledger, payroll: before }).filter((y) => y < thisYear);
+    if (
+      past.length > 0 &&
+      !(await askOnPage(
+        `This changes the figures for ${yearsSaid(past)}, not only this year: every pay run already posted moves to the accounts chosen. Save it?`,
+      ))
+    ) {
+      state.ledger = { ...state.ledger, payroll: before };
+      redraw("payroll");
+      return;
+    }
+  }
   state.ledger = { ...state.ledger, payroll };
   partChanged("payroll");
   state.persistent = await savePart(state.ledger, "payroll");

@@ -3,7 +3,7 @@ import { computeOurReturns } from "./variance.js";
 import { state } from "./state.js";
 import { booksReadOnly, setSaveGuard } from "./store.js";
 import type { StoredLedger } from "./store.js";
-import { lockBroken, lockedDifferences, lockedFigures } from "@nzosa/core";
+import { accountEntityKey, emptyEntityModel, lockBroken, lockedDifferences, lockedFigures } from "@nzosa/core";
 import { noteLockedMove } from "./locked-changes.js";
 import type { Account, LockDates, LockedFigures } from "@nzosa/core";
 import { tellOnPage } from "./ui.js";
@@ -66,7 +66,25 @@ function figuresForAll(locks: LockDates | undefined): LockedFigures {
     const from = dates.length === 0 ? locks.gst : dates.reduce((a, b) => (a < b ? a : b));
     returns = computeOurReturns({ ...varianceInput(), accounts: [] }, from, locks.gst);
   }
-  return lockedFigures(locks, journals, returns);
+  return lockedFigures(locks, journals, returns, state.ledger.openingBalances, accountDescriber());
+}
+
+/**
+ * An account's type and entity, in words, for the year lock: "Expense, Larch
+ * Street". Changing either moves its history (between the profit and loss and
+ * the balance sheet, or to another entity), so the lock compares them too.
+ */
+function accountDescriber(): (code: string) => string {
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const names = new Map(model.entities.map((e) => [e.id, e.name]));
+  const byCode = new Map<string, string>();
+  for (const account of state.chart) {
+    const entity = names.get(model.accounts[accountEntityKey(account)] ?? "") ?? "";
+    const said = [account.type.trim(), entity].filter((x) => x !== "").join(", ");
+    if (account.code.trim() !== "") byCode.set(account.code.trim(), said);
+    if (account.name.trim() !== "" && !byCode.has(account.name.trim())) byCode.set(account.name.trim(), said);
+  }
+  return (code) => byCode.get(code) ?? "";
 }
 
 /** The figures of some other books, worked out by borrowing the state for a moment. */

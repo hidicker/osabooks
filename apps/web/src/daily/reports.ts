@@ -135,6 +135,7 @@ import { taxYearEnd, taxYearEndSaid, taxYearEndShort, taxYearStart, taxYearStart
 import { booksCountry, booksLocale, gstPercent, moneyPlaces, booksMoney, noSalesTax, taxTypeLabel, booksCurrency } from "../country.js";
 import { type DownloadKind, hasDownload } from "./report-downloads.js";
 import { balanceSheetLabel } from "./balance-sheet-label.js";
+import { offerGstLock } from "./lock-dates.js";
 
 /**
  * The entity and registration last applied to the GST control.
@@ -2691,7 +2692,9 @@ function renderGstReturn(body: HTMLElement, year: number): void {
       ) {
         return;
       }
-      void recordFiledReturn(filedReturnFromOurs(result)).then(() => redraw("reports"));
+      await recordFiledReturn(filedReturnFromOurs(result));
+      redraw("reports");
+      await offerGstLock(result.period.to);
     });
     actions.append(mark);
     body.append(actions);

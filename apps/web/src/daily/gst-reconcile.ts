@@ -21,6 +21,7 @@ import { loadFiledReturns } from "../migrate/file-intake.js";
 import { chosenStartDate } from "../migrate/onboarding-state.js";
 import { askOnPage, note, tellOnPage, wideTable } from "../ui.js";
 import { taxWithin } from "@nzosa/core";
+import { offerGstLock } from "./lock-dates.js";
 
 /**
  * Agreeing a filed GST return with what the books now say.
@@ -487,6 +488,7 @@ function blankFiledDraft(periodEnd: string): FiledDraft {
 async function keepFiled(one: FiledReturn): Promise<void> {
   await recordFiledReturn(one);
   renderVariance();
+  await offerGstLock(one.periodEnd);
 }
 
 async function markFiled(result: GstReturnResult): Promise<void> {

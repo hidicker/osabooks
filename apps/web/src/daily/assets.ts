@@ -1,9 +1,10 @@
 import { redraw, showPage } from "../app.js";
-import { accountsForEditing, importedAssetProceeds, reclassify, record } from "../books.js";
+import { accountsForEditing, importedAssetProceeds, reclassify, record, yearsChangedBy, yearsSaid } from "../books.js";
 import { booksCountry, booksMoney, booksCurrency } from "../country.js";
 import { combobox } from "../combobox.js";
 import { $, state } from "../state.js";
 import { savePart } from "../store.js";
+import type { StoredLedger } from "../store.js";
 import { amountCell, askOnPage, askTextOnPage, download, nameCell, note, tellOnPage, wideTable } from "../ui.js";
 import {
   DEPRECIATION_METHODS,
@@ -536,7 +537,9 @@ async function saveAsset(asset: FixedAsset, replacing: string | null, proceeds: 
   if (asset.disposed === null) delete assetProceeds[asset.number];
   else if (proceeds !== null) assetProceeds[asset.number] = proceeds;
 
-  state.ledger = { ...state.ledger, assets, assetProceeds };
+  const next = { ...state.ledger, assets, assetProceeds };
+  if (!(await pastYearsAgreed(next, "depreciation and any sale are worked out from the register for every year they reach"))) return;
+  state.ledger = next;
   state.persistent = await savePart(state.ledger, "assets");
   const what =
     replacing === null
@@ -552,10 +555,29 @@ async function saveAsset(asset: FixedAsset, replacing: string | null, proceeds: 
   redraw("assets");
 }
 
+/**
+ * Asked before a change reaches years already past. True when it reaches none,
+ * or the person agrees.
+ */
+async function pastYearsAgreed(next: StoredLedger, why: string): Promise<boolean> {
+  const thisYear = taxYearOf(localToday());
+  const past = yearsChangedBy(next).filter((year) => year < thisYear);
+  if (past.length === 0) return true;
+  return askOnPage(`This changes the figures for ${yearsSaid(past)}, not only this year: ${why}. Save it?`);
+}
+
 async function removeAsset(asset: FixedAsset): Promise<void> {
-  if (!await askOnPage(`Remove ${asset.number} ${asset.name} from the register? Its depreciation goes with it.`)) return;
   const before = state.ledger.assets ?? [];
   const assets = before.filter((a) => a.number !== asset.number);
+  const reach = yearsChangedBy({ ...state.ledger, assets }).filter((year) => year < taxYearOf(localToday()));
+  if (
+    !await askOnPage(
+      `Remove ${asset.number} ${asset.name} from the register? Its depreciation goes with it` +
+        (reach.length > 0 ? `, which changes the figures for ${yearsSaid(reach)}.` : "."),
+    )
+  ) {
+    return;
+  }
   // Its sale proceeds go with it. Left behind, they would sit under a number no
   // asset holds -- and be picked up by the next asset given that number.
   const proceedsBefore = state.ledger.assetProceeds ?? {};

@@ -1528,7 +1528,12 @@ export function renderEntities(): void {
       option.selected = model.accounts[accountEntityKey(account)] === entity.id;
       select.append(option);
     }
-    select.addEventListener("change", () => {
+    select.addEventListener("change", async () => {
+      const to = model.entities.find((e) => e.id === select.value)?.name ?? "no entity";
+      if (!(await changeReaching(account, `All of them move to ${to}, in every year.`))) {
+        redraw("entities");
+        return;
+      }
       const live = state.ledger.entities ?? emptyEntityModel();
       const accountsMap = { ...live.accounts };
       const key = accountEntityKey(account);
@@ -2592,7 +2597,48 @@ function openRemoveUnused(): void {
   box.showModal();
 }
 
+/** How much an account holds: entries posted to it, and the first and last of their dates. */
+function historyOf(account: Account): { count: number; first: string; last: string } {
+  let count = 0;
+  let first = "";
+  let last = "";
+  for (const journal of postedJournals()) {
+    for (const line of journal.lines) {
+      const here = account.code.trim() !== "" ? line.accountCode === account.code.trim() : line.accountName === account.name.trim();
+      if (!here || line.amount === 0) continue;
+      count += 1;
+      if (first === "" || journal.date < first) first = journal.date;
+      if (journal.date > last) last = journal.date;
+    }
+  }
+  return { count, first, last };
+}
+
+/**
+ * Said, and asked, before changing what an account with history is: every
+ * entry already in it moves, in every year, not only from now on.
+ */
+async function changeReaching(account: Account, change: string): Promise<boolean> {
+  const held = historyOf(account);
+  if (held.count === 0) return true;
+  return askOnPage(
+    `${account.code !== "" ? `${account.code} ` : ""}${account.name} has ${held.count} entr${held.count === 1 ? "y" : "ies"}, ` +
+      `from ${held.first} to ${held.last}. ${change} Change it?`,
+  );
+}
+
 async function setAccountType(account: Account, label: string, type: string): Promise<void> {
+  const side = (t: string): string => (inProfitAndLoss({ ...account, type: t }) ? "the profit and loss" : "the balance sheet");
+  const moves = side(account.type) !== side(type);
+  if (
+    !(await changeReaching(
+      account,
+      `As ${type === "" ? "no type" : type} all of them${moves ? ` move from ${side(account.type)} to ${side(type)}` : " change type"}, in every year.`,
+    ))
+  ) {
+    redraw("entities");
+    return;
+  }
   const chart = [...state.chart];
   const index = chart.findIndex((a) => a.code === account.code && a.name === account.name);
   if (index >= 0) {
