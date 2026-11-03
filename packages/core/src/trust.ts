@@ -80,6 +80,12 @@ export interface TrustBeneficiary extends TrustPerson {
   corporateRule?: boolean | undefined;
   /** A disability allowance or child disability allowance is paid: outside the minor rule. */
   disabilityAllowance?: boolean | undefined;
+  /**
+   * Everything in the trust was settled by people unrelated to the child: not a
+   * relative or legal guardian, nor anyone associated with one. The minor rule
+   * applies only to property settled by such a person, so it does not apply.
+   */
+  settledByUnrelated?: boolean | undefined;
   /** The account in the books that holds what the trust owes them. */
   accountCode?: string | undefined;
   /** The trustee does not deduct tax from their income, by agreement (26J). */
@@ -218,6 +224,7 @@ export function beneficiaryRule(b: TrustBeneficiary, allocation: Cents, balanceD
     ageOn(b.born, balanceDate) < MINOR_AGE &&
     nzResident(b.residence) &&
     b.disabilityAllowance !== true &&
+    b.settledByUnrelated !== true &&
     allocation > MINOR_THRESHOLD
   ) {
     return "minor";
