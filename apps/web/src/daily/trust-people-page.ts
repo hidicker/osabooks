@@ -213,6 +213,10 @@ export function renderTrustPeoplePage(): void {
           edit<TrustBeneficiary>(entity, "beneficiaries", b.id, { disabilityAllowance: v }, "disability allowance"),
           "A child on a disability allowance or child disability allowance is outside the minor rule.",
         ),
+        tick("Settled by someone unrelated", b.settledByUnrelated === true, (v) =>
+          edit<TrustBeneficiary>(entity, "beneficiaries", b.id, { settledByUnrelated: v }, "settled by someone unrelated"),
+          "Everything in the trust came from people who are not the child's relative or legal guardian, nor associated with one. The minor rule then does not apply.",
+        ),
         tick("Trustee does not deduct their tax", b.trusteeDoesNotPay === true, (v) =>
           edit<TrustBeneficiary>(entity, "beneficiaries", b.id, { trusteeDoesNotPay: v }, "tax agreement"),
           "By agreement, for example where the beneficiary has losses. The trustees are liable if they default.",

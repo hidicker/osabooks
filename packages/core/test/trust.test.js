@@ -84,6 +84,7 @@ test("a New Zealand child under 16 is a minor unless the allocation is $1,000 or
   assert.equal(beneficiaryRule(kiri, 120_000, BALANCE), "minor", "$1,200 is taxed in full at 39%");
   assert.equal(beneficiaryRule(kiri, 100_000, BALANCE), null, "$1,000 exactly is beneficiary income");
   assert.equal(beneficiaryRule({ ...kiri, disabilityAllowance: true }, 500_000, BALANCE), null);
+  assert.equal(beneficiaryRule({ ...kiri, settledByUnrelated: true }, 500_000, BALANCE), null, "settled only by someone unrelated");
   // "Tax resident in" is typed by hand: New Zealand written out is still New Zealand.
   for (const residence of ["New Zealand", "nz", "N.Z.", " Aotearoa ", ""]) {
     assert.equal(beneficiaryRule({ ...kiri, residence }, 500_000, BALANCE), "minor", residence);
