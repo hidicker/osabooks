@@ -89,13 +89,6 @@ works).
   meals for income tax only, with no sales tax; a "Meals: half deductible"
   split for US books would need a non-deductible meals account in the chart.
   Canada, if added, has New Zealand's rule.
-- **Notes double as a record of how a line was coded.** Reconcile writes
-  "Suggestion accepted unchanged" and "Changed by hand, no description given"
-  into the note, where the person's own words go, and Coding reconciliation
-  still recognises a line kept before 2 November by its note. A separate field
-  for how a line was coded (accepted, changed, kept, imported) would leave the
-  note for words a person typed. Needs a change to old books as they load.
-  From the code check of 2 November 2026 (`review-2026-11-02.md`, 4).
 - **Thirty-three copies of "format money".** Local `money()`, `dollars()` and
   `formatMoney()` functions across the pages, some on `booksMoney`, some
   rebuilt with `toLocaleString`, one on `toFixed(2)` (grants), differing on

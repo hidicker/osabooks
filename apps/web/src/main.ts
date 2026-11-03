@@ -135,6 +135,7 @@ import { reportsFromMenu, wireMenu } from "./menu.js";
 import { $, state } from "./state.js";
 import {
   dedupeReference,
+  separateCodingNotes,
 } from "@nzosa/core";
 import {
   setLoadingStatus,
@@ -301,7 +302,14 @@ async function init(): Promise<void> {
     // none only because their entity is unregistered have that stored first.
     // Before the lock baseline, so the locks measure the books as they stand.
     const kept = keepConfirmedGst();
+    // Once: notes the app wrote to say how a line was coded move to their own
+    // field, leaving each note for what a person wrote. Figures do not change.
+    const overridesNow = state.ledger.overrides ?? {};
+    const separated = separateCodingNotes(overridesNow);
+    const notesMoved = separated !== overridesNow;
+    if (notesMoved) state.ledger = { ...state.ledger, overrides: separated };
     resetLockBaseline();
+    if (notesMoved && kept === null) await savePart(state.ledger);
     if (kept !== null) {
       await savePart(state.ledger);
       if (kept.batch.length > 0 || kept.splitIds.length > 0) {

@@ -1,4 +1,4 @@
-import { formatAmount, localToday } from "@nzosa/core";
+import { formatAmount, localToday, overrideSaid } from "@nzosa/core";
 import type { GstSide, GstTreatment, Transaction } from "@nzosa/core";
 import { loadLedger, saveLedger } from "./ledger.js";
 
@@ -117,7 +117,8 @@ export function runOverride(options: OverrideOptions): number {
       : existing?.claimIn !== undefined
         ? { claimIn: existing.claimIn }
         : {}),
-    note: options.note ?? existing?.note ?? 'Suggestion confirmed unchanged',
+    note: options.note ?? existing?.note ?? "",
+    ...(options.note === undefined && existing?.note === undefined ? { how: "accepted" as const } : {}),
     at: localToday(),
   };
 
@@ -131,7 +132,7 @@ export function runOverride(options: OverrideOptions): number {
   }
   if (record?.treatment !== undefined) process.stdout.write(`  gst        ${record.treatment}\n`);
   if (record?.side !== undefined) process.stdout.write(`  side       ${record.side}\n`);
-  process.stdout.write(`  note       ${record?.note ?? ""}\n`);
+  process.stdout.write(`  note       ${record === undefined ? "" : overrideSaid(record)}\n`);
   process.stdout.write(`  confirmed  yes\n`);
   return 0;
 }
@@ -167,7 +168,7 @@ function listOverrides(
       record.side !== undefined ? `side ${record.side}` : "",
     ].filter((part) => part !== "");
     process.stdout.write(`    ${parts.join(", ")}\n`);
-    process.stdout.write(`    ${record.note}${record.at ? `  (${record.at})` : ""}\n\n`);
+    process.stdout.write(`    ${overrideSaid(record)}${record.at ? `  (${record.at})` : ""}\n\n`);
   }
 
   return 0;

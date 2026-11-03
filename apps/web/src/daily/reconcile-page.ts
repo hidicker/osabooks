@@ -633,7 +633,7 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
   // which reads as tax on the payment.
   const settlesInvoice = invoiceAssignments().get(one.transaction.id) ?? "";
   reason.textContent = one.confirmed
-    ? (one.note ?? "Confirmed")
+    ? (one.said ?? "Confirmed")
     : (state.ledger.splits ?? {})[one.transaction.id]
       ? "Coded by the split below. Tick to confirm."
       : settlesInvoice !== ""
@@ -2444,7 +2444,7 @@ export async function confirmLine(
   // line (a later return to claim the GST in, say) is kept rather than lost.
   const {
     confirmed: _confirmed, code: _code, treatment: _treatment, side: _side,
-    contact: _contact, note: _note, at: _at, ...kept
+    contact: _contact, note: _note, how: _how, why: _why, at: _at, ...kept
   } = wasCoded ?? { note: "" };
   overrides[one.transaction.id] = {
     ...kept,
@@ -2457,12 +2457,9 @@ export async function confirmLine(
     ...(contact.trim() !== "" && contact.trim() !== one.contact
       ? { contact: contact.trim() }
       : {}),
-    note:
-      description.trim() !== ""
-        ? description.trim()
-        : changed
-          ? "Changed by hand, no description given"
-          : "Suggestion accepted unchanged",
+    // The note is the person's own words; how it was coded is said apart.
+    note: description.trim(),
+    how: changed ? "changed" : "accepted",
     at: localToday(),
   };
   state.ledger = { ...state.ledger, overrides };

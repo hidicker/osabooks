@@ -1,4 +1,4 @@
-import { auGstRateName, categorise, gstResolver, isGstControlCode, splitAccountLabel } from "@nzosa/core";
+import { auGstRateName, categorise, gstResolver, isGstControlCode, overrideSaid, splitAccountLabel } from "@nzosa/core";
 import { booksCountry, gstPercent } from "./country.js";
 import type {
   GstClassification,
@@ -31,8 +31,10 @@ export interface Suggestion {
   classification: GstClassification;
   /** True once a person has accepted or replaced the suggestion. */
   confirmed: boolean;
-  /** Present when a person changed something. */
+  /** The person's own words about the line, when they wrote any. */
   note: string | undefined;
+  /** What to say of how it was coded: the note, or how it came to be coded. */
+  said: string | undefined;
   /** The description the matched rule offers, until a person has written one. */
   description: string | undefined;
   /** A caution from the matched rule: this line needs more than one code. */
@@ -106,8 +108,9 @@ export function suggest(
         reason: coded.reason ?? "",
         classification: resolve(transaction),
         confirmed: override?.confirmed === true && !unfinished.has(transaction.id),
-        note: override?.note,
-        description: override?.note === undefined ? coded.description : undefined,
+        note: (override?.note ?? "") === "" ? undefined : override?.note,
+        said: override === undefined ? undefined : overrideSaid(override) || undefined,
+        description: (override?.note ?? "") === "" ? coded.description : undefined,
         // A caution is about the suggestion, so it goes once a person has
         // decided: they have seen it and answered it.
         warn: override?.confirmed === true ? undefined : coded.warn,
