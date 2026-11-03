@@ -3,6 +3,8 @@ import { salesTaxFraction } from "./sales-tax.js";
 import type { BetweenOverrides } from "./between-entities.js";
 import type { NonProfit } from "./non-profit.js";
 import type { Trust } from "./trust.js";
+import type { IsoDate } from "./dates.js";
+import { dayAfter, dayBefore, daysBetween } from "./dates.js";
 
 /**
  * Entities: the separate books a chart of accounts is really several of.
@@ -51,6 +53,12 @@ export interface Entity {
    * owns its own profit.
    */
   owners?: Owner[];
+  /**
+   * The shares before the ones in `owners`, oldest first, each in force up to
+   * and including its `until`. A change of shares applies from a date, so
+   * the years before it keep the shares they had: see `ownersOn`.
+   */
+  earlierOwners?: EarlierOwners[];
   /**
    * What kind of income this produces, because tax treats them differently.
    *
@@ -208,6 +216,111 @@ export interface Owner {
   name: string;
   /** Percentage share, 0 to 100. Shares across one entity should total 100. */
   percent: number;
+}
+
+/** Shares an entity had before a change, in force up to and including `until`. */
+export interface EarlierOwners {
+  until: IsoDate;
+  owners: Owner[];
+}
+
+/** The earlier shares, oldest first. */
+function earlierOf(entity: Pick<Entity, "earlierOwners">): EarlierOwners[] {
+  return [...(entity.earlierOwners ?? [])].sort((a, b) => (a.until < b.until ? -1 : a.until > b.until ? 1 : 0));
+}
+
+/** The owners and shares in force on a day. */
+export function ownersOn(entity: Pick<Entity, "owners" | "earlierOwners">, date: IsoDate): Owner[] {
+  for (const earlier of earlierOf(entity)) if (date <= earlier.until) return earlier.owners;
+  return entity.owners ?? [];
+}
+
+/**
+ * Each owner's share across a period: each set of shares weighted by the
+ * days it was in force, as Inland Revenue's IR879 does for an owner who came
+ * or went part-way through the year. The same as `ownersOn` when nothing
+ * changed in the period.
+ */
+export function ownersOver(entity: Pick<Entity, "owners" | "earlierOwners">, from: IsoDate, to: IsoDate): Owner[] {
+  const spans: { from: IsoDate; to: IsoDate; owners: Owner[] }[] = [];
+  let start: IsoDate = from;
+  for (const earlier of earlierOf(entity)) {
+    if (earlier.until < start) continue;
+    if (start > to) break;
+    const end = earlier.until < to ? earlier.until : to;
+    spans.push({ from: start, to: end, owners: earlier.owners });
+    start = dayAfter(end);
+  }
+  if (start <= to) spans.push({ from: start, to, owners: entity.owners ?? [] });
+  if (spans.length === 1) return spans[0]!.owners;
+  const total = daysBetween(from, to) + 1;
+  const byName = new Map<string, number>();
+  for (const span of spans) {
+    const days = daysBetween(span.from, span.to) + 1;
+    for (const owner of span.owners) byName.set(owner.name, (byName.get(owner.name) ?? 0) + (owner.percent * days) / total);
+  }
+  return [...byName.entries()].map(([name, percent]) => ({ name, percent }));
+}
+
+/**
+ * The one owner renamed between two lists of shares, if that is all that
+ * changed: the same shares in the same order, one name different.
+ */
+export function ownerRenamed(was: readonly Owner[], now: readonly Owner[]): { from: string; to: string } | null {
+  if (was.length === 0 || was.length !== now.length) return null;
+  let found: { from: string; to: string } | null = null;
+  for (let i = 0; i < was.length; i++) {
+    const a = was[i]!;
+    const b = now[i]!;
+    if (a.percent !== b.percent) return null;
+    if (a.name.trim() === b.name.trim()) continue;
+    if (found !== null) return null;
+    found = { from: a.name.trim(), to: b.name.trim() };
+  }
+  return found;
+}
+
+/** An owner renamed in every entity: their shares now and earlier, as a shareholder, and their IRD number. */
+export function renameOwnerInModel(model: EntityModel, from: string, to: string): EntityModel {
+  const swap = (owners: readonly Owner[] | undefined): Owner[] | undefined =>
+    owners?.map((o) => (o.name.trim() === from ? { ...o, name: to } : o));
+  return {
+    ...model,
+    entities: model.entities.map((e) => {
+      const next: Entity = { ...e };
+      if (e.owners !== undefined) next.owners = swap(e.owners)!;
+      if (e.earlierOwners !== undefined) next.earlierOwners = e.earlierOwners.map((x) => ({ ...x, owners: swap(x.owners)! }));
+      if (e.shareholders !== undefined) next.shareholders = swap(e.shareholders)!;
+      if (e.holderIrd !== undefined && e.holderIrd[from] !== undefined) {
+        const { [from]: number, ...rest } = e.holderIrd;
+        next.holderIrd = { ...rest, [to]: number! };
+      }
+      return next;
+    }),
+  };
+}
+
+/** Everyone who has owned a share at any time, the current owners first. */
+export function everyOwner(entity: Pick<Entity, "owners" | "earlierOwners">): Owner[] {
+  const out: Owner[] = [...(entity.owners ?? [])];
+  for (const earlier of earlierOf(entity).reverse()) {
+    for (const owner of earlier.owners) if (!out.some((o) => o.name === owner.name)) out.push({ name: owner.name, percent: 0 });
+  }
+  return out;
+}
+
+/**
+ * New shares from a day: the shares now in force are kept as earlier ones,
+ * up to the day before, and the new ones apply from `from`. Shares already
+ * recorded as earlier for days on or after `from` give way to the new ones.
+ */
+export function sharesFrom<E extends Pick<Entity, "owners" | "earlierOwners">>(entity: E, from: IsoDate, owners: Owner[]): E {
+  const until = dayBefore(from);
+  const kept = earlierOf(entity).filter((e) => e.until < until);
+  const before = ownersOn(entity, until);
+  const earlier = before.length > 0 ? [...kept, { until, owners: before }] : kept;
+  const { earlierOwners: _was, ...rest } = entity;
+  return { ...rest, owners, ...(earlier.length > 0 ? { earlierOwners: earlier } : {}) } as E;
 }
 
 /**
@@ -400,7 +513,7 @@ export function formatOwners(owners: readonly Owner[]): string {
 export function ownersOf(model: EntityModel): string[] {
   const names: string[] = [];
   for (const entity of model.entities) {
-    for (const owner of entity.owners ?? []) {
+    for (const owner of everyOwner(entity)) {
       if (!names.includes(owner.name)) names.push(owner.name);
     }
   }
@@ -447,13 +560,16 @@ export function validateEntityModel(
 
     // Shares that do not total 100 mean somebody's income is unreported or
     // double-reported, which is the whole point of tracking them.
-    const owners = entity.owners ?? [];
-    if (owners.length > 0) {
+    for (const [owners, when] of [
+      [entity.owners ?? [], ""] as const,
+      ...earlierOf(entity).map((e) => [e.owners, ` up to ${e.until}`] as const),
+    ]) {
+      if (owners.length === 0) continue;
       const total = owners.reduce((sum, o) => sum + o.percent, 0);
       if (Math.abs(total - 100) > 0.001) {
         problems.push({
           subject: entity.id,
-          message: `${entity.name}: owner shares total ${total}%, not 100%.`,
+          message: `${entity.name}: owner shares${when} total ${total}%, not 100%.`,
         });
       }
     }

@@ -136,6 +136,7 @@ import { booksCountry, booksLocale, gstPercent, moneyPlaces, booksMoney, noSales
 import { type DownloadKind, hasDownload } from "./report-downloads.js";
 import { balanceSheetLabel } from "./balance-sheet-label.js";
 import { offerGstLock } from "./lock-dates.js";
+import { percentInYear } from "../owners.js";
 
 /**
  * The entity and registration last applied to the GST control.
@@ -394,7 +395,7 @@ export function ownerSummaryFor(owner: string, year: number): OwnerSummary {
     entityReports(year).filter(({ entity }) => entity.kind !== "personal").map(({ entity, report }) => ({
       entity: entity.name,
       kind: entity.kind ?? "business",
-      percent: (entity.owners ?? []).find((o) => o.name === owner)?.percent ?? 0,
+      percent: percentInYear(entity, owner, year),
       report,
     })),
   );
@@ -3163,7 +3164,7 @@ export function ir3For(owner: string, year: number): ReturnType<typeof ir3Return
   const selfEmployed = (state.ledger.entities ?? emptyEntityModel()).entities
     .filter((e) => (e.kind ?? "business") === "business" && e.structure === "sole-trader")
     .flatMap((e) => {
-      const percent = (e.owners ?? []).find((o) => o.name === owner)?.percent ?? 0;
+      const percent = percentInYear(e, owner, year);
       const report = percent > 0 ? entityYearReport(e, year) : null;
       return report === null ? [] : [{ business: e.name, net: Math.round((report.netProfit * percent) / 100) as Cents }];
     });

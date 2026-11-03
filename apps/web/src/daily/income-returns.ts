@@ -19,6 +19,8 @@ import {
 } from "@nzosa/core";
 import type { Cents, Entity, FiledIncomeReturn, FiledIr3, FiledIr4, IncomeReturnForm } from "@nzosa/core";
 import { signedMoney } from "../country.js";
+import { ownersInYear } from "../owners.js";
+import { taxYearOf } from "../tax-year.js";
 
 /**
  * Last year's income tax return, read in from myIR.
@@ -186,9 +188,12 @@ function ir3AgainstTheBooks(filed: FiledIr3, owner: string, redraw: () => void =
     return wrap;
   }
   const books = booksRentals(filed.balanceDate);
+  // The shares of that year, not today's: a change since does not rewrite it.
+  const year = taxYearOf(filed.balanceDate);
   const shareOf = (entity: Entity): number => {
-    const held = (entity.owners ?? []).find((o) => o.name.trim() === owner);
-    return held === undefined ? ((entity.owners ?? []).length === 0 ? 1 : 0) : held.percent / 100;
+    const owners = ownersInYear(entity, year);
+    const held = owners.find((o) => o.name.trim() === owner);
+    return held === undefined ? (owners.length === 0 ? 1 : 0) : held.percent / 100;
   };
   // The owner's own rentals first: a line on their return is one of these.
   const theirs = books.filter((b) => shareOf(b.entity) > 0);

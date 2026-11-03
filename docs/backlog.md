@@ -30,10 +30,6 @@ works).
   or before a lock is not refused by the server. Doing it there means
   comparing the locked figures (`lockedFigures` in core's lock-dates.ts) in the
   database, or in an edge function every save goes through.
-- **Owners and shares with a date.** A change of shares rewrites past years'
-  Income by owner, IR3 shares and the owner split of money between entities.
-  Each confirmed line should keep the shares it was confirmed with, and owner
-  accounts be found by a stable id rather than the owner's name.
 ## Tax and returns
 
 - **A shared bank account is held under the GST lock even for an unregistered
