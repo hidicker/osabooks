@@ -1,5 +1,5 @@
 import { combobox } from "./combobox.js";
-import { accountZeroOrExempt } from "./books.js";
+import { accountRate, accountZeroOrExempt, unregisteredCode } from "./books.js";
 import { booksCountry, gstPercent, booksCurrency } from "./country.js";
 import { formatAmount, parseAmount } from "@nzosa/core";
 import type { SplitPart, Transaction } from "@nzosa/core";
@@ -99,14 +99,29 @@ export function splitEditor(options: SplitEditorOptions): HTMLElement {
   const accountLike = (pattern: RegExp, avoid?: RegExp): string =>
     options.codes.find((c) => pattern.test(c) && (avoid === undefined || !avoid.test(c))) ?? "";
 
-  const halfButton = button("Split 50/50", () => {
-    // Entertainment: half deductible with GST, half not. The odd cent goes to
-    // the first part so the two still sum to the line.
-    const whole = transaction.amount;
-    const first = whole - Math.trunc(whole / 2);
-    const nonDeductible = accountLike(/entertainment.*non[- ]?deduct|non[- ]?deduct.*entertainment/i);
-    const deductible = accountLike(/entertainment/i, /non[- ]?deduct/i);
+  // The odd cent goes to the first half so the two still sum to the line.
+  const whole = transaction.amount;
+  const firstHalf = whole - Math.trunc(whole / 2);
+  const secondHalf = Math.trunc(whole / 2);
 
+  // Two equal parts for two people or two purposes, each to be coded. The
+  // rate starts as the line's own; picking each part's account sets its own.
+  const halveButton = button("Halve", () => {
+    readRows();
+    const rate = drafts[0]?.rate || "15";
+    drafts.length = 0;
+    drafts.push({ amount: (firstHalf / 100).toFixed(2), code: "", rate, note: "" });
+    drafts.push({ amount: (secondHalf / 100).toFixed(2), code: "", rate, note: "" });
+    draw();
+  });
+  halveButton.title = "Two equal parts, each coded on its own";
+
+  const nonDeductible = accountLike(/entertainment.*non[- ]?deduct|non[- ]?deduct.*entertainment/i);
+  const deductible = accountLike(/entertainment/i, /non[- ]?deduct/i);
+  // New Zealand's rule: half deductible with GST, half not. Offered only where
+  // the country has that rule and the chart has both accounts.
+  const entertainmentButton = button("Entertainment: half deductible", () => {
+    const first = firstHalf;
     drafts.length = 0;
     drafts.push({
       amount: (first / 100).toFixed(2),
@@ -115,13 +130,15 @@ export function splitEditor(options: SplitEditorOptions): HTMLElement {
       note: "Deductible half",
     });
     drafts.push({
-      amount: (Math.trunc(whole / 2) / 100).toFixed(2),
+      amount: (secondHalf / 100).toFixed(2),
       code: nonDeductible,
       rate: "0",
       note: "Non-deductible half, no GST claimed",
     });
     draw();
   });
+  entertainmentButton.title = "Half to Entertainment with GST, half to Entertainment - Non deductible without";
+  entertainmentButton.hidden = booksCountry().entertainmentHalf !== true || deductible === "" || nonDeductible === "";
 
   // What is still to allocate, into an empty last part or a new one: the
   // usual end of a split, done in one press rather than worked out.
@@ -140,9 +157,13 @@ export function splitEditor(options: SplitEditorOptions): HTMLElement {
     // The account pickers commit without firing an event, so their values are
     // read back before the drafts are turned into parts.
     readRows();
+    const unregistered = unregisteredCode();
     options.onSave(
       drafts.map((draft) => {
         const amount = parseAmount(draft.amount, booksCurrency()) ?? 0;
+        // Nobody in an entity that is not registered can charge or claim GST,
+        // whatever rate the part was left at.
+        if (draft.code !== "" && unregistered(draft.code)) draft.rate = "0";
         // Outside New Zealand a 0% part on a GST-free or input taxed account
         // is that, as on Reconcile, not "no GST": the BAS counts both.
         const own =
@@ -217,6 +238,11 @@ export function splitEditor(options: SplitEditorOptions): HTMLElement {
         // was an answer about a different account.
         if (isGstAccount(draft.code) && draft.rate !== "0" && draft.rate !== "100") {
           draft.rate = "";
+        } else if (!isGstAccount(draft.code)) {
+          // As on a whole line: the part takes its account's rate, and an
+          // account of an entity not registered for GST is always none.
+          const own = accountRate(draft.code);
+          if (own !== null) draft.rate = own;
         }
         // After the picker has finished with its own elements, since this
         // rebuilds the row the callback came from.
@@ -310,7 +336,7 @@ export function splitEditor(options: SplitEditorOptions): HTMLElement {
           `${formatAmount(difference)} still to allocate`;
   }
 
-  footer.append(addButton, restButton, halfButton, saveButton, removeButton, balance);
+  footer.append(addButton, restButton, halveButton, entertainmentButton, saveButton, removeButton, balance);
   if (options.parts.length === 0) removeButton.hidden = true;
   footer.append(button("Cancel", () => options.onCancel()));
 
