@@ -1,5 +1,9 @@
 /**
- * Money is represented as an integer number of minor units (cents for NZD).
+ * Money is held as an integer number of hundredths of the books' currency,
+ * whatever that currency is: cents for dollars, and for won (which has no
+ * minor unit) hundredths of a won, so 3,300,000 won is 330000000. The
+ * currency decides how an amount is written and read -- won with no decimals,
+ * dinars with three -- never the scale it is held at.
  *
  * Bank exports and spreadsheets round-trip amounts through IEEE floats, which
  * is how the source workbook ended up with values like `-78.08000000000001`
@@ -137,8 +141,11 @@ function normaliseSeparators(text: string, currency: string): string {
   return sep === "," ? text.replace(",", ".") : text;
 }
 
-function roundToMinor(value: number, currency: string): Cents {
-  const factor = 10 ** minorUnits(currency);
+/** Every amount is held in hundredths, whatever the currency. */
+const HELD_PLACES = 2;
+
+function roundToMinor(value: number, _currency: string): Cents {
+  const factor = 10 ** HELD_PLACES;
   // Nudge by an epsilon proportional to the value so that a float that is a
   // hair below the true half-cent (78.07999999999999) still rounds correctly,
   // without dragging genuine half-cents in the wrong direction.
@@ -147,14 +154,35 @@ function roundToMinor(value: number, currency: string): Cents {
   return Math.round(nudged);
 }
 
-/** Render minor units as a plain decimal string, e.g. `-78.08`. */
+/**
+ * Render an amount as a plain decimal string, e.g. `-78.08`, to the places
+ * its currency is written with (none for won), from the hundredths it is held in.
+ */
 export function formatAmount(cents: Cents, currency = "NZD"): string {
-  const places = minorUnits(currency);
-  if (places === 0) return String(cents);
+  const places = Math.min(HELD_PLACES, minorUnits(currency));
+  if (places < HELD_PLACES) {
+    const shown = (Math.abs(cents) / 100).toFixed(places);
+    return `${cents < 0 && Number(shown) !== 0 ? "-" : ""}${shown}`;
+  }
   const sign = cents < 0 ? "-" : "";
   const abs = Math.abs(cents);
   const factor = 10 ** places;
   const whole = Math.floor(abs / factor);
   const frac = String(abs % factor).padStart(places, "0");
   return `${sign}${whole}.${frac}`;
+}
+
+/**
+ * An amount as duplicate-detection keys have always written it: two places,
+ * or for a currency with none the held figure as it stands. Kept apart from
+ * formatAmount so that changing how money is shown can never change a key,
+ * which would make a line already in the books look new.
+ */
+export function amountKeyText(cents: Cents, currency = "NZD"): string {
+  const places = minorUnits(currency);
+  if (places === 0) return String(cents);
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(cents);
+  const factor = 10 ** places;
+  return `${sign}${Math.floor(abs / factor)}.${String(abs % factor).padStart(places, "0")}`;
 }

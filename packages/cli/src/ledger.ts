@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync, existsSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { NO_SALES_TAX, dedupe, dedupeKey, jurisdictionOf, setSalesTaxFraction } from "@nzosa/core";
+import { NO_SALES_TAX, dedupe, dedupeKey, jurisdictionOf, setBooksDayFirst, setSalesTaxFraction } from "@nzosa/core";
 import type {
   Account,
   DedupeResult,
@@ -236,6 +236,7 @@ export function loadLedger(path: string): Ledger {
   const ledger = readLedger(path);
   const country = jurisdictionOf(ledger.jurisdiction);
   setSalesTaxFraction(country.salesTax === null ? NO_SALES_TAX : country.salesTax.fraction);
+  setBooksDayFirst(country.dayFirst);
   return ledger;
 }
 

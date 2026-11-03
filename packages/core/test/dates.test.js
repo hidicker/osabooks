@@ -123,3 +123,25 @@ test("localStamp shows a moment on the local clock", () => {
   assert.equal(localStamp(at.toISOString()), "2026-11-03 09:05");
   assert.equal(localStamp("not a time"), "not a time");
 });
+
+test("Korean dates: spaced year-first, with a closing point or a time, and eight digits", () => {
+  assert.equal(parseDate("2026. 3. 12."), "2026-03-12");
+  assert.equal(parseDate("2026. 3. 12"), "2026-03-12");
+  assert.equal(parseDate("2026.03.12 14:22:01"), "2026-03-12");
+  assert.equal(parseDate("20260312"), "2026-03-12");
+  // Not a date: no month thirteen, and an Excel serial is still a serial.
+  assert.equal(parseDate("20261312"), null);
+  assert.equal(parseDate("45000"), "2023-03-15");
+});
+
+test("a date with no order of its own is read as the books' country writes it", async () => {
+  const { setBooksDayFirst } = await import("../dist/index.js");
+  try {
+    setBooksDayFirst(false); // United States books: 3/4/2026 is 4 March
+    assert.equal(parseDate("3/4/2026"), "2026-03-04");
+    assert.equal(parseDate("3/4/2026", { dayFirst: true }), "2026-04-03");
+  } finally {
+    setBooksDayFirst(true);
+  }
+  assert.equal(parseDate("3/4/2026"), "2026-04-03");
+});

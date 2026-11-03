@@ -1,5 +1,5 @@
 import { daysBetween } from "./dates.js";
-import { formatAmount } from "./money.js";
+import { amountKeyText } from "./money.js";
 import type { Transaction } from "./types.js";
 
 /**
@@ -34,7 +34,7 @@ export function dedupeKey(transaction: Transaction): string {
   return [
     transaction.account,
     transaction.date,
-    formatAmount(transaction.amount, transaction.currency),
+    amountKeyText(transaction.amount, transaction.currency),
     transaction.currency,
     transaction.serial,
     transaction.trn,
@@ -58,7 +58,7 @@ export function looseKey(transaction: Transaction): string {
   return [
     transaction.account,
     transaction.date,
-    formatAmount(transaction.amount, transaction.currency),
+    amountKeyText(transaction.amount, transaction.currency),
     transaction.currency,
     transaction.particulars,
     transaction.code,
@@ -74,7 +74,7 @@ export function looseKey(transaction: Transaction): string {
 function adjacencyKey(transaction: Transaction): string {
   return [
     transaction.account,
-    formatAmount(transaction.amount, transaction.currency),
+    amountKeyText(transaction.amount, transaction.currency),
     transaction.currency,
     transaction.particulars,
     transaction.code,
@@ -101,7 +101,7 @@ function adjacencyKey(transaction: Transaction): string {
 function crossSourceKey(transaction: Transaction): string {
   return [
     transaction.account,
-    formatAmount(transaction.amount, transaction.currency),
+    amountKeyText(transaction.amount, transaction.currency),
     transaction.currency,
     transaction.particulars,
     transaction.code,
@@ -132,7 +132,7 @@ const CROSS_SOURCE_DAYS = 5;
 function payeeKey(transaction: Transaction): string {
   return [
     transaction.account,
-    formatAmount(transaction.amount, transaction.currency),
+    amountKeyText(transaction.amount, transaction.currency),
     transaction.currency,
     transaction.otherParty.toLowerCase().replace(/\s+/g, " ").trim(),
   ].join(SEP);

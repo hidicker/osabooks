@@ -194,11 +194,12 @@ export type {
   EntityProblem,
 } from "./entities.js";
 
-export { parseAmount, formatAmount, minorUnits } from "./money.js";
+export { parseAmount, formatAmount, minorUnits, amountKeyText } from "./money.js";
 export type { Cents } from "./money.js";
 
 export {
   parseDate,
+  setBooksDayFirst,
   fromExcelSerial,
   dayAfter,
   dayBefore,

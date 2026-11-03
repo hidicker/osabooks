@@ -1,4 +1,4 @@
-import { NO_SALES_TAX, jurisdictionOf, minorUnits, salesTaxFraction, setSalesTaxFraction } from "@nzosa/core";
+import { NO_SALES_TAX, jurisdictionOf, minorUnits, salesTaxFraction, setBooksDayFirst, setSalesTaxFraction } from "@nzosa/core";
 import type { Jurisdiction } from "@nzosa/core";
 import { state } from "./state.js";
 import { addCountryReports } from "./daily/country-reports.js";
@@ -35,6 +35,7 @@ export function applyCountryRules(): Jurisdiction {
   const country = booksCountry();
   const tax = country.salesTax;
   setSalesTaxFraction(tax === null ? NO_SALES_TAX : tax.fraction);
+  setBooksDayFirst(country.dayFirst);
   return country;
 }
 
