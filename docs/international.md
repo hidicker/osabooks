@@ -48,7 +48,11 @@ The facts are in `packages/core/src/jurisdiction.ts`. The web app reads them thr
 - GST returns, IR10, IR3 and IR3R
 - payroll and myIR
 - Akahu
-- the AI accounts check
+- the AI accounts check against Inland Revenue's own return guides, attached by hand
+
+**Every country:** the AI accounts check against the OpenAccountants guides. Its prompt names the
+country's tax, tax office and guides, and carries the country's own reports (`countryReportSheets`)
+where New Zealand's carries its GST returns, IR3s and IR10 (`apps/web/src/ai-review.ts`).
 
 Modules tagged `countries: ["nz"]`, and pages marked `data-module="nz"` or `business+nz`, appear only for New Zealand books.
 

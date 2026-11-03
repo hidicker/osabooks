@@ -10,7 +10,7 @@ Point it at your bank exports and, if you have them, the exports from Xero or Qu
 
 **Your books, where you choose to keep them.** On your own computer, they are files in a folder you can back up and read without this software, and nothing from them leaves the computer unless you connect a bank feed or an AI. Or online, on your own Supabase project, to work on from any device and share with a bookkeeper or accountant ([how](docs/self-hosting.md)).
 
-**AI is optional.** Without it, OsaBooks codes from your rules and your own past decisions. With it, it can suggest codes for the lines nothing recognises, check a finished year against the [OpenAccountants](https://github.com/openaccountants/openaccountants) guides (New Zealand books, for now), and connect to Claude, ChatGPT or another AI app through an MCP connector, so the AI can read your books and suggest entries. Whatever it suggests waits in OsaBooks until you accept it.
+**AI is optional.** Without it, OsaBooks codes from your rules and your own past decisions. With it, it can suggest codes for the lines nothing recognises, check a finished year against the [OpenAccountants](https://github.com/openaccountants/openaccountants) guides, and connect to Claude, ChatGPT or another AI app through an MCP connector, so the AI can read your books and suggest entries. Whatever it suggests waits in OsaBooks until you accept it.
 
 ## Running it
 

@@ -14,6 +14,8 @@ import {
 } from "@nzosa/core";
 import type { GstReturnResult } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart, taxYearStartSaid } from "./tax-year.js";
+import { booksCountry } from "./country.js";
+import { countryReportSheets } from "./daily/country-reports.js";
 
 /**
  * A year-end review of the accounts, in one prompt.
@@ -52,17 +54,141 @@ import { taxYearEnd, taxYearEndSaid, taxYearStart, taxYearStartSaid } from "./ta
 export const OPENACCOUNTANTS_MCP = "https://www.openaccountants.com/api/mcp";
 export const OPENACCOUNTANTS_CONNECT = "https://www.openaccountants.com/connect";
 
-/** The New Zealand guides that library holds, so the model can name them. */
-const NZ_GUIDES = [
-  "nz-income-tax-ir3",
-  "nz-gst-return",
-  "nz-provisional-tax",
-  "nz-acc-levies",
-  "nz-capital-gains",
-  "nz-tax-residency",
-  "nz-timing-deductions-when-expense-incurred",
-  "nz-motor-vehicle-expenses-logbook-business-use",
-];
+/**
+ * The guides that library holds for each country, the ones a year-end review
+ * of small books turns to first, so the model can name them. It finds others
+ * there itself; these are where to start.
+ */
+const GUIDES: Readonly<Record<string, readonly string[]>> = {
+  nz: [
+    "nz-income-tax-ir3",
+    "nz-gst-return",
+    "nz-provisional-tax",
+    "nz-acc-levies",
+    "nz-capital-gains",
+    "nz-tax-residency",
+    "nz-timing-deductions-when-expense-incurred",
+    "nz-motor-vehicle-expenses-logbook-business-use",
+  ],
+  au: [
+    "australia-gst",
+    "au-bas-preparation",
+    "au-individual-return",
+    "au-rental-property-2",
+    "au-sole-trader-schedule",
+    "au-company-tax",
+    "au-deductions-offsets",
+    "au-payg-instalments-2",
+    "au-lodgment-deadlines-penalties",
+    "au-rates-2026-27",
+  ],
+  us: [
+    "us-federal-income-tax-return-1040",
+    "us-schedule-c-and-se-computation",
+    "us-sole-prop-bookkeeping",
+    "us-real-estate-professional-and-short-term-rentals",
+    "us-section-179-and-bonus-depreciation",
+    "us-1099-k-and-payment-processors",
+    "us-federal-return-assembly",
+  ],
+  kr: ["south-korea-vat", "kr-income-tax", "simplified-business-operator-registration-under-vat-act"],
+};
+
+/** The books' country, in the words the prompt uses. */
+function here(): {
+  id: string;
+  code: string;
+  name: string;
+  place: string;
+  tax: string | null;
+  office: string;
+  theOffice: string;
+  short: string;
+  zeroOrExempt: string;
+} {
+  const country = booksCountry();
+  const office = country.taxAuthority.name;
+  return {
+    id: country.id,
+    code: country.id.toUpperCase(),
+    name: country.id === "generic" ? "" : country.name,
+    // As a sentence says it: "kept in the United States".
+    place: country.id === "generic" ? "their country" : country.id === "us" ? "the United States" : country.name,
+    tax: country.salesTax?.name ?? null,
+    office,
+    theOffice: country.id === "nz" || office.startsWith("the ") ? office : `the ${office}`,
+    short: country.taxAuthority.short,
+    // Australia's names for the two kinds of supply with no GST charged.
+    zeroOrExempt: country.id === "au" ? "GST-free or input taxed" : "zero-rated or exempt",
+  };
+}
+
+/**
+ * The country's own reports, as the Reports page draws them -- the BAS, the
+ * income tax estimate, Schedule C, the VAT return -- drawn off the page and
+ * read back as text. The same code makes the figures here as there, so the
+ * review checks what the books show rather than a copy made for it.
+ */
+function countryReportsBlock(year: number): string[] {
+  const sheets = countryReportSheets(booksCountry().id);
+  if (sheets.length === 0) return [];
+  const lines: string[] = [`THE REPORTS FOR ${here().place.toUpperCase()}, as these books draw them (figures as on the Reports page):`];
+  for (const { sheet, render } of sheets) {
+    const body = document.createElement("div");
+    try {
+      render(body, year);
+    } catch (error) {
+      lines.push("", `${sheet}: could not be worked out — ${(error as Error).message}`);
+      continue;
+    }
+    // Controls are for the page, not the reader: a select's text is every option.
+    for (const control of body.querySelectorAll("select, button, input, textarea, script, style")) control.remove();
+    const said: string[] = [];
+    for (const element of body.querySelectorAll("h2, h3, h4, p, li, tr")) {
+      if (element.tagName !== "TR" && element.closest("table") !== null) continue;
+      const text =
+        element.tagName === "TR"
+          ? [...element.querySelectorAll("th, td")].map((cell) => (cell.textContent ?? "").replace(/\s+/g, " ").trim()).filter((t) => t !== "").join(" | ")
+          : (element.textContent ?? "").replace(/\s+/g, " ").trim();
+      if (text !== "" && said[said.length - 1] !== text) said.push(text);
+    }
+    if (said.length === 0) continue;
+    lines.push("", `${sheet}:`, ...said.slice(0, 150).map((text) => `  ${text}`));
+    if (said.length > 150) lines.push(`  ...and ${said.length - 150} more lines`);
+  }
+  return lines.length > 1 ? lines : [];
+}
+
+/** Whether the books' closing balances hold together, said for any country. */
+function balanceBlock(year: number): string[] {
+  try {
+    const summary = ir10Summary({
+      yearEnding: taxYearEnd(year),
+      yearStarting: taxYearStart(year),
+      journals: postedJournals(),
+      ...(state.ledger.openingBalances ? { openingBalances: state.ledger.openingBalances } : {}),
+      chart: state.chart,
+      assets: state.ledger.assets ?? [],
+      proceeds: state.ledger.assetProceeds ?? {},
+      currentAccountsAsLiabilities: true,
+    });
+    const lines = [
+      summary.imbalance === 0
+        ? "The balance sheet holds together: every account's closing balance sums to zero."
+        : `THE BOOKS DO NOT BALANCE: closing balances sum to ${money(summary.imbalance)} rather ` +
+          "than zero. Say so first, and treat every figure below it as provisional.",
+    ];
+    if (!state.ledger.openingBalances) {
+      lines.push(
+        "No opening balances are set, so the balance sheet starts from nothing and every",
+        "brought-forward figure is missing. Say what that makes unanswerable.",
+      );
+    }
+    return lines;
+  } catch {
+    return [];
+  }
+}
 
 export function yearsInBooks(): number[] {
   return bookYears();
@@ -162,24 +288,29 @@ function accountTotals(period: Period): string[] {
         : treated !== null
           ? treated.treatment
           : profitAndLoss(account?.type ?? "")
-            ? "NO GST TREATMENT SET"
-            : "balance sheet, outside GST";
+            ? `NO ${here().tax ?? "TAX"} TREATMENT SET`
+            : `balance sheet, outside ${here().tax ?? "sales tax"}`;
     const line =
       `- ${code} ${account?.name ?? ""} [${account?.type ?? "?"}` +
       (where === null ? "" : `, ${where}`) +
       `; ${entity === undefined ? "entity not set" : `${entity.name}, ${kindWords(entity.kind)}`}` +
-      `]: ${money(amount)} · GST: ${tax}`;
+      `]: ${money(amount)}` + (here().tax === null ? "" : ` · ${here().tax}: ${tax}`);
     (entity?.kind === "personal" ? personal : taxed).push(line);
   }
 
-  const lines = ["Account totals for the year, with the entity and the GST treatment of each:", ...taxed];
+  const lines = [
+    here().tax === null
+      ? "Account totals for the year, with the entity of each:"
+      : `Account totals for the year, with the entity and the ${here().tax} treatment of each:`,
+    ...taxed,
+  ];
   if (personal.length > 0) {
     lines.push(
       "",
       "PERSONAL ACCOUNTS. These are the household's own money, recorded so the bank accounts",
-      "reconcile. They are not in any tax figure: not a rental schedule, not the IR3, not GST.",
+      `reconcile. They are not in any tax figure: not a rental schedule, not an owner's return${here().tax === null ? "" : `, not ${here().tax}`}.`,
       "Never treat them as deductions or as part of a profit. Only check them for taxable income",
-      "passing through (interest, dividends, salary) that should be on an owner's IR3 and is not.",
+      "passing through (interest, dividends, salary) that should be on an owner's return and is not.",
       ...personal,
     );
   }
@@ -221,15 +352,20 @@ function entitiesBlock(): string[] {
   const model = state.ledger.entities ?? emptyEntityModel();
   const lines = ["Entities in these books (an account's code ends in its entity's letters):"];
   for (const entity of model.entities) {
+    const { tax, short } = here();
     const gst =
-      entity.kind === "personal"
-        ? "outside GST"
-        : entity.gstRegistered === false
-          ? "NOT GST registered"
-          : entity.gstByOwners === true
-            ? "GST: each owner is registered for their own share and files their own return, so " +
-              "each payment to Inland Revenue is split between the owners' registrations"
-            : `GST registered, filing every ${entity.gstFrequency ?? 2} month${(entity.gstFrequency ?? 2) === 1 ? "" : "s"}`;
+      tax === null
+        ? "no national sales tax"
+        : entity.kind === "personal"
+          ? `outside ${tax}`
+          : entity.gstRegistered === false
+            ? `NOT ${tax} registered`
+            : entity.gstByOwners === true
+              ? `${tax}: each owner is registered for their own share and files their own return, so ` +
+                `each payment to ${short} is split between the owners' registrations`
+              : here().id === "nz"
+                ? `${tax} registered, filing every ${entity.gstFrequency ?? 2} month${(entity.gstFrequency ?? 2) === 1 ? "" : "s"}`
+                : `${tax} registered`;
     lines.push(
       `- ${entity.name}${entity.codeSuffix ? ` (codes ending ${entity.codeSuffix})` : ""}: ` +
         `${kindWords(entity.kind)}${entity.structure ? `, a ${entity.structure}` : ""}, ${gst}` +
@@ -244,6 +380,13 @@ function entitiesBlock(): string[] {
 
 /** Who files, which decides every due date. */
 function filingBlock(year: number): string[] {
+  if (here().id !== "nz") {
+    return [
+      `Who files the returns, and when each is due: not worked out here. Give the due dates from`,
+      `the guides for ${here().place}, and where a tax agent changes them, both answers, rather than`,
+      "calling anything late.",
+    ];
+  }
   const filing = state.ledger.filing;
   if (filing === undefined) {
     return [
@@ -275,7 +418,9 @@ function rentalsBlock(year: number): string[] {
   if (schedules.length === 0) return [];
   const lines = [
     "RENTAL SCHEDULES, as these books set them out (income and expenses of each property for",
-    "the year; GST-exclusive where the property is registered, inclusive where it is not):",
+    here().tax === null
+      ? "the year):"
+      : `the year; ${here().tax}-exclusive where the property is registered, inclusive where it is not):`,
   ];
   for (const { entity, now } of schedules) {
     const owners = (entity.owners ?? []).map((o) => `${o.name} ${o.percent}%`).join(" / ");
@@ -332,7 +477,7 @@ function tripsBlock(period: Period): string[] {
   if (trips.length === 0) return [];
   const model = state.ledger.entities ?? emptyEntityModel();
   const lines = [
-    "VEHICLE TRIPS, claimed at Inland Revenue's kilometre rates. Each is a record of one trip to",
+    `VEHICLE TRIPS, claimed at ${here().office}'s kilometre rates. Each is a record of one trip to`,
     "a rental or for a business, kept trip by trip; this is not a business vehicle's logbook test:",
   ];
   for (const trip of trips) {
@@ -371,27 +516,35 @@ function agentStatementsBlock(period: Period): string[] {
 
 /** The instructions all three share. */
 function preamble(year: number): string[] {
+  const { id, code, place, tax } = here();
+  const nz = id === "nz";
+  const guides = GUIDES[id] ?? [];
   return [
-    "You are reviewing a small New Zealand set of books at year end, as an accountant would",
+    `You are reviewing a small set of books kept in ${place} at year end, as an accountant would`,
     "before signing anything off. Everything you need is below: the entities and what kind each",
-    "is, who files the returns, every GST period against what was filed, the figures each return",
-    "is built from (rental schedules and each owner's IR3, or the IR10 for a business), the asset",
-    "register, and every account's total with its entity and GST treatment.",
+    nz
+      ? "is, who files the returns, every GST period against what was filed, the figures each return"
+      : `is, the reports these books draw for ${place}${tax === null ? "" : ` (${tax} among them)`}, the figures each return`,
+    nz
+      ? "is built from (rental schedules and each owner's IR3, or the IR10 for a business), the asset"
+      : "is built from (rental schedules, each business's profit, the income tax figures), the asset",
+    `register, and every account's total with its entity${tax === null ? "" : ` and ${tax} treatment`}.`,
     "",
     "Check the figures these books produce; do not rebuild them your own way. Where you think one",
     "is wrong, say which figure, why, and what it should be. Each entity is taxed on its own: a",
-    "rental's income and expenses go on its owners' IR3s by their shares, a business has its own",
+    `rental's income and expenses go on its owners' ${nz ? "IR3s" : "own returns"} by their shares, a business has its own`,
     "return, and personal accounts are in no tax figure at all.",
     "",
     "Use the OpenAccountants MCP connector for the rules rather than your training data:",
     `  ${OPENACCOUNTANTS_MCP}`,
-    "Its New Zealand guides include " + NZ_GUIDES.join(", ") + ".",
+    ...(guides.length > 0
+      ? [`Its guides for ${place} include ${guides.join(", ")}; find others there for jurisdiction ${code}.`]
+      : ["Find the guides for the books' country there (list_skills, by jurisdiction)."]),
     "Name the guide you used for every figure or rule you rely on, and repeat that guide's",
-    "verification status exactly as the guide gives it. Most New Zealand guides are unreviewed",
-    "drafts written from primary sources; say so where that is what they say, and never",
-    "describe one as reviewed or signed off unless it tells you it is. Where the connector is",
-    "not available to you, or a lookup is refused, say so plainly at the top of your answer",
-    "rather than answering from memory as though it were.",
+    "verification status exactly as the guide gives it: say a guide is accountant-reviewed or",
+    "signed off only if it tells you it is. Where the connector is not available to you, or a",
+    "lookup is refused, say so plainly at the top of your answer rather than answering from",
+    "memory as though it were.",
     "",
     "Answer in plain English, most serious first, each point naming the account and the figure.",
     "Say what you are unsure of, and say what you would need to see to be sure. This is a",
@@ -585,7 +738,9 @@ function invoicesBlock(period: Period): string[] {
     `Outstanding at the year end: ${owedToUs.length} sales invoices unpaid, ` +
       `${money(total(owedToUs))} owed to the entity; ${owedByUs.length} bills unpaid, ` +
       `${money(total(owedByUs))} owed by it.`,
-    "On a payments basis neither is in the GST return, and both belong on the balance sheet.",
+    here().tax === null
+      ? "Both belong on the balance sheet."
+      : `On a payments (cash) basis neither is in the ${here().tax} return, and both belong on the balance sheet.`,
   ];
 }
 
@@ -621,12 +776,16 @@ export function reviewFacts(year: number): string[] {
   return [
     ...section(entitiesBlock()),
     ...section(filingBlock(year)),
-    ...section(gstBlock(period)),
+    // New Zealand's returns are worked out here, box by box, against what was
+    // filed. Elsewhere the country's own reports carry its returns.
+    ...section(here().id === "nz" ? gstBlock(period) : []),
     ...section(rentalsBlock(year)),
-    ...section(ir3Block(year)),
+    ...section(here().id === "nz" ? ir3Block(year) : []),
     // An IR10 is a business's return. For rentals and personal books it is the
     // wrong form, and sending one merged every entity into a single "profit".
-    ...section(has.business ? ir10Block(year) : []),
+    ...section(here().id === "nz" && has.business ? ir10Block(year) : []),
+    ...section(here().id === "nz" ? [] : countryReportsBlock(year)),
+    ...section(here().id === "nz" ? [] : balanceBlock(year)),
     ...section(assetsBlock(period)),
     ...section(tripsBlock(period)),
     ...section(agentStatementsBlock(period)),
@@ -637,6 +796,8 @@ export function reviewFacts(year: number): string[] {
 }
 
 export function reviewPrompt(year: number): string {
+  const { id, place, tax, theOffice, zeroOrExempt } = here();
+  const nz = id === "nz";
   const model = state.ledger.entities ?? emptyEntityModel();
   const registered = model.entities.some((one) => one.kind !== "personal" && one.gstRegistered !== false);
   const has = kinds();
@@ -653,23 +814,42 @@ export function reviewPrompt(year: number): string {
     "- What is missing entirely: a category of cost this kind of entity always has and these",
     "  books do not.",
     "",
-    "GST",
-    "- Any account whose GST treatment cannot be right for what it holds: zero-rated or",
-    "  exempt where the supply is standard-rated, standard-rated where nothing can be",
-    "  claimed, and anything with no treatment set at all. Balance sheet accounts are",
-    "  outside GST and need no treatment.",
-    "- GST claimed on a purchase where the supplier did not charge New Zealand GST.",
-    "- Anything claimed that an entity not registered for GST cannot claim.",
-    "- Where our figure and the filed figure differ, what would explain it and what would",
-    "  not. Name the period and both figures.",
-    "- Periods with nothing filed recorded here: say that the filed returns should be loaded",
-    "  (myIR's GST return summary). Payments to Inland Revenue are not the filed return; do not",
-    "  rebuild one from them.",
-    "- Excluded transactions, late claims and missing tax points: whether each is right.",
-    ...(registered
-      ? []
-      : ["- No entity here is registered, so say plainly whether any GST should be claimed."]),
-    "",
+    ...(tax === null
+      ? [
+          "Sales tax",
+          `- There is no national sales tax in ${place}. Check any state or local sales tax these books`,
+          "  record (above): whether what was collected was charged where it should have been, whether",
+          "  what is still owed matches the returns, and whether anything suggests a tax, or a use tax,",
+          "  that these books do not record.",
+          "",
+        ]
+      : [
+          tax,
+          `- Any account whose ${tax} treatment cannot be right for what it holds: ${zeroOrExempt}`,
+          "  where the supply is standard-rated, standard-rated where nothing can be",
+          "  claimed, and anything with no treatment set at all. Balance sheet accounts are",
+          `  outside ${tax} and need no treatment.`,
+          nz
+            ? "- GST claimed on a purchase where the supplier did not charge New Zealand GST."
+            : `- ${tax} claimed on a purchase where the supplier charged none, or charged another country's.`,
+          `- Anything claimed that an entity not registered for ${tax} cannot claim.`,
+          ...(nz
+            ? [
+                "- Where our figure and the filed figure differ, what would explain it and what would",
+                "  not. Name the period and both figures.",
+                "- Periods with nothing filed recorded here: say that the filed returns should be loaded",
+                "  (myIR's GST return summary). Payments to Inland Revenue are not the filed return; do not",
+                "  rebuild one from them.",
+                "- Excluded transactions, late claims and missing tax points: whether each is right.",
+              ]
+            : [
+                `- Each period's ${tax} return as these books draw it (above): whether its figures follow`,
+                `  from the accounts and their treatments. Payments to ${theOffice} are not the filed return;`,
+                "  do not rebuild one from them.",
+              ]),
+          ...(registered ? [] : [`- No entity here is registered, so say plainly whether any ${tax} should be claimed.`]),
+          "",
+        ]),
     ...(has.rentals
       ? [
           "Rentals",
@@ -678,10 +858,15 @@ export function reviewPrompt(year: number): string {
           "- Interest: whether each loan's interest belongs to the property it is charged to,",
           "  which turns on what the borrowed money was used for. Say what you would need to see.",
           ...(has.residential
-            ? [
-                "- Residential rentals: the interest deduction rules for the year, and ring-fencing of",
-                "  any loss, with any loss brought forward.",
-              ]
+            ? nz
+              ? [
+                  "- Residential rentals: the interest deduction rules for the year, and ring-fencing of",
+                  "  any loss, with any loss brought forward.",
+                ]
+              : [
+                  `- Residential rentals: the rules in ${place} for the year on deducting interest, and on what`,
+                  "  happens to a loss, with any loss brought forward.",
+                ]
             : []),
           "- Repairs against capital improvements, and any insurance payout: what it compensates",
           "  decides how it is treated.",
@@ -703,17 +888,21 @@ export function reviewPrompt(year: number): string {
                 "  whether anything about them would be treated as income.",
               ]
             : []),
-          "- What the IR10 needs that these books do not hold.",
+          nz ? "- What the IR10 needs that these books do not hold." : "- What the business's return needs that these books do not hold.",
           "",
         ]
       : []),
     ...(ownersOf(model).length > 0
       ? [
-          "Each owner's IR3",
-          "- Whether each owner's IR3 above takes the right share of each rental, and whether any",
+          nz ? "Each owner's IR3" : "Each owner's return",
+          nz
+            ? "- Whether each owner's IR3 above takes the right share of each rental, and whether any"
+            : "- Whether each owner's share of each rental and business is right, and whether any",
           "  income is missing from it: interest, dividends or salary, including any that passes",
           "  through the personal accounts or a loan account.",
-          "- Provisional tax: whether what was paid matches what was due, and next year's figure.",
+          nz
+            ? "- Provisional tax: whether what was paid matches what was due, and next year's figure."
+            : "- Tax paid in advance during the year (instalments, estimated tax): whether it matches what was due.",
           "- Due dates, given who files the returns (above).",
           "",
         ]
