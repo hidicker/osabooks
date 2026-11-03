@@ -16,7 +16,7 @@ back, and a fix is released before anything is said publicly.
 
 What follows is checked in each security review; the last was on 5 October 2026.
 
-**Run on your own computer** (the launcher, `NZOSA.cmd`):
+**Run on your own computer** (the launcher, `OsaBooks.cmd`):
 
 - The local server listens on this computer only (127.0.0.1), refuses any
   request whose Host is not this computer (so another web page cannot reach it

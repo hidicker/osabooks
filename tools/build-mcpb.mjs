@@ -5,7 +5,7 @@
 //
 // The extension is a zip holding the compiled server, the compiled core it
 // imports (core has no dependencies, so there is nothing else to bundle), a
-// manifest, and the licence files. Output: packages/mcp/nzosa.mcpb
+// manifest, and the licence files. Output: packages/mcp/osabooks.mcpb
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -15,7 +15,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const mcp = join(root, "packages", "mcp");
 const core = join(root, "packages", "core");
 const stage = join(mcp, "mcpb-stage");
-const out = join(mcp, "nzosa.mcpb");
+const out = join(mcp, "osabooks.mcpb");
 
 for (const needed of [join(mcp, "dist", "server.js"), join(core, "dist", "index.js")]) {
   if (!existsSync(needed)) {
@@ -113,7 +113,7 @@ const packed = spawnSync("npx", ["--yes", "@anthropic-ai/mcpb", "pack", stage, o
   shell: true,
 });
 if (packed.status !== 0 || !existsSync(out)) {
-  console.error("Packing failed. The staged folder is complete; zip its contents as nzosa.mcpb.");
+  console.error("Packing failed. The staged folder is complete; zip its contents as osabooks.mcpb.");
   process.exit(1);
 }
 console.log(`Built ${out}`);
@@ -121,6 +121,8 @@ console.log(`Built ${out}`);
 // Beside the app, so the AI page can offer it for download.
 const appDist = join(root, "apps", "web", "dist");
 if (existsSync(appDist)) {
+  cpSync(out, join(appDist, "osabooks.mcpb"));
+  // The old name too, for links and instructions that still say it.
   cpSync(out, join(appDist, "nzosa.mcpb"));
-  console.log(`Copied to ${join(appDist, "nzosa.mcpb")}`);
+  console.log(`Copied to ${join(appDist, "osabooks.mcpb")} (and nzosa.mcpb)`);
 }

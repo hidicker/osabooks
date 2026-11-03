@@ -187,7 +187,7 @@ export function ownProjectPanel(): HTMLElement {
   save.textContent = "Download the script";
   save.addEventListener("click", () => {
     void script().then((text) => {
-      if (text !== null) download(text, "nzosa-own-project.sql", "text/plain");
+      if (text !== null) download(text, "osabooks-own-project.sql", "text/plain");
     });
   });
   two.append(" ", copy, " ", save);

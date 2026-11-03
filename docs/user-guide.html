@@ -80,7 +80,7 @@ strong { font-weight: 650; }
       <a href="#licence-and-liability">Licence and liability</a>
     </nav>
     <main>
-<h1 id="nzosa-a-guide-for-owners">OsaBooks: a guide for owners</h1>
+<h1 id="osabooks-a-guide-for-owners">OsaBooks: a guide for owners</h1>
 <p>For the person whose business this is. No accounting background assumed.</p>
 <p>If you are the accountant, read the <a href="accountant-guide.md">guide for accountants</a> instead. If you are changing the code, read the <a href="developer-guide.md">guide for developers</a>.</p>
 <hr>
@@ -92,7 +92,7 @@ strong { font-weight: 650; }
 <hr>
 <h2 id="where-your-data-lives">Where your data lives</h2>
 <p>Worth understanding before you put a year of your business into it, because it depends on how you opened it.</p>
-<p><strong>If you started it with the launcher</strong> (<code>NZOSA.cmd</code> on Windows, <code>NZOSA.command</code> on a Mac), your books are <strong>files in a folder on your computer</strong>. One file per part — transactions, decisions, invoices, chart. You can back them up, copy them to another machine, and read them without this software. This is the mode to use for real books.</p>
+<p><strong>If you started it with the launcher</strong> (<code>OsaBooks.cmd</code> on Windows, <code>OsaBooks.command</code> on a Mac), your books are <strong>files in a folder on your computer</strong>. One file per part — transactions, decisions, invoices, chart. You can back them up, copy them to another machine, and read them without this software. This is the mode to use for real books.</p>
 <p><strong>If you opened it as a web page</strong> with no launcher running, there is no folder, and your books are kept <strong>inside that browser</strong> on that device. That is fine for trying it out. It is a poor place for anything you care about:</p>
 <ul><li>Clearing your browsing data deletes it.</li><li>It does not follow you to another browser, another computer, or your phone.</li><li>A private or incognito window starts empty and keeps nothing.</li><li>The browser is allowed to discard it if the device runs short of space.</li></ul>
 <p>Either way, <strong>nothing is uploaded</strong>. Your files are read on your own machine and the app does not send them anywhere. That is also why nobody can recover your books for you if you lose them — there is no copy but yours.</p>
@@ -105,18 +105,18 @@ strong { font-weight: 650; }
 <h3 id="1-install-node-js">1. Install Node.js</h3>
 <p>Go to <a href="https://nodejs.org">nodejs.org</a> and download the <strong>LTS</strong> version — the one on the left, marked "Recommended For Most Users". Run the installer and accept every default.</p>
 <p>Node.js is the engine OsaBooks runs on. You will never open it or see it again.</p>
-<h3 id="2-get-the-nzosa-folder">2. Get the OsaBooks folder</h3>
+<h3 id="2-get-the-osabooks-folder">2. Get the OsaBooks folder</h3>
 <p>You will be given either a ZIP file or a link. Download it and <strong>unzip it somewhere you will find again</strong> — Documents is a good choice, and somewhere inside a folder that is backed up is better.</p>
 <p>Do not run it from inside the ZIP. Windows will let you open files in a ZIP without unpacking it, and OsaBooks will fail in confusing ways if you do.</p>
 <h3 id="3-start-it">3. Start it</h3>
 <p>Open the folder and double-click:</p>
-<ul><li><strong>Windows</strong> — <code>NZOSA.cmd</code></li><li><strong>Mac</strong> — <code>NZOSA.command</code></li></ul>
+<ul><li><strong>Windows</strong> — <code>OsaBooks.cmd</code></li><li><strong>Mac</strong> — <code>OsaBooks.command</code></li></ul>
 <p>The first time, it spends a minute or two fetching what it needs and building itself. A black window shows what it is doing; that is normal, and it closes on its own. Your browser then opens at OsaBooks.</p>
-<p>To stop it, double-click <strong><code>Stop NZOSA</code></strong> in the same folder. Closing the browser tab does not stop it.</p>
+<p>To stop it, double-click <strong><code>Stop OsaBooks</code></strong> in the same folder. Closing the browser tab does not stop it.</p>
 <h3 id="if-something-gets-in-the-way">If something gets in the way</h3>
 <p><strong>Windows says it protected your PC.</strong> Click <em>More info</em>, then <em>Run anyway</em>. This is SmartScreen not recognising a file that few people have downloaded; it is not a virus warning.</p>
-<p><strong>Mac says it is from an unidentified developer.</strong> Right-click <code>NZOSA.command</code>, choose <strong>Open</strong>, then <strong>Open</strong> again in the box that appears. You only do this once.</p>
-<p><strong>Mac says it cannot be opened, or opens it in a text editor.</strong> The file lost its permission to run, which happens with some ways of downloading. Open Terminal, type <code>chmod +x </code> (with the space), drag <code>NZOSA.command</code> into the window, and press Enter. Then double-click it as normal.</p>
+<p><strong>Mac says it is from an unidentified developer.</strong> Right-click <code>OsaBooks.command</code>, choose <strong>Open</strong>, then <strong>Open</strong> again in the box that appears. You only do this once.</p>
+<p><strong>Mac says it cannot be opened, or opens it in a text editor.</strong> The file lost its permission to run, which happens with some ways of downloading. Open Terminal, type <code>chmod +x </code> (with the space), drag <code>OsaBooks.command</code> into the window, and press Enter. Then double-click it as normal.</p>
 <p><strong>Nothing happens, or the window flashes and vanishes.</strong> Node.js is probably not installed, or was installed after you first tried. Restart the computer and try again.</p>
 <p><strong>It says OsaBooks is already running.</strong> It is — the launcher reopens your browser at it rather than starting a second copy.</p>
 <h3 id="where-your-books-end-up">Where your books end up</h3>
@@ -130,6 +130,7 @@ strong { font-weight: 650; }
 <p>At the top of Setup. Your company, trust, or your own name. It is the one thing no file can tell it: a chart of accounts arrives with sixty accounts and not one of them says whose they are.</p>
 <p>If one set of books holds several things — a company and two rental properties, say — add the others on <strong>Entities &amp; accounts</strong>. Most people need only the one.</p>
 <p>A rental property is an entity of its own. Give it its kind (residential or commercial), whether it is registered for GST, and its owners with their shares — "Ana Whitcombe 50%; Tom Whitcombe 50%" — then assign its income and expense accounts to it. An entity that is not registered for GST charges and claims none, so anything coded to its accounts stays off every GST return whatever the account's tax code says. Household spending can be an entity too, which keeps it out of every figure rather than mixed into one.</p>
+<p>When the owners or their shares change, you are asked whether the new shares apply from a date or correct every year. From a date, the years before keep the shares they had, and a year the change falls in counts each set of shares for its days. Changing only one name is offered as the same person renamed: their shares, own accounts, returns and tax details move to the new name.</p>
 <p>If your coded history uses its own categories — "Totara Rent", say — rename the category on <strong>Entities &amp; accounts</strong> to the account it really is, by its code or its name. The two are merged: every line coded to the category moves to the account, the account keeps its own GST treatment and entity, and the imported file's lines count as agreeing with it.</p>
 <h3 id="2-fetch-your-files-all-at-once">2. Fetch your files, all at once</h3>
 <p>Setup lists exactly what to export and where each one lives. If you use an accounting system already, they all come from the same place and the whole set takes a few minutes — so fetch them in one visit rather than one at a time.</p>
@@ -139,6 +140,7 @@ strong { font-weight: 650; }
 <h3 id="3-say-which-bank-accounts-are-yours">3. Say which bank accounts are yours</h3>
 <p>On <strong>Entities &amp; accounts</strong>. Your chart lists an account called something like "Business Cheque Account"; your ledger has one identified by its number. Tell it which is which.</p>
 <p>This matters more than it sounds. Money moving between two of your own accounts is a transfer, not income — but the software can only know that if it knows both ends belong to you. Get this wrong and paying your own credit card looks like a sale.</p>
+<p>Tick <strong>A loan</strong> beside an account that is money owed, such as a home loan or a TotalMoney account. The cash flow statement then leaves it out of cash, and shows money borrowed or repaid under financing. Accounts whose names say loan, mortgage, TotalMoney or line of credit start ticked.</p>
 <h3 id="4-opening-balances">4. Opening balances</h3>
 <p>On its own page. Load the trial balance from your previous year end (from Xero: Reporting → Trial Balance, dated the year end before the books start, with all columns selected and Compare with set to 4 years), or choose <strong>Enter opening balances</strong> and type them in: each account's balance on the day the books start, as a debit or a credit, with a balancing line to retained earnings or owner's equity. It saves only once debits equal credits. Skip this only if the books start at the very beginning of the business, when there is genuinely nothing to bring forward.</p>
 <h3 id="5-let-it-learn-your-coding">5. Let it learn your coding</h3>
@@ -163,7 +165,8 @@ strong { font-weight: 650; }
 <p>A line is either a transfer or coded to an account, never both. <strong>Accept all</strong> confirms the other suggestions on screen and leaves any line that could be a transfer unconfirmed, for you to look at on its own. A line that already has an account is never matched as a transfer for you; if it really is one, linking it asks before removing the coding. Any line left in both states from before this rule is listed at the top of <strong>Reconcile</strong>.</p>
 <p><strong>Customer payments.</strong> If you raise invoices, a receipt should settle the invoice, not count as a fresh sale. Coding it as a sale counts the same income twice and leaves the invoice looking unpaid for ever. Match it under <strong>Settles which invoice?</strong> on the line.</p>
 <ul><li>One payment for several invoices: pick each one, with <strong>and another invoice</strong> between them. The payment is divided, a part for each invoice.</li><li>A payment that is more than the invoice still owes: the button reads <strong>Match, splitting off</strong> the extra. The invoice is settled, and the extra becomes a part of its own for you to code — a rounding, a fee reimbursed, an overpayment.</li><li>A receipt coded straight to Accounts Receivable without being matched leaves its invoice owing. <strong>Reconcile</strong> lists any such line at the top.</li></ul>
-<p><strong>Entertainment.</strong> Most business entertainment is only half deductible in New Zealand. The <strong>Split 50/50</strong> button does the halving, the GST and the notes correctly. Use it rather than coding the whole amount.</p>
+<p><strong>Entertainment.</strong> Most business entertainment is only half deductible in New Zealand. In a split, the <strong>Entertainment: half deductible</strong> button does the halving, the GST and the notes correctly. Use it rather than coding the whole amount. It shows when the chart has both Entertainment and Entertainment - Non deductible.</p>
+<p><strong>Sharing a cost.</strong> <strong>Halve</strong> makes two equal parts for you to code, for example half each to two people. Each part takes its own account's GST, so a part coded to someone not registered for GST has none.</p>
 <hr>
 <h2 id="gst">GST</h2>
 <p><strong>GST reconciliation</strong> builds your returns from your coding, period by period, on the payments basis.</p>

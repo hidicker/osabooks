@@ -122,7 +122,7 @@ function download(backup: Backup): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = `nzosa-backup-${books}-${stamp}.json`;
+  link.download = `osabooks-backup-${books}-${stamp}.json`;
   link.click();
   URL.revokeObjectURL(url);
 }

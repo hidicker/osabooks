@@ -221,17 +221,17 @@ attached to a book that no longer exists.
 
 ### The launchers
 
-`NZOSA.cmd` and `NZOSA.command` at the repo root exist so a non-technical user
+`OsaBooks.cmd` and `OsaBooks.command` at the repo root exist so a non-technical user
 never types a command. They install on first run, always build, start the
 server **detached with no window**, wait for it to answer, and exit — so the
 console window closes and the app stays up.
 
-`Stop NZOSA.cmd` / `Stop NZOSA.command` stop it, finding the process by the
+`Stop OsaBooks.cmd` / `Stop OsaBooks.command` stop it, finding the process by the
 port it listens on rather than by a saved process id: a stale id after a crash
 points at nothing, or at whatever has since been given that number.
 
 Detaching costs the two things a visible window gave for free, so both are
-replaced. Errors go to `nzosa-log.txt` beside the app, because a hidden process
+replaced. Errors go to `osabooks-log.txt` beside the app, because a hidden process
 has nowhere to print; and the launcher waits for the port before exiting, so a
 failure keeps its window open with the log in it rather than vanishing. The
 launcher also checks whether the app is already running *before* installing or
@@ -240,10 +240,10 @@ could not even write its log, because the first still held the file open.
 
 Two things about them are load-bearing:
 
-- **`NZOSA.cmd` must be CRLF**, and must not be renamed to anything
-  starting with the word `Start`. `cmd /c "Start NZOSA.cmd"` parses
+- **`OsaBooks.cmd` must be CRLF**, and must not be renamed to anything
+  starting with the word `Start`. `cmd /c "Start OsaBooks.cmd"` parses
   `Start` as the START builtin and detaches the process, and LF-only line
-  endings break `goto` and parenthesised blocks. `NZOSA.command` must
+  endings break `goto` and parenthesised blocks. `OsaBooks.command` must
   stay LF: `/bin/sh` chokes on CR.
 - **A busy port never falls back to the next one.** Browser storage is per
   origin, so a different port is a different database; moving silently would
