@@ -34,6 +34,13 @@ export interface Jurisdiction {
   salesTax: { name: string; rate: number; fraction: { num: number; den: number } } | null;
   /** Who collects tax, shortest and in full, and their online service. */
   taxAuthority: { short: string; name: string; portal: string };
+  /**
+   * Whether business entertainment is half deductible with half its sales tax
+   * claimed, as in New Zealand. Elsewhere it is treated differently (in
+   * Australia and the UK usually neither deductible nor claimable), so the
+   * split that halves it is offered only where this is true.
+   */
+  entertainmentHalf?: boolean;
 }
 
 export const JURISDICTIONS: Readonly<Record<JurisdictionId, Jurisdiction>> = {
@@ -46,6 +53,7 @@ export const JURISDICTIONS: Readonly<Record<JurisdictionId, Jurisdiction>> = {
     dayFirst: true,
     salesTax: { name: "GST", rate: 0.15, fraction: { num: 3, den: 23 } },
     taxAuthority: { short: "IRD", name: "Inland Revenue", portal: "myIR" },
+    entertainmentHalf: true,
   },
   // Drafts for the country packs to come. Nothing can choose them yet.
   au: {

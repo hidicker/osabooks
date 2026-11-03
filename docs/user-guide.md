@@ -182,7 +182,9 @@ A line is either a transfer or coded to an account, never both. **Accept all** c
 - A payment that is more than the invoice still owes: the button reads **Match, splitting off** the extra. The invoice is settled, and the extra becomes a part of its own for you to code — a rounding, a fee reimbursed, an overpayment.
 - A receipt coded straight to Accounts Receivable without being matched leaves its invoice owing. **Reconcile** lists any such line at the top.
 
-**Entertainment.** Most business entertainment is only half deductible in New Zealand. The **Split 50/50** button does the halving, the GST and the notes correctly. Use it rather than coding the whole amount.
+**Entertainment.** Most business entertainment is only half deductible in New Zealand. In a split, the **Entertainment: half deductible** button does the halving, the GST and the notes correctly. Use it rather than coding the whole amount. It shows when the chart has both Entertainment and Entertainment - Non deductible.
+
+**Sharing a cost.** **Halve** makes two equal parts for you to code, for example half each to two people. Each part takes its own account's GST, so a part coded to someone not registered for GST has none.
 
 ---
 
