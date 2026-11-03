@@ -4,7 +4,7 @@ import { taxYearStart } from "../tax-year.js";
 import { booksCurrency, booksLocale } from "../country.js";
 import { $, state } from "../state.js";
 import { save, savePart } from "../store.js";
-import { askOnPage, note, tellOnPage } from "../ui.js";
+import { askOnPage, escapeHtml, note, tellOnPage } from "../ui.js";
 import { foreignInUse, missingRates, localToday } from "@nzosa/core";
 import type { Account } from "@nzosa/core";
 import { exchangeAccounts, fxRates } from "../fx-books.js";
@@ -141,7 +141,7 @@ function currencySection(body: HTMLElement, currency: string, use: { from: strin
     summary.textContent = `The ${list.length} ${currency} rates`;
     const table = document.createElement("table");
     table.className = "report-table owner-table";
-    table.innerHTML = `<thead><tr><th>Date</th><th>${books} for 1 ${currency}</th><th></th></tr></thead>`;
+    table.innerHTML = `<thead><tr><th>Date</th><th>${escapeHtml(books)} for 1 ${escapeHtml(currency)}</th><th></th></tr></thead>`;
     const tbody = document.createElement("tbody");
     for (const r of list.slice(0, 400)) {
       const tr = document.createElement("tr");
