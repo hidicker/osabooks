@@ -89,11 +89,6 @@ works).
   meals for income tax only, with no sales tax; a "Meals: half deductible"
   split for US books would need a non-deductible meals account in the chart.
   Canada, if added, has New Zealand's rule.
-- **History after a restore shows the replaced books' first steps.** Restoring
-  a backup into new books leaves "Started with one entity, XYZ Ltd" and "the
-  standard chart" from the empty books in History, and none of the backup's
-  own (History is not in backups, by design). Clearing History on restore, or
-  one entry "Restored from <file>", would say what happened.
 - **Notes double as a record of how a line was coded.** Reconcile writes
   "Suggestion accepted unchanged" and "Changed by hand, no description given"
   into the note, where the person's own words go, and Coding reconciliation
