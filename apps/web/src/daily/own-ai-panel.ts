@@ -1,4 +1,4 @@
-import { backendKind, folderPaths, openCloudBookId } from "../store.js";
+import { backendKind, folderPaths, ledgerName, openCloudBookId } from "../store.js";
 import { connectorUrl } from "../cloud.js";
 import { note } from "../ui.js";
 
@@ -116,6 +116,9 @@ function forOnline(inner: HTMLElement, book: string): void {
   const said = document.createElement("p");
   said.className = "own-ai-said";
   const address = connectorUrl(book);
+  // Named after the books: with a connector for each set, the name is how the
+  // AI, and the person, tell them apart.
+  const name = ledgerName().trim() === "" ? "OsaBooks" : `OsaBooks: ${ledgerName().trim()}`;
   const shown = document.createElement("p");
   shown.append(code(address), " ", copyButton("Copy", () => address, said));
   inner.append(
@@ -125,9 +128,9 @@ function forOnline(inner: HTMLElement, book: string): void {
     heading("Claude (on the web, the desktop app or a phone)"),
     steps([
       ["Open Settings, Connectors, and choose Add custom connector."],
-      ["Name it OsaBooks, paste the address above, and add it."],
+      [`Name it “${name}”, paste the address above, and add it.`],
       ["Choose Connect. Sign in to OsaBooks when asked, and allow it."],
-      ["In a chat, turn the OsaBooks connector on and ask: “Suggest codes for this month's uncoded lines.”"],
+      [`In a chat, turn “${name}” on and ask: “Suggest codes for this month's uncoded lines.”`],
     ]),
     heading("ChatGPT and other apps"),
     note(
@@ -136,7 +139,9 @@ function forOnline(inner: HTMLElement, book: string): void {
     ),
     note(
       "Each set of books has its own address, and only people who are members of these books can connect to them. " +
-        "Somebody who may only read them gets an app that only reads.",
+        "Somebody who may only read them gets an app that only reads. With several sets, add one connector for each, " +
+        "named after its books, and turn on only the ones a chat needs: every answer says which books it came from, " +
+        "and a suggestion meant for other books is refused.",
     ),
     whereItLands(),
   );

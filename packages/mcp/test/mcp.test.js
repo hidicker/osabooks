@@ -306,7 +306,7 @@ test("a folder holding several sets of books still starts, and says why it canno
   child.stdin.end();
   await new Promise((done) => child.on("close", done));
   const [hello, answer] = out.trim().split("\n").map((line) => JSON.parse(line));
-  assert.equal(hello.result.serverInfo.name, "nzosa-mcp");
+  assert.equal(hello.result.serverInfo.name, "osabooks");
   assert.equal(answer.result.isError, true);
   assert.match(answer.result.content[0].text, /holds 2 sets of books.*Change the books folder/);
 });
