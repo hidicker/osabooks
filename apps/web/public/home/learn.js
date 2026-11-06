@@ -303,6 +303,14 @@
 
     scale1.state.targetAngle = Math.max(-0.23, Math.min(0.23, ((totalCr - totalDr) / Math.max(totalDr, 1)) * 0.25));
 
+    // The summary line, from the lines as they are now.
+    const lines = s1Txs.length;
+    const done = rec.length;
+    const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+    document.getElementById('s1SummaryText').innerHTML =
+      `▼ <strong>Today:</strong> ${plural(done, 'decision')} today, ${plural(lines, 'bank line')}, posting ${plural(done, 'journal')}: ` +
+      `<strong>${totalDr.toFixed(2)}</strong> of debits and <strong>${totalCr.toFixed(2)}</strong> of credits.`;
+
     const tbody = document.getElementById('s1TableBody');
     tbody.innerHTML = '';
     s1Txs.forEach(tx => {
@@ -316,7 +324,7 @@
           <td><strong>${parts.slice(0, 2).join(' ')}</strong><br><span style="color:var(--text-muted)">${parts.slice(2).join(' ')}</span></td>
           <td class="num" style="font-weight:600">${tx.amount.toFixed(2)}</td>
           <td class="center"><button class="${btnClass}" data-learn="s1ReconcileOne" data-arg="${tx.id}" title="Click ✓ to Reconcile">✓</button></td>
-          <td>${tx.bankAcct} ${tx.bankAcct.slice(0, 15)}-<br>${tx.bankAcct.slice(16)}</td>
+          <td>${tx.bankAcct.slice(0, 15)}-<br>${tx.bankAcct.slice(16)}</td>
           <td class="num" style="font-weight:600; color:var(--bank-blue)">${tx.amount.toFixed(2)}</td>
           <td class="num"></td>
         </tr>

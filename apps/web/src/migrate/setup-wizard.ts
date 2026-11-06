@@ -2090,8 +2090,10 @@ export async function seedBrowser(): Promise<void> {
       ? "These are demo books — an invented coffee roastery and two rentals owned by " +
         "a couple, part way through a year."
       : about) +
-    " Nothing here is real, and you can change anything. Other demo books are under Demo books at the top. To keep " +
-    "books of your own, run OsaBooks on your own computer: see the guide for owners.";
+    " Nothing here is real, and you can change anything." +
+    // The Demo books bar is only on the demo site.
+    (isDemoBuild() ? " Other demo books are under Demo books at the top." : "") +
+    " To keep books of your own, run OsaBooks on your own computer: see the guide for owners.";
 }
 
 /** Choosing which system the books are coming from. */

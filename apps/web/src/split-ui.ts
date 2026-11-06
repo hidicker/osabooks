@@ -1,7 +1,9 @@
 import { combobox } from "./combobox.js";
 import { accountRate, accountZeroOrExempt, unregisteredCode } from "./books.js";
 import { booksCountry, gstPercent, booksCurrency } from "./country.js";
-import { formatAmount, parseAmount } from "@nzosa/core";
+import { formatAmount, parseAmount, uncodedParts } from "@nzosa/core";
+import { askOnPage } from "./ui.js";
+import { state } from "./state.js";
 import type { SplitPart, Transaction } from "@nzosa/core";
 import {
   gstRateOptions,
@@ -153,34 +155,47 @@ export function splitEditor(options: SplitEditorOptions): HTMLElement {
   });
   restButton.hidden = true;
 
-  const saveButton = button("Save split", () => {
+  const saveButton = button("Save split", async () => {
     // The account pickers commit without firing an event, so their values are
     // read back before the drafts are turned into parts.
     readRows();
     const unregistered = unregisteredCode();
-    options.onSave(
-      drafts.map((draft) => {
-        const amount = parseAmount(draft.amount, booksCurrency()) ?? 0;
-        // Nobody in an entity that is not registered can charge or claim GST,
-        // whatever rate the part was left at.
-        if (draft.code !== "" && unregistered(draft.code)) draft.rate = "0";
-        // Outside New Zealand a 0% part on a GST-free or input taxed account
-        // is that, as on Reconcile, not "no GST": the BAS counts both.
-        const own =
-          draft.rate === "0" && booksCountry().id !== "nz" && booksCountry().id !== "au" ? accountZeroOrExempt(draft.code) : null;
-        const { treatment, side } =
-          own === null
-            ? rateToClassification(draft.rate as GstRate, amount)
-            : { treatment: own, side: amount > 0 ? ("sales" as const) : ("purchases" as const) };
-        return {
-          amount,
-          ...(draft.code !== "" ? { code: draft.code } : {}),
-          treatment,
-          side,
-          note: draft.note,
-        };
-      }),
-    );
+    const parts = drafts.map((draft) => {
+      const amount = parseAmount(draft.amount, booksCurrency()) ?? 0;
+      // Nobody in an entity that is not registered can charge or claim GST,
+      // whatever rate the part was left at.
+      if (draft.code !== "" && unregistered(draft.code)) draft.rate = "0";
+      // Outside New Zealand a 0% part on a GST-free or input taxed account
+      // is that, as on Reconcile, not "no GST": the BAS counts both.
+      const own =
+        draft.rate === "0" && booksCountry().id !== "nz" && booksCountry().id !== "au" ? accountZeroOrExempt(draft.code) : null;
+      const { treatment, side } =
+        own === null
+          ? rateToClassification(draft.rate as GstRate, amount)
+          : { treatment: own, side: amount > 0 ? ("sales" as const) : ("purchases" as const) };
+      return {
+        amount,
+        ...(draft.code !== "" ? { code: draft.code } : {}),
+        treatment,
+        side,
+        note: draft.note,
+      };
+    });
+    // A part with no account (and no invoice) stops the line being confirmed
+    // later; better said now, while the split is open.
+    const missing = uncodedParts(transaction.id, parts, state.ledger.invoiceMatches ?? {}).length;
+    if (
+      missing > 0 &&
+      !(await askOnPage(
+        `${missing === 1 ? "One part has" : `${missing} parts have`} no account yet. The line can't be confirmed ` +
+          "until each part has an account or an invoice. Save the split anyway?",
+        "Save anyway",
+        "Go back",
+      ))
+    ) {
+      return;
+    }
+    options.onSave(parts);
   });
   saveButton.className = "primary";
 
