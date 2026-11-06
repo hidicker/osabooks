@@ -702,6 +702,8 @@ export function renderEntities(): void {
     owners.addEventListener("input", () => sayOwners(owners.value));
     owners.addEventListener("change", () => void changeOwners(entity.id, parseOwners(owners.value)));
     ownersWrap.append(owners, said);
+    // A charity, society or club has no owners to carry its income to.
+    ownersWrap.hidden = entity.kind === "nonprofit";
 
     // A company's shareholders, for the IR4's split of the current account.
     // Kept apart from owners, whose shares carry profit to their own returns.
@@ -798,16 +800,17 @@ export function renderEntities(): void {
       structure.append(option);
     }
     structure.hidden = (entity.kind ?? "business") !== "business";
-    structure.addEventListener("change", () => {
+    structure.addEventListener("change", async () => {
+      const chosen = structure.value;
+      const partners = chosen === "partnership" ? await shareholdersAsOwners(entity, "partners") : undefined;
       const live = state.ledger.entities ?? emptyEntityModel();
       void saveEntities({
         ...live,
         entities: live.entities.map((e) => {
           if (e.id !== entity.id) return e;
           const { structure: _was, ...rest } = e;
-          return structure.value === ""
-            ? rest
-            : { ...rest, structure: structure.value as BusinessStructure };
+          const next = chosen === "" ? rest : { ...rest, structure: chosen as BusinessStructure };
+          return partners === undefined ? next : { ...next, owners: partners };
         }),
       });
     });
@@ -821,7 +824,9 @@ export function renderEntities(): void {
     ltcWrap.title = "A look-through company files an IR7 and its owners include its income in their own returns.";
     ltcWrap.append(ltcBox, document.createTextNode(" Look-through company (LTC)"));
     ltcWrap.hidden = (entity.kind ?? "business") !== "business" || entity.structure !== "company";
-    ltcBox.addEventListener("change", () => {
+    ltcBox.addEventListener("change", async () => {
+      const ticked = ltcBox.checked;
+      const owners = ticked ? await shareholdersAsOwners(entity, "owners") : undefined;
       const live = state.ledger.entities ?? emptyEntityModel();
       void saveEntities(
         {
@@ -829,7 +834,8 @@ export function renderEntities(): void {
           entities: live.entities.map((e) => {
             if (e.id !== entity.id) return e;
             const { lookThrough: _was, ...rest } = e;
-            return ltcBox.checked ? { ...rest, lookThrough: true } : rest;
+            const next = ticked ? { ...rest, lookThrough: true } : rest;
+            return owners === undefined ? next : { ...next, owners };
           }),
         },
         `${entity.name} ${ltcBox.checked ? "is" : "is not"} a look-through company`,
@@ -2833,4 +2839,23 @@ async function renameOwner(from: string, to: string): Promise<void> {
     if (name !== null) await renameChartAccount(row.account, row.label, { code: row.account.code, name });
   }
   redraw("entities");
+}
+
+/**
+ * A company's shareholders, offered as its partners or owners when it becomes
+ * a partnership or a look-through company with none of those yet. They are
+ * kept apart -- shareholders split a company's current account, owners carry
+ * its income to their own returns -- so a company made a partnership kept
+ * "Ana 50%, Tom 50%" as shareholders and its IR7 said no partners were set up.
+ */
+async function shareholdersAsOwners(entity: Entity, word: "partners" | "owners"): Promise<Owner[] | undefined> {
+  const now = (state.ledger.entities ?? emptyEntityModel()).entities.find((e) => e.id === entity.id) ?? entity;
+  const holders = now.shareholders ?? [];
+  if ((now.owners ?? []).length > 0 || holders.length === 0) return undefined;
+  const yes = await askOnPage(
+    `Use its shareholders as its ${word}: ${formatOwners(holders)}? The IR7 shares out its income by them.`,
+    `Yes, as ${word}`,
+    "Not now",
+  );
+  return yes ? holders.map((o) => ({ ...o })) : undefined;
 }

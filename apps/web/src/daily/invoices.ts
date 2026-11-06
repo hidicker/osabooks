@@ -617,7 +617,7 @@ export function renderInvoiceEditor(): void {
 
   const paid = text((draft.paid / 100).toFixed(2));
   paid.classList.add("invoice-paid");
-  const paidField = field("Already paid", paid, "Leave at 0.00 for a new invoice.");
+  const paidField = field("Already paid", paid, `Leave at 0.00 for a new ${asBill ? "bill" : "invoice"}.`);
   // A bill's payments are bank lines matched on Reconcile, or a payment
   // recorded on the Bills page with its date and account. A bare figure here
   // would have neither.

@@ -32,6 +32,21 @@ test("nothing in, nothing out", () => {
   assert.deepEqual(postLedger(base()), []);
 });
 
+test("books with no bank lines still post their invoices and pay runs", () => {
+  // A pay run saved on books started from scratch, before any bank file,
+  // reached no report: the ledger posted nothing without a bank line.
+  const payRun = {
+    transactionId: "payrun:1", date: "2026-06-15", narration: "Pay run", source: "payroll",
+    lines: [
+      { accountCode: "477", accountName: "Wages", amount: 300000, taxType: "NONE" },
+      { accountCode: "804", accountName: "Wages payable", amount: -300000, taxType: "NONE" },
+    ],
+  };
+  const journals = postLedger(base({ invoices: [{ ...INVOICE, paid: 0, outstanding: 115000, status: "Awaiting Payment" }], assetJournals: [payRun] }));
+  assert.ok(journals.some((j) => j.transactionId === "payrun:1"), "the pay run");
+  assert.ok(journals.some((j) => j.lines.some((l) => l.accountCode === "610")), "the invoice's receivable");
+});
+
 test("every journal balances, and so does the ledger", () => {
   const t = txn({ id: "a", amount: 115000 });
   const journals = postLedger(base({ transactions: [t], byId: new Map([["a", t]]) }));

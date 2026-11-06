@@ -327,7 +327,9 @@ export function renderIr9Page(): void {
   }
   if (sheet.tax !== null) {
     const tax = document.createElement("tr");
-    tax.append(nameCell("20"), nameCell("Tax on taxable income, at 28%"), amountCell(money(sheet.tax)));
+    // An unincorporated body is taxed at individual rates, not 28%.
+    const rate = inputs.incorporated === true ? "at 28%" : "at individual rates";
+    tax.append(nameCell("20"), nameCell(`Tax on taxable income, ${rate}`), amountCell(money(sheet.tax)));
     tbody.append(tax);
     if (sheet.credits > 0) {
       const credits = document.createElement("tr");

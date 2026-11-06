@@ -88,7 +88,7 @@ test("round-trips every amount in the sample range", () => {
   }
 });
 
-test("a currency written to three places keeps its third decimal", () => {
+test("a currency written to three places reads its third decimal as one, and is held to two", () => {
   // Dinars and rials have three minor units. Reading the third decimal as the
   // start of a thousands group multiplied every one of them by a thousand.
   // Held in hundredths, as every amount is: 12.345 is 12.35.

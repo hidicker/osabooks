@@ -63,6 +63,15 @@ export function disposalJournals(options: DisposalJournalsOptions): PostedJourna
 
       const assetAccount = bestAccountMatch(fixed, row.asset.type);
       const contra = bestAccountMatch(accumulated, row.asset.type);
+      // What the sale made or lost goes to the asset's own entity's accounts:
+      // in books with several, its codes carry the entity's ending (710KC,
+      // 300KC). A plain 300 or 470 there is an account of no type, which put a
+      // loss among the current assets and left it out of the IR10.
+      const own = (pattern: RegExp, not?: RegExp): Account | undefined =>
+        accountLike(chart, pattern, not, assetAccount?.code);
+      const recovered = own(/depreciation recovered/i);
+      const gain = own(/capital gain/i);
+      const loss = own(/loss on (the )?(sale|disposal)/i, /capital gain/i);
 
       const disposal = disposalOf({
         cost: row.asset.cost,
@@ -83,6 +92,9 @@ export function disposalJournals(options: DisposalJournalsOptions): PostedJourna
             ...(assetAccount?.name ? { assetName: assetAccount.name } : {}),
             accumulatedCode: contra?.code ?? options.fallbackAccumulatedCode ?? "731",
             ...(contra?.name ? { accumulatedName: contra.name } : {}),
+            ...(recovered !== undefined ? { recoveredCode: recovered.code, recoveredName: recovered.name } : {}),
+            ...(gain !== undefined ? { capitalGainCode: gain.code, capitalGainName: gain.name } : {}),
+            ...(loss !== undefined ? { lossCode: loss.code, lossName: loss.name } : {}),
           },
           options.posting ?? {},
         ),
@@ -90,6 +102,26 @@ export function disposalJournals(options: DisposalJournalsOptions): PostedJourna
     }
   }
   return out;
+}
+
+/** The letters after a code's number: "KC" in 710KC, "" in 710. */
+function codeEnding(code: string): string {
+  return code.trim().replace(/^[0-9]+/, "");
+}
+
+/**
+ * The account a name points to, preferring one with the same ending as the
+ * asset's own account, so each entity's sale goes to its own. With no such
+ * account, the only one there is; with several and none of them its own,
+ * nothing, and the usual code is used.
+ */
+function accountLike(chart: readonly Account[], pattern: RegExp, not: RegExp | undefined, assetCode: string | undefined): Account | undefined {
+  const found = chart.filter((a) => pattern.test(a.name) && (not === undefined || !not.test(a.name)));
+  if (assetCode !== undefined) {
+    const same = found.find((a) => codeEnding(a.code) === codeEnding(assetCode));
+    if (same !== undefined) return same;
+  }
+  return found.length === 1 ? found[0] : undefined;
 }
 
 /**

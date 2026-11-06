@@ -1,5 +1,5 @@
 import { redraw } from "../app.js";
-import { postedJournals, record } from "../books.js";
+import { bookYears, postedJournals, record } from "../books.js";
 import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { amountCell, askOnPage, nameCell, note } from "../ui.js";
@@ -15,12 +15,15 @@ import { booksCurrency, reportMoney } from "../country.js";
  * Rental information: each tenancy's rent, its changes and its bond, and
  * whether the tenants are behind or ahead.
  *
- * Beside the books rather than in them. Nothing here posts: what was due is
- * worked out from the tenancy, what was paid is read from the rent account,
- * and the two are set against each other.
+ * Beside the books rather than in them: what was due is worked out from the
+ * tenancy, what was paid is read from the rent account, and the two are set
+ * against each other. The one thing here that posts is a trip to a property in
+ * your own vehicle, claimed as travel at the year end, as on Rental year end.
  */
 
 let editing: Tenancy | null = null;
+/** The year trips are shown and added for; chosen, or the latest with anything in it. */
+let tripsYear: number | null = null;
 
 function money(cents: Cents): string {
   return reportMoney(cents);
@@ -332,11 +335,23 @@ function toldBehind(t: Tenancy, asAt: IsoDate): HTMLElement {
 
 const PERIOD_WORD: Record<RentFrequency, string> = { weekly: "week", fortnightly: "fortnight", monthly: "month" };
 
+/** The day rent is counted to: today, or the latest bank line or property manager statement if earlier. */
+function rentCountedTo(today: IsoDate): IsoDate {
+  let latest = "";
+  for (const t of state.ledger.transactions) if (t.date > latest) latest = t.date;
+  for (const a of state.ledger.agentStatements ?? []) if (a.to > latest) latest = a.to;
+  return latest !== "" && latest < today ? (latest as IsoDate) : today;
+}
+
 function card(t: Tenancy, entities: Entity[], asAt: IsoDate): HTMLElement {
   const box = document.createElement("div");
   box.className = "journal-card";
   const entity = entities.find((e) => e.id === t.entityId);
-  const position = rentPosition(t, postedJournals(), asAt);
+  // Rent received is only known to the latest bank line or statement, so
+  // what was due is counted to then: counted to today, books whose bank lines
+  // end in March showed a paid-up tenant months behind.
+  const counted = rentCountedTo(asAt);
+  const position = rentPosition(t, postedJournals(), counted);
 
   const title = document.createElement("p");
   title.className = "journal-narration";
@@ -359,6 +374,7 @@ function card(t: Tenancy, entities: Entity[], asAt: IsoDate): HTMLElement {
         : "Up to date.";
   if (position.paidTo !== null) verdict.textContent += ` Paid to ${position.paidTo}.`;
   box.append(verdict);
+  if (counted < asAt) box.append(note(`As at ${counted}, the latest bank line or statement in the books.`));
   for (const said of position.notes) box.append(note(said));
   box.append(note(`Bond: ${bondStatus(t.bond, entity?.kind === "residential", asAt)}${t.bond ? ` $${money(t.bond.amount)}.` : ""}`));
   // Behind: whether the tenant has been told, and when.
@@ -434,7 +450,15 @@ export function renderRentalsPage(): void {
     return;
   }
   const asAt = localToday();
-  const year = taxYearOf(asAt);
+  // Trips belong to a year. This one, unless nothing is in it yet: then the
+  // latest year the books reach, not an empty one that has barely started.
+  const thisYear = taxYearOf(asAt);
+  const reached = bookYears().filter((y) => y <= thisYear);
+  const tripYears = [...new Set([thisYear, ...reached])].sort((a, b) => b - a);
+  if (tripsYear === null || !tripYears.includes(tripsYear)) {
+    tripsYear = reached.includes(thisYear) || reached.length === 0 ? thisYear : Math.max(...reached);
+  }
+  const year = tripsYear;
   const tenancies = state.ledger.tenancies ?? [];
   const shown = entities.filter((e) => state.entityFilter === "" || e.id === state.entityFilter);
   // Open to start with: every property with a current tenancy, or the only one.
@@ -465,7 +489,7 @@ export function renderRentalsPage(): void {
     const meta = document.createElement("span");
     meta.className = "rental-year-meta";
     const behind = current
-      .map((t) => rentPosition(t, postedJournals(), asAt).balance)
+      .map((t) => rentPosition(t, postedJournals(), rentCountedTo(asAt)).balance)
       .filter((b) => b > 0)
       .reduce((sum, b) => sum + b, 0);
     meta.textContent =
@@ -501,8 +525,24 @@ export function renderRentalsPage(): void {
 
     section.append(propertyCarePanel(entity.id, renderRentalsPage));
     const trips = document.createElement("h4");
-    trips.textContent = `Trips to the property in your own vehicle, year to ${taxYearEndSaid(year)}`;
-    section.append(vehiclesBox(year, renderRentalsPage), trips, tripsPanel(year, renderRentalsPage, entity.id));
+    trips.textContent = "Trips to the property in your own vehicle";
+    const pickYear = document.createElement("select");
+    pickYear.setAttribute("aria-label", "Year for trips");
+    for (const y of tripYears) {
+      const option = document.createElement("option");
+      option.value = String(y);
+      option.textContent = `Year to ${taxYearEndSaid(y)}`;
+      option.selected = y === year;
+      pickYear.append(option);
+    }
+    pickYear.addEventListener("change", () => {
+      tripsYear = Number(pickYear.value);
+      renderRentalsPage();
+    });
+    const yearRow = document.createElement("div");
+    yearRow.className = "page-actions";
+    yearRow.append(pickYear);
+    section.append(trips, yearRow, vehiclesBox(year, renderRentalsPage), tripsPanel(year, renderRentalsPage, entity.id));
     body.append(section);
   }
   // A tenancy for a property not shown -- the filter moved since -- is still drawn.

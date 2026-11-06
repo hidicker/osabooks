@@ -13,8 +13,12 @@ import { booksMoney } from "../country.js";
  * the PDF and save. Nothing is saved from here.
  */
 
-let pasted = "";
-let reading: ReturnType<typeof readAgentStatements> | null = null;
+/**
+ * What was pasted and read, for each panel: Rental year end draws one per
+ * property, and one shared answer showed on every property at once, with an
+ * error on each it was not for.
+ */
+const held = new Map<string, { pasted: string; reading: ReturnType<typeof readAgentStatements> | null }>();
 
 function dollars(cents: number): string {
   return booksMoney(cents);
@@ -25,9 +29,12 @@ export function agentReaderPanel(
   open: (read: ReadAgentStatement, entity: Entity | null) => void,
   redraw: () => void,
 ): HTMLElement {
+  const key = rentals.map((e) => e.id).join(",");
+  const mine = held.get(key) ?? { pasted: "", reading: null };
+  held.set(key, mine);
   const box = document.createElement("details");
   box.className = "agent-reader";
-  box.open = reading !== null;
+  box.open = mine.reading !== null;
   const summary = document.createElement("summary");
   summary.textContent = "Read a statement with AI";
   box.append(
@@ -43,15 +50,15 @@ export function agentReaderPanel(
   const area = document.createElement("textarea");
   area.rows = 5;
   area.placeholder = "Paste the AI's answer here";
-  area.value = pasted;
+  area.value = mine.pasted;
   area.addEventListener("input", () => {
-    pasted = area.value;
+    mine.pasted = area.value;
   });
   const read = document.createElement("button");
   read.type = "button";
   read.textContent = "Read the answer";
   read.addEventListener("click", () => {
-    reading = readAgentStatements(pasted);
+    mine.reading = readAgentStatements(mine.pasted);
     redraw();
   });
   box.append(
@@ -61,13 +68,14 @@ export function agentReaderPanel(
       prompt: agentStatementPrompt,
       contains: "your name and address",
       onAnswer: (text) => {
-        pasted = text;
-        reading = readAgentStatements(pasted);
+        mine.pasted = text;
+        mine.reading = readAgentStatements(mine.pasted);
         redraw();
       },
     }),
   );
 
+  const reading = mine.reading;
   if (reading === null) return box;
   if (reading.problems.length > 0) {
     const list = document.createElement("ul");
@@ -100,11 +108,9 @@ export function agentReaderPanel(
     use.textContent = entity === null ? "Open in the editor" : `Open in the editor for ${entity.name}`;
     use.addEventListener("click", () => {
       open(statement, entity);
-      reading = { ...reading!, statements: reading!.statements.filter((s) => s !== statement) };
-      if (reading.statements.length === 0) {
-        reading = null;
-        pasted = "";
-      }
+      const left = reading.statements.filter((s) => s !== statement);
+      mine.reading = left.length === 0 ? null : { ...reading, statements: left };
+      if (left.length === 0) mine.pasted = "";
     });
     card.append(use);
     box.append(card);

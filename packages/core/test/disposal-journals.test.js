@@ -57,6 +57,30 @@ test("the asset and its contra are both the roasting ones, not the office ones",
   assert.ok(!codes.includes("711"), "not the office contra");
 });
 
+test("in books with several entities, the sale goes to the asset's own entity's accounts", () => {
+  // Codes there carry the entity's ending. A plain 470 or 300 is an account of
+  // no type: the loss landed among current assets and missed IR10 box 59.
+  const chart = [
+    account("730KC", "Roasting Equipment", "Fixed Asset"),
+    account("731KC", "Less Accumulated Depreciation on Roasting Equipment", "Fixed Asset"),
+    account("300RL", "Depreciation Recovered", "Other Income"),
+    account("300KC", "Depreciation Recovered", "Other Income"),
+    account("301KC", "Capital Gain (Loss) on Disposal of Assets", "Other Income"),
+    account("470RL", "Loss on sale of Fixed Assets", "Expense"),
+    account("470KC", "Loss on sale of Fixed Assets", "Expense"),
+  ];
+  const [lost] = run({ chart, proceeds: { "FA-0036": 100000 } });
+  const lostCodes = lost.lines.map((l) => l.accountCode);
+  assert.ok(lostCodes.includes("470KC"), `the loss to 470KC: ${lostCodes.join(", ")}`);
+  assert.ok(!lostCodes.includes("470") && !lostCodes.includes("470RL"));
+  assert.ok(!lostCodes.includes("301KC"), "a capital gain account is not a loss account");
+
+  const [gained] = run({ chart, proceeds: { "FA-0036": 1200000 } });
+  const gainedCodes = gained.lines.map((l) => l.accountCode);
+  assert.ok(gainedCodes.includes("300KC") && gainedCodes.includes("301KC"), gainedCodes.join(", "));
+  assert.equal(gained.lines.reduce((s, l) => s + l.amount, 0), 0);
+});
+
 test("it is dated when the asset actually left", () => {
   const [journal] = run();
   assert.equal(journal.date, "2025-09-01");

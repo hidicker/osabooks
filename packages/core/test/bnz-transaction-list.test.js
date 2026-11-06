@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { detect, importFile, dedupe, dedupeKey } from "../dist/index.js";
+import { detect, importFile, dedupe, dedupeKey, formatAmount } from "../dist/index.js";
 
 const text = readFileSync(
   fileURLToPath(new URL("../../../samples/bnz-transaction-list.csv", import.meta.url)),
@@ -78,6 +78,16 @@ test("reads the original currency out of a card row's Code column", () => {
 
   assert.equal(openai.amount, -3769, "the billed amount stays in the account currency");
   assert.deepEqual(openai.foreign, { currency: "USD", amount: -2300 });
+});
+
+test("a won amount in the Code column is whole won, held in hundredths like any other", () => {
+  // "KRW37225" is ₩37,225. Read as hundredths it was ₩372.25, shown as ₩372,
+  // while the same purchase from Wise showed ₩37,225.
+  const won = text.replace('"USD2300"', '"KRW37225"');
+  const result = importFile(won, { file: "tl.csv" });
+  const openai = result.transactions.find((t) => t.otherParty.startsWith("OPENAI"));
+  assert.deepEqual(openai.foreign, { currency: "KRW", amount: -3722500 });
+  assert.equal(formatAmount(openai.foreign.amount, "KRW"), "-37225");
 });
 
 test("skips the Total footer without inventing a transaction", () => {
