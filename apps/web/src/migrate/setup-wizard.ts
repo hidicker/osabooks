@@ -1658,11 +1658,14 @@ function startAgainInCountry(current: string): HTMLElement {
   wrap.className = "start-again-country";
   const select = document.createElement("select");
   select.setAttribute("aria-label", "Country to start these books again in");
+  // The country they are in now as well, to start empty in the same one:
+  // books that opened with demo books, or a trial run, otherwise had no way
+  // back to empty books in their own country from here.
   for (const [id, label] of countryChoices(current)) {
-    if (id === current) continue;
     const option = document.createElement("option");
     option.value = id;
-    option.textContent = label;
+    option.textContent = id === current ? `${label} (empty again)` : label;
+    option.selected = id === current;
     select.append(option);
   }
   const go = document.createElement("button");
@@ -1672,7 +1675,7 @@ function startAgainInCountry(current: string): HTMLElement {
   const row = document.createElement("div");
   row.className = "page-actions";
   row.append(select, go);
-  wrap.append(note("Chose the wrong country? Start these books again in the right one:"), row);
+  wrap.append(note("Start these books again, empty, in this country or another:"), row);
   return wrap;
 }
 
