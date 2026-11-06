@@ -1209,6 +1209,27 @@ export function controlAccountFor(
   return found === undefined ? undefined : { code: found.code, name: found.name };
 }
 
+/**
+ * The one entity a document's lines are coded to, in books with several:
+ * undefined when there is only one entity, when the lines name none, or when
+ * they belong to more than one.
+ */
+function entityOfLines(invoice: Invoice): string | undefined {
+  const model = state.ledger.entities ?? emptyEntityModel();
+  if (model.entities.length < 2) return undefined;
+  // A line's account is a code ("200KC") or a label ("Sales - 200KC"); the
+  // coding lookup reads either.
+  const ownerOf = entityOfCoding();
+  const owners = new Set<string>();
+  for (const line of invoice.lines ?? []) {
+    const code = (line.accountCode ?? "").trim();
+    if (code === "") continue;
+    const owner = ownerOf(code) ?? model.accounts[code];
+    if (owner !== undefined) owners.add(owner);
+  }
+  return owners.size === 1 ? [...owners][0] : undefined;
+}
+
 /** A document's own control account, for posting; undefined keeps 610 or 800. */
 export function documentControl(invoice: Invoice): { code: string; name: string } | undefined {
   // A claim is owed to the person in Unpaid Expense Claims, where its
@@ -1219,6 +1240,15 @@ export function documentControl(invoice: Invoice): { code: string; name: string 
     return own !== undefined ? { code: own.code, name: own.name } : { code: "801", name: "Unpaid Expense Claims" };
   }
   if (invoice.entityId === undefined) {
+    // In books with several entities, an invoice made on the Invoices page
+    // carries no entity of its own, and its receivable went to a plain 610
+    // beside the entity's own (610KC): two receivables lines on the balance
+    // sheet, and an aged report out by the invoice. Its lines say whose it is.
+    const owner = entityOfLines(invoice);
+    if (owner !== undefined) {
+      const own = controlAccountFor(owner, invoice.kind === "purchase" ? "purchase" : "sales");
+      if (own !== undefined) return own;
+    }
     // Books kept elsewhere than New Zealand bring their own chart, whose
     // receivables and payables are not numbered 610 and 800: the one account of
     // that type is the control. New Zealand's keep 610 and 800 as they were.
@@ -2318,13 +2348,23 @@ export function yearsSaid(years: readonly number[]): string {
   return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
 }
 
+/** The coding of books with no bank lines: nothing to code. */
+const NO_BANK_LINES: CodingEngine = {
+  transactions: [],
+  overrides: {},
+  codeOf: () => null,
+  classify: () => ({ treatment: "standard", side: "none" }) as never,
+};
+
 export function postedJournals(): PostedJournal[] {
   // Composition is in core, where the three rules that go expensively wrong --
   // a settled invoice not counting as a fresh sale, a transfer posting once
   // rather than twice, judgements coming last -- are tested. This gathers what
   // the app knows and hands it over.
-  const engine = reportEngine();
-  if (!engine) return [];
+  // Books with no bank lines yet still post what they hold: invoices, pay
+  // runs, journals and depreciation. Without one, a pay run saved on books
+  // started from scratch reached no report at all.
+  const engine = reportEngine() ?? NO_BANK_LINES;
 
   // Built once, not once per lookup: this is called for every line of every
   // journal, and rebuilding the chart index inside it made posting the ledger

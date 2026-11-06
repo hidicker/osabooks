@@ -93,7 +93,16 @@ export function postLedger(options: PostLedgerOptions): PostedJournal[] {
     transactions, codeOf, classify, chart, bankLabels, byId,
     invoices, settled, transfers, manualJournals,
   } = options;
-  if (transactions.length === 0) return [];
+  // Books with no bank lines can still hold invoices, journals and pay runs:
+  // those post. Only books with nothing at all have nothing to post.
+  if (
+    transactions.length === 0 &&
+    (invoices ?? []).length === 0 &&
+    (manualJournals ?? []).length === 0 &&
+    (options.assetJournals ?? []).length === 0
+  ) {
+    return [];
+  }
 
   const byName = new Map(chart.map((a) => [a.name.trim().toLowerCase(), a]));
   // A document line or a payment names its account by the bare code, as an

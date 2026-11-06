@@ -29,12 +29,30 @@ export function formSelect(value: NonProfitForm, onChange: (form: NonProfitForm)
   return select;
 }
 
-function change(entity: Entity, next: NonProfit, what: string): void {
+/**
+ * Save one change to the settings as they are now, not as they were drawn.
+ *
+ * Each field is saved when it is left, and saving draws the page again. Built
+ * from what was drawn, a second field saved before the first had redrawn put
+ * the first back as it was; and the redraw took the cursor out of the field
+ * just tabbed into. So the change is made to the saved settings, and the
+ * cursor is put back in the same field of the new page.
+ */
+function change(entity: Entity, update: (now: NonProfit) => NonProfit, what: string): void {
   const live = state.ledger.entities ?? emptyEntityModel();
+  const now = live.entities.find((e) => e.id === entity.id)?.nonprofit ?? nonProfitDefaults("society");
+  const focused = document.activeElement;
+  const field =
+    focused instanceof HTMLInputElement && focused.closest(".non-profit-settings") !== null ? focused.placeholder : "";
   void saveEntities(
-    { ...live, entities: live.entities.map((e) => (e.id === entity.id ? { ...e, nonprofit: next } : e)) },
+    { ...live, entities: live.entities.map((e) => (e.id === entity.id ? { ...e, nonprofit: update(now) } : e)) },
     `${entity.name}: ${what}`,
-  );
+  ).then(() => {
+    if (field === "") return;
+    const again = [...document.querySelectorAll<HTMLElement>(`.non-profit-settings[data-entity="${CSS.escape(entity.id)}"] input`)]
+      .find((input) => input instanceof HTMLInputElement && input.placeholder === field);
+    again?.focus();
+  });
 }
 
 function tick(label: string, checked: boolean, onChange: (value: boolean) => void): HTMLLabelElement {
@@ -51,6 +69,7 @@ function tick(label: string, checked: boolean, onChange: (value: boolean) => voi
 export function nonProfitSettings(entity: Entity): HTMLElement {
   const box = document.createElement("div");
   box.className = "non-profit-settings";
+  box.dataset["entity"] = entity.id;
   box.hidden = entity.kind !== "nonprofit";
   const np: NonProfit = entity.nonprofit ?? nonProfitDefaults("society");
 
@@ -58,10 +77,10 @@ export function nonProfitSettings(entity: Entity): HTMLElement {
     formSelect(np.form, (form) => {
       // The form's usual answers fill what has not been said; what has is kept.
       const usual = nonProfitDefaults(form);
-      change(entity, { ...usual, ...np, form, registeredCharity: np.registeredCharity ?? usual.registeredCharity }, `now a ${form}`);
+      change(entity, (now) => ({ ...usual, ...now, form, registeredCharity: now.registeredCharity ?? usual.registeredCharity }), `now a ${form}`);
     }),
     tick("Registered charity", np.registeredCharity === true, (value) =>
-      change(entity, { ...np, registeredCharity: value }, value ? "registered charity" : "not a registered charity"),
+      change(entity, (now) => ({ ...now, registeredCharity: value }), value ? "registered charity" : "not a registered charity"),
     ),
   );
 
@@ -71,14 +90,14 @@ export function nonProfitSettings(entity: Entity): HTMLElement {
   number.value = np.charityNumber ?? "";
   number.hidden = np.registeredCharity !== true;
   number.addEventListener("change", () => {
-    const { charityNumber: _gone, ...rest } = np;
-    change(entity, number.value.trim() === "" ? rest : { ...rest, charityNumber: number.value.trim() }, "charity number");
+    const typed = number.value.trim();
+    change(entity, ({ charityNumber: _gone, ...rest }) => (typed === "" ? rest : { ...rest, charityNumber: typed }), "charity number");
   });
   box.append(number);
 
   box.append(
     tick("Donee organisation (donors can claim a tax credit)", np.donee === true, (value) =>
-      change(entity, { ...np, donee: value }, value ? "donee organisation" : "not a donee organisation"),
+      change(entity, (now) => ({ ...now, donee: value }), value ? "donee organisation" : "not a donee organisation"),
     ),
   );
   // What a receipt shows, and who signs it: only a donee organisation issues them.
@@ -89,8 +108,8 @@ export function nonProfitSettings(entity: Entity): HTMLElement {
     parent.title = "A branch must say on its receipts which larger organisation it belongs to.";
     parent.value = np.partOf ?? "";
     parent.addEventListener("change", () => {
-      const { partOf: _gone, ...rest } = np;
-      change(entity, parent.value.trim() === "" ? rest : { ...rest, partOf: parent.value.trim() }, "part of");
+      const typed = parent.value.trim();
+      change(entity, ({ partOf: _gone, ...rest }) => (typed === "" ? rest : { ...rest, partOf: typed }), "part of");
     });
     box.append(parent);
     const ird = document.createElement("input");
@@ -98,8 +117,8 @@ export function nonProfitSettings(entity: Entity): HTMLElement {
     ird.placeholder = "IRD number";
     ird.value = np.irdNumber ?? "";
     ird.addEventListener("change", () => {
-      const { irdNumber: _gone, ...rest } = np;
-      change(entity, ird.value.trim() === "" ? rest : { ...rest, irdNumber: ird.value.trim() }, "IRD number");
+      const typed = ird.value.trim();
+      change(entity, ({ irdNumber: _gone, ...rest }) => (typed === "" ? rest : { ...rest, irdNumber: typed }), "IRD number");
     });
     const signer = document.createElement("input");
     signer.type = "text";
@@ -110,10 +129,13 @@ export function nonProfitSettings(entity: Entity): HTMLElement {
     role.placeholder = "Designation (Treasurer)";
     role.value = np.signatory?.designation ?? "";
     const saveSigner = (): void => {
-      const { signatory: _gone, ...rest } = np;
       const name = signer.value.trim();
       const designation = role.value.trim();
-      change(entity, name === "" && designation === "" ? rest : { ...rest, signatory: { name, designation } }, "who signs receipts");
+      change(
+        entity,
+        ({ signatory: _gone, ...rest }) => (name === "" && designation === "" ? rest : { ...rest, signatory: { name, designation } }),
+        "who signs receipts",
+      );
     };
     signer.addEventListener("change", saveSigner);
     role.addEventListener("change", saveSigner);
@@ -122,7 +144,7 @@ export function nonProfitSettings(entity: Entity): HTMLElement {
   if (np.registeredCharity !== true) {
     box.append(
       tick("Approved by Inland Revenue for the $1,000 deduction", np.deduction === true, (value) =>
-        change(entity, { ...np, deduction: value }, value ? "approved for the $1,000 deduction" : "not approved for the $1,000 deduction"),
+        change(entity, (now) => ({ ...now, deduction: value }), value ? "approved for the $1,000 deduction" : "not approved for the $1,000 deduction"),
       ),
     );
   }

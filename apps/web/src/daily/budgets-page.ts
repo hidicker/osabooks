@@ -1,5 +1,5 @@
 import { redraw } from "../app.js";
-import { record } from "../books.js";
+import { bookYears, record } from "../books.js";
 import { booksMoney, booksCurrency } from "../country.js";
 import { $, state } from "../state.js";
 import { savePart } from "../store.js";
@@ -14,7 +14,9 @@ import { parseAmount, localToday } from "@nzosa/core";
  */
 
 // The books' year, by the year it ends in, as the Reports page counts it.
-let year = taxYearOf(localToday());
+// Chosen on the first visit: this year, or the latest the books reach if
+// nothing is in this one yet, so the actual figures are not all 0.00.
+let year: number | null = null;
 
 const isIncome = (type: string): boolean => /revenue|income|sales/i.test(type);
 const isCost = (type: string): boolean => /expense|overhead|direct|cost/i.test(type);
@@ -31,7 +33,9 @@ export function renderBudgets(): void {
   controls.className = "contacts-controls";
   const pick = document.createElement("select");
   const now = taxYearOf(localToday());
-  for (const y of [now - 1, now, now + 1]) {
+  const reached = bookYears().filter((y) => y <= now);
+  if (year === null) year = reached.includes(now) || reached.length === 0 ? now : Math.max(...reached);
+  for (const y of [...new Set([year, now - 1, now, now + 1])].sort((a, b) => a - b)) {
     const option = document.createElement("option");
     option.value = String(y);
     option.textContent = `Year to ${taxYearEndShort(y)}`;

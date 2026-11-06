@@ -2,7 +2,7 @@ import { renderAuRentalSchedule, renderAuTax, renderBas, renderContractors, rend
 import { attachmentsControl } from "./attachments-ui.js";
 import { comparing, drawPeriodControls, earlierRange, periodFileName, periodHeading, reportRange } from "./report-period.js";
 import { cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell, localToday } from "@nzosa/core";
-import type { OwingDocument } from "@nzosa/core";
+import type { OpeningBalances, OwingDocument } from "@nzosa/core";
 import { computeOurReturns } from "../variance.js";
 import { renderCashFlow } from "./cash-flow-report.js";
 import { INCOME_HEAD, incomeRows } from "./income-rows.js";
@@ -34,6 +34,7 @@ import {
   manualJournalGstAccount,
   ledgerFromStart,
   invoicesInPlay,
+  entityBankAccounts,
 } from "../books.js";
 import { renderBetweenReport } from "./between-report.js";
 import { monthlyColumns, rankedBars, statTiles } from "../charts.js";
@@ -276,7 +277,8 @@ export function currentReport(
    */
   over?: DateRange,
 ): { report: ProfitAndLoss; title: string; year: number } | null {
-  if (state.ledger.transactions.length === 0) return null;
+  // Nothing to report: no bank lines, and nothing else posted either.
+  if (state.ledger.transactions.length === 0 && postedJournals().length === 0) return null;
 
   // Above the figures, not below them: a warning under a total is read after
   // the total has already been believed. Not while filling in a chart: the
@@ -1338,6 +1340,40 @@ function companyBooks(): boolean {
 }
 
 /**
+ * The chosen entity's part of the books, for a return that is one entity's:
+ * each journal kept to the lines posted to its accounts or its own bank
+ * accounts, and the opening balances likewise. Everything when no entity is
+ * chosen. The P&L narrows the same way; the IR10 counted every entity's.
+ */
+function entityPart(
+  journals: PostedJournal[],
+  opening: OpeningBalances | undefined,
+): { journals: PostedJournal[]; opening: OpeningBalances | undefined } {
+  const entity = state.entityFilter;
+  if (entity === "") return { journals, opening };
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const banks = new Set(entityBankAccounts());
+  const mine = (code: string, name = ""): boolean =>
+    banks.has(code) || model.accounts[accountEntityKey({ code, name })] === entity;
+  const kept = journals
+    .map((j) => ({ ...j, lines: j.lines.filter((l) => mine(l.accountCode, l.accountName)) }))
+    .filter((j) => j.lines.length > 0);
+  if (opening === undefined) return { journals: kept, opening };
+  const only = (accounts: Record<string, Cents>): Record<string, Cents> =>
+    Object.fromEntries(Object.entries(accounts).filter(([code]) => mine(code)));
+  return {
+    journals: kept,
+    opening: {
+      ...opening,
+      accounts: only(opening.accounts),
+      ...(opening.byDate !== undefined
+        ? { byDate: Object.fromEntries(Object.entries(opening.byDate).map(([d, a]) => [d, only(a as Record<string, Cents>)])) }
+        : {}),
+    },
+  };
+}
+
+/**
  * The books' own IR10 for the year ending on a date, box by box, in cents.
  *
  * Worked out exactly as the IR10 on this page is, so a filed return is set
@@ -1345,12 +1381,12 @@ function companyBooks(): boolean {
  */
 export function booksIr10(yearEnding: string): Record<number, Cents> {
   const year = Number(yearEnding.slice(0, 4));
-  const { journals } = positionJournals();
+  const { journals, opening } = entityPart(positionJournals().journals, state.ledger.openingBalances);
   const summary = ir10Summary({
     yearEnding: taxYearEnd(year),
     yearStarting: taxYearStart(year),
     journals,
-    ...(state.ledger.openingBalances ? { openingBalances: state.ledger.openingBalances } : {}),
+    ...(opening ? { openingBalances: opening } : {}),
     chart: state.chart,
     assets: state.ledger.assets ?? [],
     proceeds: assetProceedsInUse(),
@@ -1360,14 +1396,41 @@ export function booksIr10(yearEnding: string): Record<number, Cents> {
 }
 
 function renderIr10(body: HTMLElement, year: number): void {
-  const { journals, basis, fromImport } = positionJournals();
   const entity = reportingEntity();
+  // One entity's return. With all of several shown it added a company's
+  // rentals and its owners' properties together and worked out company tax on
+  // the lot, so it asks which first.
+  const several = state.ledger.entities?.entities ?? [];
+  if (entity === undefined && several.length > 1) {
+    const heading = document.createElement("h3");
+    heading.textContent = "Financial Statement - IR10";
+    body.append(heading, note("The IR10 is one entity's return. Choose whose:"));
+    const choices = document.createElement("div");
+    choices.className = "page-actions";
+    const businesses = several.filter((e) => (e.kind ?? "business") === "business" || e.kind === "commercial");
+    for (const one of businesses.length > 0 ? businesses : several) {
+      const pick = document.createElement("button");
+      pick.type = "button";
+      pick.textContent = one.name;
+      pick.addEventListener("click", () => {
+        const filter = $<HTMLSelectElement>("entity-filter");
+        filter.value = one.id;
+        filter.dispatchEvent(new Event("change"));
+      });
+      choices.append(pick);
+    }
+    body.append(choices);
+    return;
+  }
+  const position = positionJournals();
+  const { basis, fromImport } = position;
+  const { journals, opening } = entityPart(position.journals, state.ledger.openingBalances);
   const company = companyBooks();
   const summary = ir10Summary({
     yearEnding: taxYearEnd(year),
     yearStarting: taxYearStart(year),
     journals,
-    ...(state.ledger.openingBalances ? { openingBalances: state.ledger.openingBalances } : {}),
+    ...(opening ? { openingBalances: opening } : {}),
     chart: state.chart,
     assets: state.ledger.assets ?? [],
     proceeds: assetProceedsInUse(),
@@ -1981,15 +2044,49 @@ function renderDepreciation(body: HTMLElement, year: number): void {
   table.append(head, tbody);
   body.append(table);
 
-  if (schedule.disposedBookValue !== 0) {
-    body.append(
-      note(
-        `Assets disposed of in the year carried ${money(schedule.disposedBookValue)} of book ` +
-          "value. Enter each sale price on the Fixed assets page to work out the " +
-          (booksCountry().id === "au" ? "balancing adjustment or capital gain." : "loss, depreciation recovered or capital gain."),
-      ),
+  for (const line of disposalNotes(schedule, year)) body.append(note(line));
+}
+
+/**
+ * What the schedule says about the year's disposals. It used to ask for the
+ * sale prices whatever had been entered. Now: which still have none, and,
+ * for those posted, whether the sale itself is in the books -- the disposal
+ * takes the sale price back out of the asset's account, where the sale is
+ * expected to be coded, so without it the price is left sitting there.
+ */
+function disposalNotes(schedule: ReturnType<typeof depreciationSchedule>, year: number): string[] {
+  const disposed = schedule.rows.filter((r) => r.disposedInPeriod);
+  if (disposed.length === 0) return [];
+  const proceeds = assetProceedsInUse();
+  const missing = disposed.filter((r) => proceeds[r.asset.number] === undefined);
+  const out: string[] = [];
+  if (missing.length > 0) {
+    out.push(
+      `${missing.map((r) => r.asset.number).join(", ")} ${missing.length === 1 ? "has" : "have"} no sale price yet ` +
+        `(${booksMoney(missing.reduce((s, r) => s + r.bookValueAtDisposal, 0))} of book value). Enter it on the Fixed ` +
+        "assets page to work out the " +
+        (booksCountry().id === "au" ? "balancing adjustment or capital gain." : "loss, depreciation recovered or capital gain."),
     );
   }
+  const from = taxYearStart(year);
+  const to = taxYearEnd(year);
+  const journals = postedJournals().filter((j) => j.date >= from && j.date <= to);
+  for (const journal of journals.filter((j) => j.source === "disposal")) {
+    // The sale price line: the debit to the account the asset is carried in.
+    const cost = journal.lines.find((l) => l.amount < 0 && !/accumulated/i.test(l.accountName));
+    const price = journal.lines.find((l) => l.amount > 0 && l.accountCode === cost?.accountCode);
+    if (cost === undefined || price === undefined) continue;
+    const sold = journals.some(
+      (j) => j.source !== "disposal" && j.lines.some((l) => l.accountCode === cost.accountCode && l.amount < 0),
+    );
+    if (!sold) {
+      out.push(
+        `${journal.narration}: no sale is coded to ${cost.accountName} in the year, so its ` +
+          `${booksMoney(price.amount)} sale price stays in that account. Code the money received for it there.`,
+      );
+    }
+  }
+  return out;
 }
 
 /** A statement being entered or edited: amounts as typed, until it is saved. */
@@ -2193,7 +2290,9 @@ export function renderAgentStatements(
       heldCode: "",
       heldAtStart: "",
       income: [{ code: "", description: "Rent", amount: "" }],
-      expenses: [{ code: "", description: "Management fees", amount: "" }],
+      // Empty, with "e.g. Management fees" as its hint: filled in, a repair
+      // coded on this line was saved as "Management fees — Repairs".
+      expenses: [{ code: "", description: "", amount: "" }],
       paidToOwner: "",
       heldAtEnd: "",
     };
@@ -4518,7 +4617,7 @@ export function renderReportsPage(): void {
 
   const built = currentReport();
   if (!built) {
-    body.append(note("No transactions yet. Import a bank file first."));
+    body.append(note("Nothing in the books yet. Import a bank file, or enter an invoice, a journal or a pay run."));
     return;
   }
   const { report, title, year } = built;

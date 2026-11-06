@@ -1,5 +1,5 @@
 import { findHeaderRow } from "../csv.js";
-import { parseAmount } from "../money.js";
+import { fromMinorUnits, parseAmount } from "../money.js";
 import { parseDate } from "../dates.js";
 import { ColumnReader, scoreColumns } from "./shared.js";
 import type {
@@ -153,10 +153,11 @@ function parseOriginalAmount(
   if (currency === accountCurrency.toUpperCase()) return undefined;
 
   const digits = match[2] ?? "";
-  // The code is already in minor units, so it is read as an integer rather
-  // than through parseAmount, which would treat it as a major-unit decimal.
+  // The code is in the currency's own smallest unit (cents, or whole won), so
+  // it is read as an integer, not through parseAmount, which would treat it
+  // as a major-unit decimal, and turned into the hundredths amounts are held in.
   const value = Number(digits);
   if (!Number.isFinite(value)) return undefined;
 
-  return { currency, amount: Math.sign(amount) * value };
+  return { currency, amount: Math.sign(amount) * fromMinorUnits(value, currency) };
 }

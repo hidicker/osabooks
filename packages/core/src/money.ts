@@ -2,8 +2,9 @@
  * Money is held as an integer number of hundredths of the books' currency,
  * whatever that currency is: cents for dollars, and for won (which has no
  * minor unit) hundredths of a won, so 3,300,000 won is 330000000. The
- * currency decides how an amount is written and read -- won with no decimals,
- * dinars with three -- never the scale it is held at.
+ * currency decides how an amount is written and read -- won with no decimals
+ * -- never the scale it is held at. A currency with three decimals (dinars)
+ * is read with them but held, like every other, to two: 12.345 is 12.35.
  *
  * Bank exports and spreadsheets round-trip amounts through IEEE floats, which
  * is how the source workbook ended up with values like `-78.08000000000001`
@@ -152,6 +153,16 @@ function roundToMinor(value: number, _currency: string): Cents {
   const scaled = value * factor;
   const nudged = scaled + Math.sign(scaled) * Math.abs(scaled) * Number.EPSILON * 4;
   return Math.round(nudged);
+}
+
+/**
+ * An amount written in a currency's own smallest unit -- cents, or whole won
+ * and yen, which have none smaller -- as the hundredths it is held in. A BNZ
+ * card row writes "KRW37225" for ₩37,225, and read as hundredths that was
+ * ₩372.25, shown as ₩372.
+ */
+export function fromMinorUnits(value: number, currency: string): Cents {
+  return Math.round(value * 10 ** (HELD_PLACES - minorUnits(currency)));
 }
 
 /**

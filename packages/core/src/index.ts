@@ -194,7 +194,7 @@ export type {
   EntityProblem,
 } from "./entities.js";
 
-export { parseAmount, formatAmount, minorUnits, amountKeyText } from "./money.js";
+export { parseAmount, formatAmount, minorUnits, amountKeyText, fromMinorUnits } from "./money.js";
 export type { Cents } from "./money.js";
 
 export {

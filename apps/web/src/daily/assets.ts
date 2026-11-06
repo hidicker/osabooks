@@ -350,6 +350,13 @@ function assetFromDraft(draft: AssetDraft): { asset: FixedAsset; proceeds: Cents
     averaging: existing?.averaging || "Full Month",
     disposed,
   };
+  // The type is how the asset finds its accounts. One that names none -- the
+  // box said "No account matches" and the form "Ready to save." -- posted its
+  // depreciation to an account of no type, among the current assets.
+  const typed = asset.type.toLowerCase();
+  if (typed !== "" && typed !== (existing?.type ?? "").trim().toLowerCase() && !assetTypes().some((t) => t.trim().toLowerCase() === typed)) {
+    problems.push(`asset type: no fixed asset account is called "${asset.type}"; choose one from the list, or add the account on Entities & accounts`);
+  }
   const proceeds = draft.disposing ? amount(draft.proceeds, "sale proceeds") : null;
   return {
     asset,

@@ -72,7 +72,7 @@ export function openQuickEntry(kind: InvoiceKind): void {
   intro.className = "payment-file-said";
   intro.textContent =
     `One ${noun} a row. Enter moves to the next box, and from the amount starts a new row dated as the last. ` +
-    `Each is saved as a ${noun} of one line, numbered in turn.`;
+    `Each is saved as ${bills ? "a bill" : "an invoice"} of one line, numbered in turn.`;
   box.append(heading, intro);
 
   // Whose bills, where the books keep them for more than one entity.

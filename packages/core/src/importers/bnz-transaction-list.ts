@@ -1,6 +1,6 @@
 import { normaliseHeader } from "../csv.js";
 import type { ReadonlyCsvRecord } from "../csv.js";
-import { parseAmount } from "../money.js";
+import { fromMinorUnits, parseAmount } from "../money.js";
 import { parseDate } from "../dates.js";
 import { accountId, isAccountNumber, normaliseAccountNumber } from "../accounts.js";
 import { ColumnReader } from "./shared.js";
@@ -218,11 +218,12 @@ function foreignLeg(
   const currency = (match[1] ?? "").toUpperCase();
   if (currency === accountCurrency.toUpperCase()) return undefined;
 
-  // Already in minor units, so read as an integer rather than a decimal.
+  // Written in the currency's own smallest unit (cents, or whole won), so
+  // read as an integer and turned into the hundredths amounts are held in.
   const value = Number(match[2] ?? "");
   if (!Number.isFinite(value) || value === 0) return undefined;
 
-  return { foreign: { currency, amount: Math.sign(amount) * value } };
+  return { foreign: { currency, amount: Math.sign(amount) * fromMinorUnits(value, currency) } };
 }
 
 function isHeader(fields: readonly string[]): boolean {
