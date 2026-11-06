@@ -19,6 +19,12 @@ let year: number | null = null;
 /** "" for what has no class, "*" for everything, or a class's name. */
 let showing = "";
 let query = "";
+/**
+ * Lines given a class here one at a time, kept in the list until the year,
+ * filter or search changes. Otherwise, under "No class yet", a line vanished
+ * the moment it was classed and the rows below moved up under the pointer.
+ */
+const justGiven = new Set<string>();
 
 /** Rows drawn at once: a year of bank lines is thousands. */
 const SHOWN = 300;
@@ -172,7 +178,11 @@ export function renderClasses(): void {
   }
 
   const thisYear = taxYearOf(localToday());
-  if (year === null) year = thisYear;
+  // This year, unless nothing is posted in it yet: then the latest year that
+  // has something, so the page does not open empty.
+  if (year === null) {
+    year = [thisYear, thisYear - 1, thisYear - 2].find((y) => sources(taxYearStart(y), taxYearEnd(y)).length > 0) ?? thisYear;
+  }
   const controls = document.createElement("div");
   controls.className = "contacts-controls";
   const pickYear = document.createElement("select");
@@ -185,6 +195,7 @@ export function renderClasses(): void {
   }
   pickYear.addEventListener("change", () => {
     year = Number(pickYear.value);
+    justGiven.clear();
     redraw("classes");
   });
   const pickShown = select(names, showing, "No class yet");
@@ -195,6 +206,7 @@ export function renderClasses(): void {
   pickShown.insertBefore(every, pickShown.firstChild);
   pickShown.addEventListener("change", () => {
     showing = pickShown.value;
+    justGiven.clear();
     redraw("classes");
   });
   const search = document.createElement("input");
@@ -204,6 +216,7 @@ export function renderClasses(): void {
   search.value = query;
   search.addEventListener("input", () => {
     query = search.value;
+    justGiven.clear();
     redraw("classes");
     document.getElementById("classes-search")?.focus();
   });
@@ -214,7 +227,7 @@ export function renderClasses(): void {
   const all = sources(taxYearStart(year), taxYearEnd(year));
   const shown = all.filter(
     (s) =>
-      (showing === "*" || (assigned[s.id] ?? "") === showing) &&
+      (showing === "*" || (assigned[s.id] ?? "") === showing || justGiven.has(s.id)) &&
       (needle === "" || [s.narration, ...s.accounts].some((text) => text.toLowerCase().includes(needle))),
   );
   if (shown.length === 0) {
@@ -261,6 +274,7 @@ export function renderClasses(): void {
       const next = { ...assigned };
       if (pick.value === "") delete next[source.id];
       else next[source.id] = pick.value;
+      justGiven.add(source.id);
       void keep(
         { names, assigned: next },
         pick.value === "" ? `Class taken off ${source.narration}` : `Class ${pick.value} given to ${source.narration}`,
