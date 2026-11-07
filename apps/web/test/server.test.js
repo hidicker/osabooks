@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import { startServer } from "../server.js";
+
+// The keys to bank feeds and AI, in a folder of the test's own rather than
+// the real one on this computer.
+const keys = mkdtempSync(join(tmpdir(), "nzosa-keys-"));
+process.env.OSABOOKS_SECRETS = keys;
+const { secretFile, startServer } = await import("../server.js");
 
 /**
  * The local server's answers to requests it should refuse: a body that is not
@@ -17,6 +22,7 @@ const base = `http://127.0.0.1:${running.port}`;
 test.after(() => {
   running.stop();
   rmSync(root, { recursive: true, force: true });
+  rmSync(keys, { recursive: true, force: true });
 });
 
 test("a body that is not JSON is a 400", async () => {
@@ -47,5 +53,21 @@ test("the bank fetches refuse a cross-site request, and allow one with no Sec-Fe
     assert.equal(same.status, 400, `${path}: on to "not connected"`);
     const none = await fetch(`${base}${path}`);
     assert.equal(none.status, 400, `${path}: on to "not connected"`);
+  }
+});
+
+test("a key file beside the books moves to OsaBooks's own folder, not left to be synced", () => {
+  // A books folder in OneDrive or Dropbox was copied to that cloud with the
+  // bank feed's and the AI's keys in it.
+  const books = mkdtempSync(join(tmpdir(), "nzosa-books-"));
+  try {
+    writeFileSync(join(books, ".ai.json"), '{"main":{"key":"sk-test"}}');
+    const file = secretFile(books, ".ai.json");
+    assert.ok(file.startsWith(keys), file);
+    assert.equal(readFileSync(file, "utf8"), '{"main":{"key":"sk-test"}}');
+    assert.equal(existsSync(join(books, ".ai.json")), false, "gone from beside the books");
+    assert.equal(secretFile(books, ".ai.json"), file, "the same place next time");
+  } finally {
+    rmSync(books, { recursive: true, force: true });
   }
 });

@@ -132,21 +132,6 @@ works).
   load what was filed from myIR and show each GST period beside it. An
   Australian BAS, a Korean VAT return or a US sales tax return filed
   elsewhere cannot be loaded to compare yet.
-- **Bank and AI tokens on Windows rely on a file mode Windows ignores.**
-  `.akahu.json`, `.ai.json`, `.wise.json` and `.simplefin.json` are written
-  with mode 0600 (`apps/web/server.js`, `packages/mcp/src/sandbox.ts`), which
-  on Windows sets nothing: the folder's own permissions are what protect
-  them. Where OsaBooks sits in a synced folder (OneDrive's Documents,
-  Dropbox), the tokens are copied to that cloud. Protect them with the
-  user's DPAPI or `icacls /inheritance:r /grant:r`, and warn when the books
-  folder is inside a synced one. From the DeepSeek code review of 3 November
-  2026, 4.
-- **A test that every ledger field survives a save.** `decisionsOf` in
-  `store.ts` names the fields the decisions part is written from; a field
-  added to `StoredLedger` and not to that list is read on open and erased by
-  the next save. None is missing today. One test filling every optional field,
-  writing each part and reading it back, would catch the next one. DeepSeek
-  review, 6.
 - **Tests on every push, and a linter.** The tests run only when a deploy is
   started. A `ci.yml` on push running `npm ci && npm test`, and
   typescript-eslint with no-floating-promises, no-misused-promises and a check

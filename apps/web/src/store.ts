@@ -1016,6 +1016,19 @@ function decisionsOf(ledger: StoredLedger): Record<string, unknown> {
   };
 }
 
+/**
+ * The books as the pieces they are saved in, as a folder or the server would
+ * hold them: for the test that every field survives a save and a reopen.
+ */
+export function ledgerToParts(ledger: StoredLedger): Record<string, { version: number; data: unknown }> {
+  const out: Record<string, { version: number; data: unknown }> = {};
+  for (const part of FOLDER_PARTS) {
+    const data = partValue(ledger, part);
+    if (data !== undefined) out[part] = { version: 1, data };
+  }
+  return out;
+}
+
 /** What each folder part holds, taken from the ledger in memory. */
 function partValue(ledger: StoredLedger, part: string): unknown {
   if (part === "transactions") return ledger.transactions;

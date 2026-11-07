@@ -21,8 +21,10 @@
 import { context } from "esbuild";
 import { createServer } from "node:http";
 import { execFileSync } from "node:child_process";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 import {
+  copyFileSync,
   createReadStream,
   existsSync,
   mkdirSync,
@@ -302,7 +304,48 @@ function sendFile(response, urlPath) {
  * travelling with it, and must survive switching between sets of books.
  */
 function feedFile(root) {
-  return join(root, ".akahu.json");
+  return secretFile(root, ".akahu.json");
+}
+
+/**
+ * Where the keys to bank feeds and AI live: OsaBooks's own folder on this
+ * computer (on Windows, OsaBooks under %LOCALAPPDATA%), one folder for each
+ * folder of books, never beside the books. A books folder in OneDrive or
+ * Dropbox is copied to that cloud, and one handed to an accountant goes with
+ * whatever is in it; the keys stay here. On another computer they are
+ * entered again. OSABOOKS_SECRETS puts them elsewhere, as the tests do.
+ */
+function secretsFolder(root) {
+  const base = process.env.OSABOOKS_SECRETS
+    ? resolve(process.env.OSABOOKS_SECRETS)
+    : process.platform === "win32"
+      ? join(process.env.LOCALAPPDATA || join(homedir(), "AppData", "Local"), "OsaBooks")
+      : process.platform === "darwin"
+        ? join(homedir(), "Library", "Application Support", "OsaBooks")
+        : join(process.env.XDG_CONFIG_HOME || join(homedir(), ".config"), "osabooks");
+  const which = createHash("sha256").update(resolve(root).toLowerCase()).digest("hex").slice(0, 16);
+  return join(base, "keys", which);
+}
+
+/**
+ * One key file, in the keys folder. A file still beside the books, from
+ * before they moved, is moved there the first time it is asked for.
+ */
+export function secretFile(root, name) {
+  const folder = secretsFolder(root);
+  const file = join(folder, name);
+  const old = join(root, name);
+  if (!existsSync(file) && existsSync(old)) {
+    try {
+      mkdirSync(folder, { recursive: true });
+      copyFileSync(old, file);
+      rmSync(old, { force: true });
+    } catch {
+      // Left where it was: read from there this time, moved next time.
+      return old;
+    }
+  }
+  return file;
 }
 
 /**
@@ -328,8 +371,8 @@ function readFeed(root, ledger) {
 }
 
 function writeStore(root, store) {
-  mkdirSync(root, { recursive: true });
   const file = feedFile(root);
+  mkdirSync(dirname(file), { recursive: true });
   const temporary = `${file}.writing`;
   writeFileSync(temporary, JSON.stringify(store, null, 1), { mode: 0o600 });
   renameSync(temporary, file);
@@ -356,7 +399,7 @@ function forgetFeed(root, ledger) {
  * else's computer.
  */
 function aiFile(root) {
-  return join(root, ".ai.json");
+  return secretFile(root, ".ai.json");
 }
 
 function readAiStore(root) {
@@ -368,8 +411,8 @@ function readAiStore(root) {
 }
 
 function writeAiStore(root, store) {
-  mkdirSync(root, { recursive: true });
   const file = aiFile(root);
+  mkdirSync(dirname(file), { recursive: true });
   const temporary = `${file}.writing`;
   writeFileSync(temporary, JSON.stringify(store, null, 1), { mode: 0o600 });
   renameSync(temporary, file);
@@ -471,7 +514,7 @@ async function talkToGemini(key, model, contents, tools) {
  * the other.
  */
 function wiseFile(root) {
-  return join(root, ".wise.json");
+  return secretFile(root, ".wise.json");
 }
 
 function readWiseStore(root) {
@@ -491,8 +534,8 @@ function writeWise(root, ledger, value) {
   const store = readWiseStore(root);
   if (value === null) delete store[ledger];
   else store[ledger] = value;
-  mkdirSync(root, { recursive: true });
   const file = wiseFile(root);
+  mkdirSync(dirname(file), { recursive: true });
   const temporary = `${file}.writing`;
   writeFileSync(temporary, JSON.stringify(store, null, 1), { mode: 0o600 });
   renameSync(temporary, file);
@@ -505,7 +548,7 @@ function writeWise(root, ledger, value) {
  * the address with its password.
  */
 function simpleFinFile(root) {
-  return join(root, ".simplefin.json");
+  return secretFile(root, ".simplefin.json");
 }
 
 function readSimpleFinStore(root) {
@@ -525,8 +568,8 @@ function writeSimpleFin(root, ledger, value) {
   const store = readSimpleFinStore(root);
   if (value === null) delete store[ledger];
   else store[ledger] = value;
-  mkdirSync(root, { recursive: true });
   const file = simpleFinFile(root);
+  mkdirSync(dirname(file), { recursive: true });
   const temporary = `${file}.writing`;
   writeFileSync(temporary, JSON.stringify(store, null, 1), { mode: 0o600 });
   renameSync(temporary, file);
