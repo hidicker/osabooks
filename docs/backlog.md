@@ -40,13 +40,15 @@ from when it is changed, and reaching what is already confirmed is a separate,
 deliberate step that says what it will change (as money between entities now
 works).
 
-- **Lock dates enforced on the server, not only the lock dates themselves.**
-  Since 20261012120000_deleted_books_and_locks.sql, save_part refuses a
-  bookkeeper's save that moves the lock dates. What they lock is still guarded
-  by the page alone: a save that changes a coding, journal or invoice dated on
-  or before a lock is not refused by the server. Doing it there means
-  comparing the locked figures (`lockedFigures` in core's lock-dates.ts) in the
-  database, or in an edge function every save goes through.
+- **Lock dates enforced on the server: stage 2, refusing.** Stage 1 went live
+  on 8 November 2026 (20261108090000_lock_watch.sql): every save that changes
+  a record dated in a locked period is noted in lock_watch, and Settings →
+  Lock dates shows the owner and the accountant what was noticed. It refuses
+  nothing. After a week or two of only genuine changes being noticed, a
+  migration makes save_part and save_part_changes refuse them, unless an
+  owner or the accountant moves the lock first. The server compares records,
+  not figures: the year lock strictly, the GST lock on the GST parts only.
+
 ## Tax and returns
 
 - **A shared bank account is held under the GST lock even for an unregistered
