@@ -71,6 +71,7 @@ export type PageName =
   | "jobs"
   | "currencies"
   | "apps"
+  | "settings"
   | "time"
   | "aupayroll"
   | "variance";
@@ -224,6 +225,7 @@ export function showPage(page: string, scrollTo?: "top" | "bottom" | number): vo
   if (page === "jobs") redraw("jobs");
   if (page === "currencies") redraw("currencies");
   if (page === "apps") redraw("apps");
+  if (page === "settings") redraw("settings");
   if (page === "time") redraw("time");
   if (page === "aupayroll") redraw("aupayroll");
   if (page === "ir9") redraw("ir9");

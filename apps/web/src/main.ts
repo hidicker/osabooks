@@ -89,6 +89,7 @@ import { renderClasses } from "./daily/classes-page.js";
 import { renderJobs } from "./daily/jobs-page.js";
 import { renderCurrencies } from "./daily/currencies-page.js";
 import { renderApps } from "./daily/apps-page.js";
+import { applyReportDefaults, renderSettings } from "./daily/settings-page.js";
 import { renderTime } from "./daily/time-page.js";
 import { renderAuPayroll } from "./daily/au-payroll-page.js";
 import { renderIr9Page } from "./daily/ir9-page.js";
@@ -203,6 +204,7 @@ async function init(): Promise<void> {
     jobs: renderJobs,
     currencies: renderCurrencies,
     apps: renderApps,
+    settings: renderSettings,
     time: renderTime,
     aupayroll: renderAuPayroll,
     entities: renderEntities,
@@ -287,6 +289,7 @@ async function init(): Promise<void> {
     const loaded = await load();
     state.ledger = loaded.ledger;
     applyCountry();
+    applyReportDefaults();
     state.persistent = loaded.persistent;
     // Before anything below can record what it did. `record` appends to
     // `state.events` and writes the lot back, so anything recording before the

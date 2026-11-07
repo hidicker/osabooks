@@ -155,6 +155,12 @@ export interface Entity {
    * chosen, and only PNG, JPEG, WebP and GIF are taken (an SVG is code).
    */
   logo?: string;
+  /** The legal name, where invoices should show it as well as the trading name. */
+  legalName?: string;
+  /** How customers reach it, printed on invoices. */
+  phone?: string;
+  email?: string;
+  website?: string;
   /**
    * What this entity does, in the owner's own words.
    *

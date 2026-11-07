@@ -143,6 +143,30 @@ export interface Filing {
   agentName?: string;
 }
 
+/** The books' own settings, chosen on the Settings page. */
+export interface BookSettings {
+  /** Days after its date a new invoice falls due. */
+  invoiceDueDays?: number;
+  /** Days after its date a new bill falls due. */
+  billDueDays?: number;
+  /** The basis the reports open on. */
+  reportBasis?: "posted" | "cash";
+  /** Invoices' own prefix ("INV-" where unset) and the lowest next number. */
+  invoicePrefix?: string;
+  invoiceNext?: number;
+  /** Bills' own prefix ("BILL-" where unset) and the lowest next number. */
+  billPrefix?: string;
+  billNext?: number;
+  /** Days a quote stays open, shown on it as valid until. */
+  quoteDays?: number;
+  /** Reports: account codes left off the account names. */
+  hideCodes?: boolean;
+  /** Reports: whole dollars rather than cents. */
+  wholeUnits?: boolean;
+  /** Reports: accounts with nothing in them still listed. */
+  showEmpty?: boolean;
+}
+
 export interface StoredLedger {
   version: 1;
   /**
@@ -385,6 +409,8 @@ export interface StoredLedger {
   timeApproval?: boolean;
   /** What the invoice, statement and reminder emails say, where changed from the standard. */
   emailWording?: Partial<Record<WordingKind, Wording>>;
+  /** Settings with no other page: due dates and the reports' basis. */
+  settings?: BookSettings;
   /** Messages for the foot of an invoice, to choose from; one may start each new invoice. */
   invoiceMessages?: InvoiceMessage[];
   /** Files attached to documents, journals, contacts and register lines: what each is. */
@@ -891,6 +917,7 @@ function decisionsOf(ledger: StoredLedger): Record<string, unknown> {
     ...(ledger.attachments && ledger.attachments.length > 0 ? { attachments: ledger.attachments } : {}),
     ...(ledger.invoiceMessages && ledger.invoiceMessages.length > 0 ? { invoiceMessages: ledger.invoiceMessages } : {}),
     ...(ledger.emailWording && Object.keys(ledger.emailWording).length > 0 ? { emailWording: ledger.emailWording } : {}),
+    ...(ledger.settings && Object.keys(ledger.settings).length > 0 ? { settings: ledger.settings } : {}),
     ...(ledger.timeApproval === true ? { timeApproval: true } : {}),
     transfers: ledger.transfers ?? {},
     legitimateDuplicates: ledger.legitimateDuplicates ?? [],

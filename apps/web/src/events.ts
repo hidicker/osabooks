@@ -181,6 +181,8 @@ export type EventKind =
   | "invoiceMessages"
   /** What the emails say, whole. */
   | "emailWording"
+  /** The Settings page's own settings. */
+  | "settings"
   /** Whether time is approved before it is invoiced. */
   | "timeApproval"
   /** Accounts taken out of the chart together. Before is the accounts. */
@@ -640,6 +642,8 @@ export function reverse(ledger: StoredLedger, event: LedgerEvent): StoredLedger 
       return { ...ledger, timeApproval: event.before === true };
     case "emailWording":
       return { ...ledger, emailWording: (event.before ?? {}) as NonNullable<StoredLedger["emailWording"]> };
+    case "settings":
+      return { ...ledger, settings: (event.before ?? {}) as NonNullable<StoredLedger["settings"]> };
     case "invoiceMessages":
       return { ...ledger, invoiceMessages: (event.before ?? []) as NonNullable<StoredLedger["invoiceMessages"]> };
     case "attachments":
@@ -760,6 +764,7 @@ export const KIND_LABELS: Record<EventKind, string> = {
   attachments: "Files",
   invoiceMessages: "Invoice messages",
   emailWording: "Email wording",
+  settings: "Settings",
   timeApproval: "Time approval",
   chartRemoved: "Chart of accounts",
   invoiceBatch: "Quick entry",

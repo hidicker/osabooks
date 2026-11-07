@@ -4,6 +4,7 @@ import { booksCurrency, booksMoney, noSalesTax, gstPercent } from "../country.js
 import { $, state } from "../state.js";
 import { save as saveLedger, savePart } from "../store.js";
 import { note, tellOnPage } from "../ui.js";
+import { numberingFor } from "../book-settings.js";
 import { findContact, nextInvoiceNumber, parseAmount, timeInvoiceLines, timeValue, unbilledTime, localToday } from "@nzosa/core";
 import type { Invoice, TimeEntry } from "@nzosa/core";
 
@@ -70,7 +71,7 @@ async function invoiceTime(customer: string, entries: readonly TimeEntry[]): Pro
   const total = lines.reduce((sum, l) => sum + l.gross, 0);
   const gst = lines.reduce((sum, l) => sum + l.tax, 0);
   const issued = today();
-  const number = nextInvoiceNumber("sales", state.ledger.invoices ?? []);
+  const number = nextInvoiceNumber("sales", state.ledger.invoices ?? [], numberingFor("sales"));
   const draft: Invoice = {
     number,
     kind: "sales",

@@ -1,6 +1,7 @@
 import { redraw } from "../app.js";
 import { record } from "../books.js";
 import { $, state } from "../state.js";
+import { numberingFor } from "../book-settings.js";
 import { savePart } from "../store.js";
 import { askOnPage, note } from "../ui.js";
 import {
@@ -50,7 +51,7 @@ function button(label: string, onClick: () => void, title?: string, primary = fa
 
 /** Make what is due, after showing what that would be. */
 async function createDue(): Promise<void> {
-  const run = generateDue(schedules(), state.ledger.invoices ?? [], today());
+  const run = generateDue(schedules(), state.ledger.invoices ?? [], today(), numberingFor("sales"));
   if (run.invoices.length === 0) {
     said =
       run.skipped.length > 0
@@ -235,7 +236,7 @@ export function renderRecurring(): void {
   body.textContent = "";
 
   const list = schedules();
-  const due = generateDue(list, state.ledger.invoices ?? [], today()).invoices.length;
+  const due = generateDue(list, state.ledger.invoices ?? [], today(), numberingFor("sales")).invoices.length;
 
   const details = document.createElement("details");
   details.className = "entity-billing-details";

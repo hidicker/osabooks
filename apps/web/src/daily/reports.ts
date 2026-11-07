@@ -137,6 +137,7 @@ import type {
   Transaction,
 } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearEndShort, taxYearStart, taxYearStartSaid, depreciationRules, monthsOfTaxYear } from "../tax-year.js";
+import { bookSettings } from "../book-settings.js";
 import { booksCountry, booksLocale, gstPercent, moneyPlaces, booksMoney, noSalesTax, sayTax, taxTypeLabel, booksCurrency } from "../country.js";
 import { type DownloadKind, hasDownload } from "./report-downloads.js";
 import { balanceSheetLabel } from "./balance-sheet-label.js";
@@ -225,6 +226,68 @@ function subAccountParent(code: string): string | undefined {
 function chartLabelOf(code: string): string {
   const account = state.chart.find((a) => a.code.trim() === code);
   return account === undefined ? code : `${account.name} - ${code}`;
+}
+
+/**
+ * The profit and loss with every income and expense account listed, those
+ * with nothing in the period at nothing, when Settings asks for it.
+ */
+function withEmptyAccounts(grouped: ReturnType<typeof groupProfitAndLoss>, showEmpty: boolean): ReturnType<typeof groupProfitAndLoss> {
+  if (!showEmpty) return grouped;
+  const classOf = reportLookups().classOf;
+  const shown = new Set(
+    [grouped.trading, grouped.costOfSales, grouped.otherIncome, grouped.operatingExpenses].flatMap((g) =>
+      g.lines.map((l) => (splitAccountLabel(l.code).code || l.code).trim()),
+    ),
+  );
+  const add: Record<"trading" | "costOfSales" | "otherIncome" | "operatingExpenses", ReportLine[]> = {
+    trading: [], costOfSales: [], otherIncome: [], operatingExpenses: [],
+  };
+  for (const account of state.chart) {
+    const code = account.code.trim();
+    if (code === "" || shown.has(code) || account.inactive === true) continue;
+    const income = /revenue|sales|income/i.test(account.type);
+    const expense = /expense|overhead|direct cost|depreciation/i.test(account.type);
+    if (!income && !expense) continue;
+    const label = `${account.name} - ${code}`;
+    const kind = classOf(label);
+    const key = income ? (kind === "otherIncome" ? "otherIncome" : "trading") : kind === "costOfSales" ? "costOfSales" : "operatingExpenses";
+    add[key].push({ code: label, net: 0, gross: 0, gst: 0, count: 0, transactionIds: [] });
+  }
+  const merged = (g: PlGroup, key: keyof typeof add): PlGroup => ({
+    ...g,
+    lines: [...g.lines, ...add[key]].sort((a, b) => a.code.localeCompare(b.code, "en-NZ", { sensitivity: "base" })),
+  });
+  return {
+    ...grouped,
+    trading: merged(grouped.trading, "trading"),
+    costOfSales: merged(grouped.costOfSales, "costOfSales"),
+    otherIncome: merged(grouped.otherIncome, "otherIncome"),
+    operatingExpenses: merged(grouped.operatingExpenses, "operatingExpenses"),
+  };
+}
+
+/**
+ * How the profit and loss, the balance sheet and the trial balance are set
+ * out, as chosen on Settings: account codes or not, cents or whole units,
+ * and whether accounts with nothing in them are listed.
+ */
+function statementDisplay(): { label: (text: string) => string; money: (cents: number) => string; showEmpty: boolean } {
+  const s = bookSettings();
+  return {
+    label: (text) => {
+      if (s.hideCodes !== true) return text;
+      const { name } = splitAccountLabel(text);
+      return name.trim() === "" ? text : name;
+    },
+    money: (cents) => {
+      if (s.wholeUnits !== true) return booksMoney(cents);
+      // Amounts are held in hundredths whatever the currency shows.
+      const whole = Math.round(cents / 100);
+      return (whole === 0 ? 0 : whole).toLocaleString(booksLocale(), { maximumFractionDigits: 0 });
+    },
+    showEmpty: s.showEmpty === true,
+  };
 }
 
 function lineRoles(): (code: string) => string {
@@ -1704,8 +1767,8 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
 
   if (basis === "accrual" && !fromImport) body.append(note(NO_JOURNAL_REPORT));
 
-  const money = (cents: Cents): string =>
-    booksMoney(cents);
+  const display = statementDisplay();
+  const money = display.money;
 
   // A general ledger brought in from the start carries every balance itself.
   const fromStart = ledgerFromStart();
@@ -1773,7 +1836,7 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
       const shown = new Set<string>();
       const rowOf = (label: string, now: Cents, then: Cents): void => {
         const row = document.createElement("tr");
-        row.append(nameCell(label));
+        row.append(nameCell(display.label(label)));
         row.append(amountCell(money(now)));
         row.append(amountCell(money(then)));
         row.append(amountCell(now === then ? "" : money((now - then) as Cents)));
@@ -1805,7 +1868,7 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
 
     for (const line of lines) {
       const row = document.createElement("tr");
-      row.append(nameCell(balanceSheetLabel(line)));
+      row.append(nameCell(display.label(balanceSheetLabel(line))));
       row.append(amountCell(line.opening === 0 ? "" : money(line.opening)));
       row.append(amountCell(line.movement === 0 ? "" : money(line.movement)));
       row.append(amountCell(money(line.closing)));
@@ -1965,18 +2028,31 @@ function renderJournal(body: HTMLElement, year: number): void {
   const table = document.createElement("table");
   table.className = "report-table owner-table";
   const head = document.createElement("thead");
+  // Set out as chosen on Settings: codes or not, cents or whole units, and
+  // the chart's accounts with nothing in them listed or not.
+  const display = statementDisplay();
+  const codes = bookSettings().hideCodes !== true;
   head.innerHTML =
-    "<tr><th>Code</th><th>Account</th><th>Lines</th><th>Debit</th><th>Credit</th></tr>";
+    `<tr>${codes ? "<th>Code</th>" : ""}<th>Account</th><th>Lines</th><th>Debit</th><th>Credit</th></tr>`;
   const tbody = document.createElement("tbody");
 
-  for (const row of [...balance.rows].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance))) {
+  const listed = [...balance.rows].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
+  if (display.showEmpty) {
+    const there = new Set(listed.map((r) => r.accountCode.trim()));
+    for (const account of state.chart) {
+      const code = account.code.trim();
+      if (code === "" || there.has(code) || account.inactive === true) continue;
+      listed.push({ accountCode: code, accountName: account.name, lines: 0, balance: 0 } as (typeof listed)[number]);
+    }
+  }
+  for (const row of listed) {
     const tr = document.createElement("tr");
     for (const [text, cls] of [
-      [/^[a-z][a-z-]*$/.test(row.accountCode) ? "" : row.accountCode, "report-name"],
+      ...(codes ? [[/^[a-z][a-z-]*$/.test(row.accountCode) ? "" : row.accountCode, "report-name"] as const] : []),
       [row.accountName, "report-name"],
-      [String(row.lines), "report-amount"],
-      [row.balance > 0 ? money(row.balance) : "", "report-amount"],
-      [row.balance < 0 ? money(-row.balance) : "", "report-amount"],
+      [row.lines === 0 ? "" : String(row.lines), "report-amount"],
+      [row.balance > 0 ? display.money(row.balance) : "", "report-amount"],
+      [row.balance < 0 ? display.money(-row.balance) : "", "report-amount"],
     ] as const) {
       const td = document.createElement("td");
       td.textContent = text;
@@ -1991,8 +2067,8 @@ function renderJournal(body: HTMLElement, year: number): void {
   const debits = balance.rows.reduce((n, r) => n + (r.balance > 0 ? r.balance : 0), 0);
   const credits = balance.rows.reduce((n, r) => n + (r.balance < 0 ? -r.balance : 0), 0);
   for (const [text, cls] of [
-    ["", "report-name"], ["Total", "report-name"], ["", "report-amount"],
-    [money(debits), "report-amount"], [money(credits), "report-amount"],
+    ...(codes ? [["", "report-name"] as const] : []), ["Total", "report-name"], ["", "report-amount"],
+    [display.money(debits), "report-amount"], [display.money(credits), "report-amount"],
   ] as const) {
     const td = document.createElement("td");
     td.textContent = text;
@@ -4706,8 +4782,8 @@ export function renderReportsPage(): void {
   table.className = "report-table";
   const tbody = document.createElement("tbody");
 
-  const money = (cents: number): string =>
-    booksMoney(cents);
+  const display = statementDisplay();
+  const money = display.money;
 
   // The same period a year earlier, when asked for: built the same way, on
   // the same basis, entity and GST choice, so the two columns are alike.
@@ -4784,7 +4860,7 @@ export function renderReportsPage(): void {
   // sales is the gross profit, and other income is kept apart so it cannot
   // flatter it. The grouping is a partition of the same lines, so the net
   // profit below is the report's own.
-  const grouped = groupProfitAndLoss(report, reportLookups().classOf);
+  const grouped = withEmptyAccounts(groupProfitAndLoss(report, reportLookups().classOf), display.showEmpty);
   // A year earlier's figure and the change, for a row: blank where there is
   // no comparison.
   const against = (now: number, then: number | undefined): { value: string; change: string } | undefined =>
@@ -4802,22 +4878,22 @@ export function renderReportsPage(): void {
     const codeOf = (line: { code: string }): string => splitAccountLabel(line.code).code || line.code;
     for (const row of nestSubAccounts(group.lines, codeOf, subAccountParent)) {
       if (row.kind === "heading") {
-        addRow(chartLabelOf(row.code), "", "report-sub-heading");
+        addRow(display.label(chartLabelOf(row.code)), "", "report-sub-heading");
         continue;
       }
       if (row.kind === "total") {
         const now = row.items.reduce((sum, line) => sum + sign(line), 0);
         const then = row.items.reduce((sum, line) => sum + (priorAll.get(line.code) ?? 0), 0);
-        addRow(`Total ${chartLabelOf(row.code)}`, money(now), "report-sub-total", "", undefined, against(now, then));
+        addRow(`Total ${display.label(chartLabelOf(row.code))}`, money(now), "report-sub-total", "", undefined, against(now, then));
         continue;
       }
       const line = row.item;
-      addRow(line.code, money(sign(line)), row.sub ? "report-sub" : "", String(line.count), line, against(sign(line), priorByCode.get(line.code)));
+      addRow(display.label(line.code), money(sign(line)), row.sub ? "report-sub" : "", line.count === 0 ? "" : String(line.count), line, against(sign(line), priorByCode.get(line.code)));
       priorByCode.delete(line.code);
     }
     // Accounts only the year before had: shown, at nothing now.
     for (const [code, then] of priorByCode) {
-      if (then !== 0) addRow(code, money(0), "", "", undefined, against(0, then));
+      if (then !== 0) addRow(display.label(code), money(0), "", "", undefined, against(0, then));
     }
     addRow(`Total ${group.title}`, money(group.total), "report-total", "", undefined, against(group.total, before?.total));
   };

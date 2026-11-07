@@ -1,4 +1,5 @@
 import { accountingDocument, documentMoney } from "../fx-books.js";
+import { bookSettings, numberingFor } from "../book-settings.js";
 import { moduleOn } from "../modules.js";
 import { creditOnAccountSection, usedInPart } from "./credit-ui.js";
 import { attachmentsControl } from "./attachments-ui.js";
@@ -195,7 +196,15 @@ function isTaxable(taxType: string): boolean {
  */
 
 function suggestInvoiceNumber(kind: InvoiceKind): string {
-  return nextInvoiceNumber(kind, state.ledger.invoices ?? []);
+  return nextInvoiceNumber(kind, state.ledger.invoices ?? [], numberingFor(kind));
+}
+
+/** The due date a new document gets from Settings, or none. */
+function dueAfter(day: string, days: number | undefined): string | null {
+  if (days === undefined) return null;
+  const at = new Date(`${day}T00:00:00Z`);
+  at.setUTCDate(at.getUTCDate() + days);
+  return at.toISOString().slice(0, 10);
 }
 
 function blankInvoice(): Invoice {
@@ -212,7 +221,7 @@ function blankInvoice(): Invoice {
       contact: "",
       reference: "",
       issued: today,
-      due: null,
+      due: dueAfter(today, bookSettings().billDueDays),
       total: 0,
       tax: 0,
       paid: 0,
@@ -232,7 +241,7 @@ function blankInvoice(): Invoice {
     contact: "",
     reference: "",
     issued: today,
-    due: null,
+    due: dueAfter(today, bookSettings().invoiceDueDays),
     total: 0,
     tax: 0,
     paid: 0,
@@ -1179,9 +1188,17 @@ export function renderInvoiceEditor(): void {
   estimate.title = `Keep it as ${quoteWord() === "Quote" ? "a quote" : "an estimate"}: it is not in the books until you make it an invoice.`;
   estimate.hidden = asBill || asReceipt;
   estimate.addEventListener("click", () => {
-    const built = build("Estimate");
+    const made = build("Estimate");
+    // Open for the days chosen in Settings, where no date is given.
+    const days = bookSettings().quoteDays;
+    const built = made.due === null && days !== undefined ? { ...made, due: dueAfter(made.issued, days) } : made;
     const prefix = quoteWord() === "Quote" ? "QU" : "EST";
-    const stem = built.number.replace(/^INV/i, prefix);
+    // The invoice series' prefix swapped for the quote's: INV-0042 is QU-0042,
+    // and KEA-0042, in books numbered KEA-, is QU-0042 too, not QU-KEA-0042.
+    const own = numberingFor("sales")?.prefix;
+    const stem = own !== undefined && built.number.toLowerCase().startsWith(own.toLowerCase())
+      ? `${prefix}-${built.number.slice(own.length)}`
+      : built.number.replace(/^INV/i, prefix);
     void saveInvoice({ ...built, number: stem === built.number && existing === undefined ? `${prefix}-${built.number}` : stem }, existing);
   });
 
@@ -1425,6 +1442,10 @@ export function supplierFor(invoice: Invoice): InvoiceSupplier | null {
     ...(entity.gstNumber === undefined ? {} : { gstNumber: entity.gstNumber }),
     ...(entity.payTo === undefined ? {} : { payTo: entity.payTo }),
     ...(entity.logo === undefined ? {} : { logo: entity.logo }),
+    ...(entity.legalName === undefined ? {} : { legalName: entity.legalName }),
+    ...(entity.phone === undefined ? {} : { phone: entity.phone }),
+    ...(entity.email === undefined ? {} : { email: entity.email }),
+    ...(entity.website === undefined ? {} : { website: entity.website }),
   };
 }
 
@@ -1474,7 +1495,7 @@ function editInvoiceCell(invoice: Invoice): HTMLTableCellElement {
         "or save as PDF, or open it in Word to change the wording.";
       send.addEventListener("click", () => {
         download(
-          invoiceDocument(invoice, supplier, { ...documentOptions(), ...salesTaxWords(invoice), ...(isEstimate(invoice) ? { title: quoteWord() } : {}) }),
+          invoiceDocument(invoice, supplier, { ...documentOptions(), ...salesTaxWords(invoice), ...(isEstimate(invoice) ? { title: quoteWord(), dueLabel: "Valid until" } : {}) }),
           `${invoice.number || "invoice"}.html`,
           "text/html;charset=utf-8",
         );
@@ -1522,7 +1543,7 @@ function editInvoiceCell(invoice: Invoice): HTMLTableCellElement {
         "file to attach to it. Nothing is sent from here.";
       mail.addEventListener("click", () => {
         download(
-          invoiceDocument(invoice, supplier, { ...documentOptions(), ...salesTaxWords(invoice), ...(isEstimate(invoice) ? { title: quoteWord() } : {}) }),
+          invoiceDocument(invoice, supplier, { ...documentOptions(), ...salesTaxWords(invoice), ...(isEstimate(invoice) ? { title: quoteWord(), dueLabel: "Valid until" } : {}) }),
           `${invoice.number || "invoice"}.html`,
           "text/html;charset=utf-8",
         );
@@ -1535,7 +1556,7 @@ function editInvoiceCell(invoice: Invoice): HTMLTableCellElement {
         const standard = invoiceEmail(
           invoice.email === undefined && known !== null ? { ...invoice, email: known } : invoice,
           supplier,
-          { ...documentOptions(), ...(isEstimate(invoice) ? { title: quoteWord() } : {}) },
+          { ...documentOptions(), ...(isEstimate(invoice) ? { title: quoteWord(), dueLabel: "Valid until" } : {}) },
         );
         // The books' own wording, where they have changed it.
         const own = state.ledger.emailWording?.invoice;
