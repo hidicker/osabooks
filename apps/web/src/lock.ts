@@ -184,7 +184,7 @@ Nothing was changed. An owner of these books can give you ` +
       `${event.reason.message}
 
 Nothing was changed. To change it, move the lock first ` +
-        "(Setup → Lock dates).",
+        "(Settings → Lock dates).",
     );
   });
 }

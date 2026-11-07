@@ -33,7 +33,7 @@ South Korea has no demo books: start empty Korean books from Setup.
 
 ## Modules
 
-Most pages appear only when their module is on. **Modules** (under Set up)
+Most pages appear only when their module is on. **Modules** (under Your books)
 turns each on or off; many turn on by themselves once the books hold
 something for them. A module for one country's forms is off in the others.
 
@@ -179,27 +179,30 @@ at the top. Click an account to see its lines. Download as CSV or Excel.
   - [ ] 부가가치세 VAT return
   - [ ] 종합소득세 Income tax estimate
 
-### Set up
+### Getting started
 - [ ] **Start here**: the guided start (country, where the books come from,
   entities, modules, AI).
-- [ ] **Modules**.
-- [ ] **Settings**: every setting in one place, each opening its page; set
-  here: due dates and quote validity, numbering, document colour, the
-  reports' basis and display, time zone, each asset type's depreciation
-  account, a link for contacts to another system; payment reminders (on the
-  days overdue chosen, above a minimum): sent by themselves for online
-  books, listed to open one by one for books in the browser, with a card
-  under Actions required; a contact's "No payment reminders" tick.
-- [ ] **Setup**: country, start again empty, source system, files, last
-  year's return.
+- [ ] **Initial set-up**: country, start again empty, source system, files,
+  last year's return. The group folds away once set-up is done.
 - [ ] **Opening balances**: edit, balance check, Enter bank balances.
 - [ ] **Coding reconciliation**: another system's coding beside OsaBooks',
   Keep mine, make rules.
+
+### Your books
+- [ ] **Settings**: every setting in one place, each opening its page; set
+  here: due dates and quote validity, numbering, document colour, the
+  reports' basis and display, time zone, lock dates, each asset type's
+  depreciation account, a link for contacts to another system; payment
+  reminders (on the days overdue chosen, above a minimum): sent by themselves
+  for online books, listed to open one by one for books in the browser, with
+  a card under Actions required; a contact's "No payment reminders" tick.
+  No entity picker on Settings and other pages the same for every entity.
 - [ ] **Entities & accounts**: entities and their settings (kind, structure,
-  owners and shares by date, shareholders, GST, loans, non-profit and trust
-  settings), the chart, Standard accounts, Move lines, Make sub-account,
-  Invoice details.
+  owners and shares by date, shareholders, GST and its basis, NZBN, a
+  provisional tax ratio, loans, non-profit and trust settings), the chart,
+  Standard accounts, Move lines, Make sub-account, Invoice details.
 - [ ] **Rules**: add, priority, bank account, export and import.
+- [ ] **Modules**.
 
 ### AI
 - [ ] **AI suggestions**: turn on, own key or shared, copy prompts.

@@ -1650,7 +1650,7 @@ function companyTaxSection(year: number, taxableProfit: Cents): HTMLElement {
     wrap.append(
       note(
         `No return for the year to ${taxYearEndSaid(year - 1)} is held, so no loss is brought forward and ` +
-          "this year's provisional tax is not known. Read last year's IR4 in under Setup, Last " +
+          "this year's provisional tax is not known. Read last year's IR4 in on Initial set-up, Last " +
           "year's income tax return.",
       ),
     );

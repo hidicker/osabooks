@@ -2226,7 +2226,7 @@ function doneQuestion(number: number, held: Onboarding): HTMLElement {
       : "These books know whose they are. ") +
       (left.length === 0
         ? "Everything Setup asks for is done; Reconcile is where the daily work starts."
-        : `Still to do on Setup: ${leftList}. ${left.length === 1 ? "It says" : "Each says"} what it would give you.`),
+        : `Still to do on Initial set-up: ${leftList}. ${left.length === 1 ? "It says" : "Each says"} what it would give you.`),
   ];
   if (several) {
     points.push(
@@ -2244,7 +2244,7 @@ function doneQuestion(number: number, held: Onboarding): HTMLElement {
   inner.append(
     advice(...points),
     actions(
-      button("Continue to Setup →", () => showPage("setup", "top"), true),
+      button("Continue to Initial set-up →", () => showPage("setup", "top"), true),
       ...(several ? [button("Entities & accounts", () => showPage("entities"))] : []),
     ),
   );
@@ -2351,7 +2351,7 @@ function modulesQuestion(number: number, held: Onboarding): HTMLElement {
         (following.length > 0
           ? `From your entities and where these books came from, they cover: ${following.join(", ")}. `
           : "") +
-        "Tick anything else they need. All of it can be changed later under Set up, Modules.",
+        "Tick anything else they need. All of it can be changed later under Your books, Modules.",
     ),
   );
   const hasBusiness = (state.ledger.entities?.entities ?? []).some((e) => (e.kind ?? "business") === "business");
@@ -2591,7 +2591,7 @@ function xeroGuide(held: Onboarding): HTMLElement {
   add("h4", "3. Load the files");
   add(
     "p",
-    "Drop them on Setup all at once, with your bank's exports. Each file is recognised and " +
+    "Drop them on Initial set-up all at once, with your bank's exports. Each file is recognised and " +
       "sorted before it is read (bank statements first, then the chart and account " +
       "transactions, then journals, invoices and assets, and the trial balance last), so the " +
       "order you pick them in does not matter.",

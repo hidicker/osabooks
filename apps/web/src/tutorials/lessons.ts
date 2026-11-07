@@ -97,13 +97,19 @@ export const LESSONS: readonly Lesson[] = [
         when: () => onScreen(document.querySelector('.sidebar-group[data-group="yearend"]')),
       },
       {
-        title: "Set up",
-        body: () =>
-          "Done once and then rarely: your entities, chart of accounts, " +
-          (noSalesTax() ? "" : "GST settings, ") +
-          "opening balances and coding rules. Pages only appear for what your books use, so a sole trader " +
-          "never sees a trust's.",
+        title: "Getting started",
+        body:
+          "Done once: the guided start, where the books come from, and their opening balances. It folds away " +
+          "once it is done.",
         target: q('.sidebar-group[data-group="setup"]'),
+      },
+      {
+        title: "Your books",
+        body: () =>
+          "Kept up as you go: Settings, your entities and chart of accounts" +
+          (noSalesTax() ? "" : ", GST settings") +
+          ", coding rules and modules. Pages only appear for what your books use, so a sole trader never sees a trust's.",
+        target: q('.sidebar-group[data-group="yourbooks"]'),
       },
       {
         title: "Modules",
@@ -661,7 +667,7 @@ export const LESSONS: readonly Lesson[] = [
       {
         title: "Drop them in",
         body:
-          "Drop both files, or the zip, on Setup or on Start here. OsaBooks works out what each one is: the chart becomes the " +
+          "Drop both files, or the zip, on Initial set-up or on Start here. OsaBooks works out what each one is: the chart becomes the " +
           "chart, the bank and card postings become bank lines, invoices and bills come in with their payments, " +
           "and the rest of the entries become journals. From QuickBooks Desktop, drop its IIF file of lists and " +
           "its Transaction Detail by Account report: the lists bring the accounts, customers and vendors, the " +

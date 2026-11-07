@@ -594,7 +594,7 @@ export function actionItems(): ActionItem[] {
   if (steps.length > 0) {
     items.push({
       key: "setup",
-      what: "Set-up",
+      what: "Initial set-up",
       count: steps.length,
       urgency: "amber",
       detail: `Still to do: ${steps.map((step) => step.what).join(", ")}.`,

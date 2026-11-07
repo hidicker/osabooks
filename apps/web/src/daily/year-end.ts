@@ -603,6 +603,6 @@ export function renderYearEnd(body: HTMLElement, year: number): void {
   if (moduleOn("vehicle")) renderVehicles(body, year, posted);
   if (moduleOn("business")) renderPrepayments(body, year, posted);
   if (!moduleOn("vehicle") && !moduleOn("business")) {
-    body.append(note("Neither vehicle private use nor prepayments is on for these books. Turn them on under Setup, What these books cover."));
+    body.append(note("Neither vehicle private use nor prepayments is on for these books. Turn them on in Modules."));
   }
 }

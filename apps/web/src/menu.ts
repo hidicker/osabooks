@@ -498,7 +498,7 @@ export function wireMenu(): void {
 }
 
 /**
- * Where Bank import sits: under Daily, or under Set up once a bank feed is
+ * Where Bank import sits: under Daily, or under Getting started once a bank feed is
  * connected.
  *
  * With a feed, transactions arrive on their own each time the books open, and

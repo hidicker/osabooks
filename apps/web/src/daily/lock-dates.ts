@@ -66,14 +66,13 @@ export async function offerGstLock(periodEnd: string): Promise<void> {
 }
 
 export function renderLockDates(): void {
-  const body = document.getElementById("setup-locks");
+  // On Settings, under its own row's name: lock dates are kept up as the
+  // books go, not set once.
+  const body = document.getElementById("settings-locks");
   if (body === null) return;
   body.textContent = "";
   const locks = state.ledger.lockDates ?? {};
 
-  const heading = document.createElement("h3");
-  heading.textContent = "Lock dates";
-  body.append(heading);
   body.append(
     note(
       "Finished periods stay as they were finished. " +
@@ -243,7 +242,7 @@ async function setLocks(next: LockDates): Promise<void> {
       ? "none"
       : [l.gst ? `GST to ${l.gst}` : "", l.year ? `year to ${l.year}` : ""].filter((p) => p !== "").join(", ");
   await record("lockDates", `Lock dates: ${words(before)} → ${words(empty ? null : next)}`, before, empty ? null : next);
-  redraw("setup");
+  redraw("settings");
   redraw("actionsBadge");
 }
 
@@ -266,7 +265,7 @@ export function renderLockedArrivals(): void {
     note(
       "These arrived after their period was locked, so they were kept out of it. Bring one in " +
         `dated ${open ?? "the first open day"}, the first day not locked; leave it out; or move the ` +
-        "lock (Setup → Lock dates) to put it in its own period.",
+        "lock (Settings → Lock dates) to put it in its own period.",
     ),
   );
   const table = document.createElement("table");
