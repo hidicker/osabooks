@@ -65,7 +65,7 @@ import {
 import type { Account, Entity } from "@nzosa/core";
 import { societyFiguresEntered } from "../daily/society-report-page.js";
 import { taxYearEndSaid, taxYearOf, taxYearStart } from "../tax-year.js";
-import { DEMO_SEEDED, markDemoSeeded, persistRules, record } from "../books.js";
+import { DEMO_SEEDED, ensureBetweenAccounts, markDemoSeeded, persistRules, record } from "../books.js";
 import { isDemoBuild } from "../ai-consent.js";
 import { savePart } from "../store.js";
 import { anyModuleOn, applyModules, moduleOn, modulesHere, modulesPanel } from "../modules.js";
@@ -1723,6 +1723,9 @@ async function startAgainIn(country: string, button: HTMLButtonElement): Promise
     forgetOnboarding();
     // Put on the emptied books as they open, before their starter chart goes in.
     rememberNewBooksCountry(country);
+    // On the demo, empty books are otherwise filled with demo books as they
+    // open: chosen empty, they stay empty until Demo books are chosen again.
+    if (isDemoBuild()) setDemoEmpty(true);
     location.reload();
   } catch (error) {
     await tellOnPage(`Could not start these books again: ${(error as Error).message}`);
@@ -1986,10 +1989,12 @@ export async function loadDemoData(button: HTMLButtonElement, persona?: string):
   try {
     const countryBefore = booksCountry().id;
     await wipe();
+    setDemoEmpty(false);
     await loadStartupFiles(demoFolder(which), true);
     // Only once it has loaded: a choice that failed must not be remembered.
     if (state.ledger.transactions.length > 0) rememberDemoPersona(which);
     reclassify();
+    await ensureBetweenAccounts();
     // Another country's books come with another country's reports, tax and
     // currency, set as the app opens: drawn again from the start, so none of
     // the last books' pages is left behind. What was loaded is already kept.
@@ -2054,6 +2059,26 @@ export async function seedStarterChart(): Promise<void> {
  * A folder-backed app never reaches here. There the books are the folder, and
  * a demo belongs in a folder of its own.
  */
+const DEMO_EMPTY = "nzosa:demo-empty";
+
+/** Whether the demo's visitor chose empty books (Start again), so none are filled in. */
+function demoEmpty(): boolean {
+  try {
+    return localStorage.getItem(DEMO_EMPTY) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function setDemoEmpty(on: boolean): void {
+  try {
+    if (on) localStorage.setItem(DEMO_EMPTY, "1");
+    else localStorage.removeItem(DEMO_EMPTY);
+  } catch {
+    // Storage blocked: the demo fills empty books, as before.
+  }
+}
+
 export async function seedBrowser(): Promise<void> {
   // A copy that ships its own data still wins: `data/` is somebody's
   // deliberate seed, and the demo is only the fallback for an empty one. The
@@ -2074,7 +2099,9 @@ export async function seedBrowser(): Promise<void> {
   // On the demo the books are only ever the invented ones, so empty books are
   // filled whatever the flag says: a visitor whose flag outlived the books (or
   // was set while the demo was opening books on the server) saw an empty demo.
+  // Unless the visitor started again with empty books on purpose.
   if (already && !isDemoBuild()) return;
+  if (isDemoBuild() && demoEmpty()) return;
 
   // The demo's own choice of books: the visitor's last, or the set for their
   // part of the world on a first visit.
@@ -2084,6 +2111,9 @@ export async function seedBrowser(): Promise<void> {
   markDemoSeeded();
   rememberDemoPersona(which);
   reclassify();
+  // The accounts for money between entities, which the opening added before
+  // these books were in: without them each entity's balance sheet was out.
+  await ensureBetweenAccounts();
   const about = DEMO_PERSONAS.find((p) => p.id === which)?.about;
   state.startupMessage =
     (which === "" || about === undefined

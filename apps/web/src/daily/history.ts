@@ -111,7 +111,7 @@ export function renderHistory(): void {
 
   const kindSelect = $<HTMLSelectElement>("history-kind");
   const chosen = kindSelect.value;
-  const kinds = [...new Set(state.events.map((e) => e.kind))];
+  const kinds = [...new Set(state.events.map(kindOf))];
   kindSelect.textContent = "";
   const all = document.createElement("option");
   all.value = "";
@@ -120,7 +120,7 @@ export function renderHistory(): void {
   for (const kind of kinds) {
     const option = document.createElement("option");
     option.value = kind;
-    option.textContent = KIND_LABELS[kind];
+    option.textContent = labelOf(kind);
     option.selected = kind === chosen;
     kindSelect.append(option);
   }
@@ -136,7 +136,7 @@ export function renderHistory(): void {
     return;
   }
 
-  const shown = state.events.filter((e) => chosen === "" || e.kind === chosen);
+  const shown = state.events.filter((e) => chosen === "" || kindOf(e) === chosen);
   // Say what the log costs. A deep history is only a good idea while it stays
   // small, and the number is the thing that tells you whether it has.
   const bytes = new Blob([JSON.stringify(state.events)]).size;
@@ -162,7 +162,7 @@ export function renderHistory(): void {
     for (const [text, cls] of [
       [when, "report-name"],
       [event.who, "report-name"],
-      [KIND_LABELS[event.kind], "report-name"],
+      [labelOf(kindOf(event)), "report-name"],
       [event.summary, "report-name"],
     ] as const) {
       const td = document.createElement("td");
@@ -197,6 +197,20 @@ export function renderHistory(): void {
 }
 
 /** Filtering the change log by what kind of change it was. */
+/**
+ * What a change is, as History lists it: a bill is kept as an invoice of the
+ * purchase kind, and said as a bill, with a filter of its own.
+ */
+function kindOf(event: { kind: string; before?: unknown; after?: unknown }): string {
+  if (event.kind !== "invoice") return event.kind;
+  const items = [event.before, event.after].flatMap((v) => (Array.isArray(v) ? v : v === null || v === undefined ? [] : [v]));
+  return items.length > 0 && items.every((i) => (i as { kind?: string } | null)?.kind === "purchase") ? "bill" : "invoice";
+}
+
+function labelOf(kind: string): string {
+  return kind === "bill" ? "Bill" : (KIND_LABELS as Record<string, string>)[kind] ?? kind;
+}
+
 export function wireHistory(): void {
   $<HTMLSelectElement>("history-kind").addEventListener("change", () => redraw("history"));
 }
@@ -324,6 +338,21 @@ function todaySection(body: HTMLElement): void {
       tr.append(nameCell(index === 0 ? transaction.date : ""));
       tr.append(nameCell(index === 0 ? transaction.otherParty || transaction.particulars || "" : ""));
       tr.append(amountCell(index === 0 ? formatAmount(transaction.amount) : ""));
+      tr.append(nameCell(`${line.accountCode} ${line.accountName}`.trim()));
+      tr.append(amountCell(line.amount > 0 ? formatAmount(line.amount) : ""));
+      tr.append(amountCell(line.amount < 0 ? formatAmount(-line.amount) : ""));
+      tbody.append(tr);
+    });
+  }
+
+  // Invoices and manual journals: no bank line behind them, so listed by
+  // their own date and narration.
+  for (const journal of work.journals.filter((j) => !claimed.has(j))) {
+    journal.lines.forEach((line, index) => {
+      const tr = document.createElement("tr");
+      tr.append(nameCell(index === 0 ? journal.date : ""));
+      tr.append(nameCell(index === 0 ? journal.narration ?? journal.transactionId : ""));
+      tr.append(amountCell(""));
       tr.append(nameCell(`${line.accountCode} ${line.accountName}`.trim()));
       tr.append(amountCell(line.amount > 0 ? formatAmount(line.amount) : ""));
       tr.append(amountCell(line.amount < 0 ? formatAmount(-line.amount) : ""));

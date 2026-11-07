@@ -5,7 +5,7 @@ import {
   postedJournals,
   reportEngine,
   varianceInput,
-  journalInEntity,
+  entityView,
   betweenTagFor,
 } from "../books.js";
 import { state } from "../state.js";
@@ -352,13 +352,9 @@ function buildSheetViewsXml(splitRow = 3): string {
  */
 function buildSummaryTrialBalanceSheet(ctx: SheetContext): string {
   const { year, from, to, entityName, gstNumber, exportBasis, startYear, yearLabel } = ctx;
-  // The entity's journals: those through its own bank accounts, and those
-  // posting to its accounts from anybody's.
-  const inEntity = journalInEntity();
-  const journals = postedJournals().filter((journal) => {
-    if (journal.date < from || journal.date > to) return false;
-    return inEntity === null || inEntity(journal);
-  });
+  // The entity's own lines, as its balance sheet and IR10 have them: a
+  // journal it shares with another entity brings only its side.
+  const journals = entityView(postedJournals(), undefined).journals.filter((journal) => journal.date >= from && journal.date <= to);
 
   const byCode = new Map(state.chart.map((a) => [a.code, a]));
   const byName = new Map(state.chart.map((a) => [a.name.trim().toLowerCase(), a]));
@@ -377,7 +373,9 @@ function buildSummaryTrialBalanceSheet(ctx: SheetContext): string {
   }
 
   const openingMap = new Map<string, number>();
-  const openingObj = state.ledger.openingBalances;
+  const openingObj = entityView([], state.ledger.openingBalances).opening;
+  // Bank accounts are kept by their own ids, not in the chart.
+  const bankIds = new Set(state.ledger.transactions.map((t) => t.account));
   if (openingObj) {
     const priorEnd = taxYearEnd(startYear - 1);
     const accounts = (openingObj.byDate && openingObj.byDate[priorEnd]) || openingObj.accounts || {};
@@ -449,7 +447,7 @@ function buildSummaryTrialBalanceSheet(ctx: SheetContext): string {
       totalExpenses += (debitCents - creditCents) / 100;
     }
 
-    if (type.toLowerCase() === "bank") {
+    if (type.toLowerCase() === "bank" || bankIds.has(code)) {
       totalBankClosing += closing;
     }
   }
@@ -567,13 +565,9 @@ function buildSummaryTrialBalanceSheet(ctx: SheetContext): string {
  */
 function buildGeneralLedgerSheet(ctx: SheetContext): string {
   const { year, from, to, entityName } = ctx;
-  // The entity's journals: those through its own bank accounts, and those
-  // posting to its accounts from anybody's.
-  const inEntity = journalInEntity();
-  const journals = postedJournals().filter((journal) => {
-    if (journal.date < from || journal.date > to) return false;
-    return inEntity === null || inEntity(journal);
-  });
+  // The entity's own lines, as its balance sheet and IR10 have them: a
+  // journal it shares with another entity brings only its side.
+  const journals = entityView(postedJournals(), undefined).journals.filter((journal) => journal.date >= from && journal.date <= to);
 
   const rows = generalLedgerRows(journals);
   const widths = [12, 14, 16, 32, 14, 26, 34, 16, 16, 16, 22, 16];
@@ -781,13 +775,9 @@ function buildBankTransactionsSheet(ctx: SheetContext): string {
  */
 function buildRevenueExpensesSheet(ctx: SheetContext): string {
   const { year, from, to, entityName } = ctx;
-  // The entity's journals: those through its own bank accounts, and those
-  // posting to its accounts from anybody's.
-  const inEntity = journalInEntity();
-  const journals = postedJournals().filter((journal) => {
-    if (journal.date < from || journal.date > to) return false;
-    return inEntity === null || inEntity(journal);
-  });
+  // The entity's own lines, as its balance sheet and IR10 have them: a
+  // journal it shares with another entity brings only its side.
+  const journals = entityView(postedJournals(), undefined).journals.filter((journal) => journal.date >= from && journal.date <= to);
 
   const byCode = new Map(state.chart.map((a) => [a.code, a]));
   const byName = new Map(state.chart.map((a) => [a.name.trim().toLowerCase(), a]));
@@ -2976,7 +2966,9 @@ export function buildExcelReport(targetYear?: number | "all"): Uint8Array {
 
   const entity = reportingEntity();
   const entityName = entity?.name ?? "All entities";
-  const gstNumber = entity?.gstNumber ?? "";
+  // Registered with no number typed in is still registered: it said "Not
+  // registered" for a company filing GST returns.
+  const gstNumber = (entity?.gstNumber ?? "").trim() || (entity !== undefined && entity.gstRegistered !== false ? "registered (number not entered)" : "");
   const basisEl = typeof document !== "undefined" ? (document.getElementById("report-basis") as HTMLSelectElement | null) : null;
   const exportBasis = basisEl?.value === "cash" ? "Cash Basis" : "Accrual / Posted Basis";
 

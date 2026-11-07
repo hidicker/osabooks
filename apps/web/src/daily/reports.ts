@@ -34,8 +34,7 @@ import {
   manualJournalGstAccount,
   ledgerFromStart,
   invoicesInPlay,
-  entityBankAccounts,
-  postedLineOwners,
+  entityView,
   companyCurrentAccounts,
   isCompanyEntity,
 } from "../books.js";
@@ -1442,21 +1441,11 @@ function entityPart(
 ): { journals: PostedJournal[]; opening: OpeningBalances | undefined; assets: FixedAsset[] } {
   const entity = state.entityFilter;
   const allAssets = state.ledger.assets ?? [];
-  if (entity === "") return { journals, opening, assets: allAssets };
+  // With one entity everything is its: narrowed, its uncoded lines, which
+  // name no account, were dropped and its balance sheet was out by them.
+  if (entity === "" || (state.ledger.entities?.entities ?? []).length < 2) return { journals, opening, assets: allAssets };
   const model = state.ledger.entities ?? emptyEntityModel();
-  const banks = new Set(entityBankAccounts());
-  const mine = (code: string, name = ""): boolean =>
-    banks.has(code) || model.accounts[accountEntityKey({ code, name })] === entity;
-  // Each line by the rule the between-entity journals follow, so an uncoded
-  // line stays with the bank account that moved: dropped, the entity's bank
-  // balance stood without its other side and the balance sheet was out by it.
-  const owners = postedLineOwners();
-  const kept = journals
-    .map((j) => {
-      const whose = owners(j);
-      return { ...j, lines: j.lines.filter((l, i) => (whose[i] !== undefined ? whose[i] === entity : mine(l.accountCode, l.accountName))) };
-    })
-    .filter((j) => j.lines.length > 0);
+  const view = entityView(journals, opening);
   // An asset is the entity's whose fixed asset account it is posted to: the
   // same match the depreciation and disposal journals make.
   const fixed = state.chart.filter((a) => /fixed asset/i.test(a.type) && !/accumulated depreciation/i.test(a.name));
@@ -1464,20 +1453,7 @@ function entityPart(
     const account = bestAccountMatch(fixed, asset.type);
     return account !== undefined && model.accounts[accountEntityKey(account)] === entity;
   });
-  if (opening === undefined) return { journals: kept, opening, assets };
-  const only = (accounts: Record<string, Cents>): Record<string, Cents> =>
-    Object.fromEntries(Object.entries(accounts).filter(([code]) => mine(code)));
-  return {
-    journals: kept,
-    assets,
-    opening: {
-      ...opening,
-      accounts: only(opening.accounts),
-      ...(opening.byDate !== undefined
-        ? { byDate: Object.fromEntries(Object.entries(opening.byDate).map(([d, a]) => [d, only(a as Record<string, Cents>)])) }
-        : {}),
-    },
-  };
+  return { ...view, assets };
 }
 
 /**
@@ -1785,11 +1761,22 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
   // sheet that does not balance is not a figure to read past.
   const proof = document.createElement("p");
   proof.className = sheet.imbalance === 0 ? "journal-balanced" : "journal-out";
+  // One entity of several: its opening balances can be out on their own when
+  // the books' opening equity is held in one entity's account. Said as that,
+  // with where to fix it, rather than as a fault.
+  const openingOut =
+    state.entityFilter !== "" && opening !== undefined
+      ? Object.values(opening.accounts).reduce((sum, cents) => sum + cents, 0)
+      : 0;
   proof.textContent =
     sheet.imbalance === 0
       ? "Balanced. Net assets equal total equity."
-      : `Out of balance by ${money(sheet.imbalance)}. The opening balances or a journal do ` +
-        "not balance; report this as a fault.";
+      : openingOut !== 0
+        ? `Out of balance by ${money(sheet.imbalance)}. This entity's opening balances do not balance on their own ` +
+          `(out by ${money(openingOut)}): the opening equity is held in another entity's account. ` +
+          "On Opening balances, give this entity its own opening equity."
+        : `Out of balance by ${money(sheet.imbalance)}. The opening balances or a journal do ` +
+          "not balance; report this as a fault.";
   body.append(proof);
 
   // Scope, said plainly.
@@ -1940,13 +1927,60 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
   );
 }
 
+/**
+ * The trial balance at the end of the period: each balance sheet account at
+ * its closing balance (the opening balances and every posting since), each
+ * income and expense account for the period, and the profit of earlier
+ * periods on a line of its own, where retained earnings would hold it. So it
+ * agrees with the balance sheet, and its debits still equal its credits.
+ */
+function closingTrialBalance(
+  view: { journals: readonly PostedJournal[]; opening: OpeningBalances | undefined },
+  from: string,
+  to: string,
+): { accountCode: string; accountName: string; lines: number; balance: number }[] {
+  const byCode = new Map(state.chart.map((a) => [a.code.trim(), a]));
+  const income = (code: string): boolean => {
+    const type = byCode.get(code.trim())?.type ?? "";
+    return /revenue|sales|income|expense|overhead|direct cost|depreciation/i.test(type) && !/current|fixed|asset|liabilit|equity/i.test(type);
+  };
+  const rows = new Map<string, { accountCode: string; accountName: string; lines: number; balance: number }>();
+  const row = (code: string, name: string) => {
+    const key = code.trim() || name;
+    const held = rows.get(key) ?? { accountCode: code, accountName: name, lines: 0, balance: 0 };
+    rows.set(key, held);
+    return held;
+  };
+  const opening = view.opening;
+  const openAt = opening?.asAt;
+  if (opening !== undefined && openAt !== undefined && openAt <= to) {
+    for (const [code, cents] of Object.entries(opening.accounts)) {
+      if (cents === 0) continue;
+      row(code, byCode.get(code.trim())?.name ?? bankLabel(code)).balance += cents;
+    }
+  }
+  let earlier = 0;
+  for (const journal of view.journals) {
+    if (journal.date > to || (openAt !== undefined && journal.date <= openAt)) continue;
+    for (const line of journal.lines) {
+      if (income(line.accountCode) && journal.date < from) {
+        earlier += line.amount;
+        continue;
+      }
+      const held = row(line.accountCode, line.accountName);
+      held.balance += line.amount;
+      if (journal.date >= from) held.lines += 1;
+    }
+  }
+  if (earlier !== 0) row("", "Profit of earlier periods (in retained earnings)").balance += earlier;
+  return [...rows.values()].filter((r) => r.balance !== 0 || r.lines > 0);
+}
+
 function renderJournal(body: HTMLElement, year: number): void {
   const { from, to } = reportRange(year);
-  const inEntity = journalInEntity();
-  const journals = reportPostings().filter((j) => {
-    if (j.date < from || j.date > to) return false;
-    return inEntity === null || inEntity(j);
-  });
+  // The chosen entity's own lines, as its balance sheet has them.
+  const view = entityView(reportPostings(), state.ledger.openingBalances);
+  const journals = view.journals.filter((j) => j.date >= from && j.date <= to);
 
   const heading = document.createElement("h3");
   heading.textContent = `Journal and trial balance, ${periodHeading(year)}`;
@@ -2025,6 +2059,15 @@ function renderJournal(body: HTMLElement, year: number): void {
     );
   }
 
+  const tbHeading = document.createElement("h4");
+  tbHeading.textContent = `Trial balance at ${daySaid(to)}`;
+  body.append(
+    tbHeading,
+    note(
+      "Balance sheet accounts at their closing balance, from the opening balances and every posting since; income and expenses for the period. " +
+        "It agrees with the balance sheet on the same day. The proof above is of the period's postings.",
+    ),
+  );
   const table = document.createElement("table");
   table.className = "report-table owner-table";
   const head = document.createElement("thead");
@@ -2036,7 +2079,7 @@ function renderJournal(body: HTMLElement, year: number): void {
     `<tr>${codes ? "<th>Code</th>" : ""}<th>Account</th><th>Lines</th><th>Debit</th><th>Credit</th></tr>`;
   const tbody = document.createElement("tbody");
 
-  const listed = [...balance.rows].sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
+  const listed = closingTrialBalance(view, from, to).sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
   if (display.showEmpty) {
     const there = new Set(listed.map((r) => r.accountCode.trim()));
     for (const account of state.chart) {
