@@ -80,7 +80,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
   },
   {
     id: "",
-    label: "A coffee roastery with two rentals",
+    label: "A coffee roastery with two rentals (New Zealand)",
     shows: "Invoices, GST returns, a company's IR4, rental schedules and the owners' IR3s",
     about: "These demo books are invented: Kea Coffee Roasters in Nelson, and two rental properties owned by Ana and Tom Whitcombe.",
     page: "reconcile",
@@ -88,7 +88,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
   },
   {
     id: "payroll",
-    label: "A bakery with three staff",
+    label: "A bakery with three staff (New Zealand)",
     shows: "Pay runs, PAYE and KiwiSaver, payday filing, GST and the company's IR4",
     about: "These demo books are invented: Māpua Bakehouse Limited, a bakery and café with three staff on fortnightly pay, registered for GST.",
     page: "payroll",
@@ -96,7 +96,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
   },
   {
     id: "society",
-    label: "A sailing club (incorporated society)",
+    label: "A sailing club (incorporated society, New Zealand)",
     shows: "Grants and what became of them, the society's statements and its IR9",
     about: "These demo books are invented: Harbourside Sailing Club, an incorporated society with 124 members, a clubroom bar and a grant to renew its training fleet.",
     page: "grants",
@@ -104,7 +104,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
   },
   {
     id: "trust",
-    label: "A family trust",
+    label: "A family trust (New Zealand)",
     shows: "Settlor, beneficiaries and their accounts, income allocated, and the IR6",
     about: "These demo books are invented: the Whitcombe Family Trust, which owns a rental house and a term deposit, and allocates its income to two beneficiaries.",
     page: "ir6",
@@ -112,7 +112,7 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
   },
   {
     id: "personal",
-    label: "A person with a rental flat",
+    label: "A person with a rental flat (New Zealand)",
     shows: "Salary, interest and dividends, a rental schedule, and the IR3",
     about: "These demo books are invented: Sam Taylor, a physiotherapist on a salary, with a home loan, some shares and a rental flat.",
     page: "personalyear",

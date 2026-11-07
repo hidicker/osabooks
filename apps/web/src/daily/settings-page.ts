@@ -111,7 +111,18 @@ function groups(): { title: string; rows: Row[] }[] {
     {
       title: "Reporting",
       rows: [
-        { name: "Reports' basis", what: "Which basis the reports open on.", status: "here" },
+        {
+          name: "Reports' basis",
+          what: country.salesTax === null
+            ? "Which basis the profit and loss, the balance sheet and the other reports open on: accrual, as invoices and bills are raised, or cash, as money moves."
+            : `Which basis the profit and loss, the balance sheet and the other reports open on: accrual, as invoices and bills are raised, or cash, as money moves. ` +
+              `It does not change the ${tax === "VAT" ? "VAT" : "GST"} returns: each entity's ${tax === "VAT" ? "VAT" : "GST"} has its own basis on Entities & accounts` +
+              (country.id === "kr"
+                ? " (in Korea always on the invoice)."
+                : `, so ${tax === "VAT" ? "VAT" : "GST"} can be on the ${nz ? "payments" : "cash"} basis while the accounts are on accrual, as is usual.`),
+          status: "here",
+          where: country.salesTax === null ? [] : [{ page: "entities", label: "Entities & accounts" }],
+        },
         {
           name: "Display",
           what: "How the profit and loss, the balance sheet and the trial balance are set out.",
