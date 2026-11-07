@@ -33,6 +33,8 @@ export interface InvoiceSupplier {
   logo?: string;
   /** The legal name, printed under the trading name where it differs. */
   legalName?: string;
+  /** A business number to print, with what it is called: "NZBN 9429041234567". */
+  businessNumber?: { label: string; value: string };
   /** How to reach the supplier, each printed when there is one. */
   phone?: string;
   email?: string;
@@ -241,6 +243,7 @@ export function invoiceDocument(
       ${supplier.address ? asLines(supplier.address) : ""}
       ${[supplier.phone, supplier.email, supplier.website].filter((x): x is string => x !== undefined && x.trim() !== "").map((x) => `<div>${escapeHtml(x.trim())}</div>`).join("")}
       ${registered ? `<div>${escapeHtml(options.taxIdLabel ?? "GST")} ${escapeHtml(gstNumber)}</div>` : ""}
+      ${supplier.businessNumber && supplier.businessNumber.value.trim() !== "" ? `<div>${escapeHtml(supplier.businessNumber.label)} ${escapeHtml(supplier.businessNumber.value.trim())}</div>` : ""}
     </div>
     <div class="meta">
       <h1>${escapeHtml(title)}</h1>

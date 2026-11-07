@@ -1443,6 +1443,7 @@ export function supplierFor(invoice: Invoice): InvoiceSupplier | null {
     ...(entity.payTo === undefined ? {} : { payTo: entity.payTo }),
     ...(entity.logo === undefined ? {} : { logo: entity.logo }),
     ...(entity.legalName === undefined ? {} : { legalName: entity.legalName }),
+    ...(entity.nzbn === undefined || booksCountry().id !== "nz" ? {} : { businessNumber: { label: "NZBN", value: entity.nzbn } }),
     ...(entity.phone === undefined ? {} : { phone: entity.phone }),
     ...(entity.email === undefined ? {} : { email: entity.email }),
     ...(entity.website === undefined ? {} : { website: entity.website }),

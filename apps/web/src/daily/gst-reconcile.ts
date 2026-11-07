@@ -1,5 +1,5 @@
 import { booksCurrency } from "../country.js";
-import { recomputeVariance, record, recordFiledReturn, saveEntities, varianceInput, varianceStale } from "../books.js";
+import { gstBasis, recomputeVariance, record, recordFiledReturn, saveEntities, varianceInput, varianceStale } from "../books.js";
 import { bookYearsEnded, gstContexts, myirCard } from "./myir-cards.js";
 import { gstAccountSection } from "./gst-account-panel.js";
 import { $, state } from "../state.js";
@@ -482,7 +482,7 @@ function filedReturnTools(): HTMLElement {
 }
 
 function blankFiledDraft(periodEnd: string): FiledDraft {
-  return { periodEnd, basis: "Payments basis", box5: "", box6: "", box9: "", box11: "", box13: "", box8: "", box12: "" };
+  return { periodEnd, basis: gstBasis() === "accruals" ? "Invoice basis" : "Payments basis", box5: "", box6: "", box9: "", box11: "", box13: "", box8: "", box12: "" };
 }
 
 async function keepFiled(one: FiledReturn): Promise<void> {

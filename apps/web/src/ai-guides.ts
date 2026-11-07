@@ -1,4 +1,4 @@
-import { companyCurrentAccounts, gstFrequency, postedJournals } from "./books.js";
+import { companyCurrentAccounts, gstBasis, gstFrequency, postedJournals } from "./books.js";
 import { reviewFacts } from "./ai-review.js";
 import { ir3For } from "./daily/reports.js";
 import { state } from "./state.js";
@@ -87,7 +87,7 @@ export const IRD_GUIDES: readonly IrdGuide[] = [
     facts: () => {
       const f = gstFrequency();
       return [
-        `Filing frequency used for these returns: ${f === 1 ? "monthly" : f === 6 ? "six-monthly" : "two-monthly"}, payments basis.`,
+        `Filing frequency used for these returns: ${f === 1 ? "monthly" : f === 6 ? "six-monthly" : "two-monthly"}, ${gstBasis() === "accruals" ? "invoice" : "payments"} basis.`,
         "This software halves the GST on part-deductible entertainment in each period, rather than",
         "claiming it in full and adjusting once a year in Box 9.",
       ];

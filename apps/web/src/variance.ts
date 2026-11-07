@@ -260,6 +260,10 @@ export function computeOurReturns(input: VarianceInput, from: string, to: string
       otherPurchases: input.otherPurchases?.(period) ?? [],
       otherSales: input.otherSales?.(period) ?? [],
     }),
+  ).map((result) =>
+    // Worked from the documents on the day they were issued: the invoice
+    // basis, whatever the dating option above says.
+    documents !== undefined ? { ...result, basis: "invoice" as const } : result,
   );
 }
 

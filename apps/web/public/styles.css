@@ -2033,6 +2033,7 @@ main:has(#page-check:not([hidden])) { max-width: none; }
   border: 1px solid rgba(128,128,128,0.4); color: var(--muted, #667); white-space: nowrap; }
 .settings-controls { display: flex; gap: 0.8rem; flex-wrap: wrap; align-items: center; margin-top: 0.4rem; }
 .settings-stack { flex-direction: column; align-items: flex-start; gap: 0.35rem; }
+.payroll-file-by { font-size: 0.8rem; color: var(--muted, #667); align-self: center; }
 .settings-controls input[type="url"] { max-width: 100%; }
 .setup-title { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.25rem; }
 .setup-what-sub { font-size: 0.82rem; font-weight: 400; color: var(--muted, #667); }
