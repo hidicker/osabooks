@@ -97,6 +97,14 @@ export interface VarianceInput {
    * out -- their GST is these lines' -- and these are counted instead.
    */
   accrualDocuments?: readonly AccrualDocumentLine[];
+  /**
+   * Which payments the documents above stand in for, where they are only some
+   * documents: on New Zealand's payments basis, a sale over $225,000 is
+   * counted when invoiced, and its payments are not counted again. The other
+   * payments stay the sales and purchases they pay for. Unset, the documents
+   * stand in for every payment that settles one.
+   */
+  documentSettles?: (transactionId: string) => Settlement | undefined;
 }
 
 /** One line of an invoice or bill as the return takes it on the accruals basis. */
@@ -190,12 +198,18 @@ export function computeOurReturns(input: VarianceInput, from: string, to: string
   // On the payments basis a payment settling an invoice is the sale or
   // purchase it pays for. On the accruals basis the document itself is, on
   // the day it was issued, and the payment only clears what is owed.
+  // The payments the documents stand in for are left out; the rest, where
+  // only some documents are counted, are the sales and purchases they pay.
+  const replaced = documents === undefined ? undefined : (input.documentSettles ?? settles);
+  const kept = replaced ? split.transactions.filter((t) => replaced(t.id) === undefined) : split.transactions;
+  const paying = documents === undefined || input.documentSettles !== undefined ? settles : undefined;
+  const paid = paying ? settledGst(kept, split.overrides, paying) : { transactions: kept, overrides: split.overrides };
   const expanded =
     documents !== undefined
       ? {
-          transactions: settles ? split.transactions.filter((t) => settles(t.id) === undefined) : split.transactions,
+          transactions: paid.transactions,
           overrides: {
-            ...split.overrides,
+            ...paid.overrides,
             ...Object.fromEntries(
               documents.map((d) => [
                 d.transaction.id,
@@ -204,9 +218,7 @@ export function computeOurReturns(input: VarianceInput, from: string, to: string
             ),
           } as typeof split.overrides,
         }
-      : settles
-        ? { ...split, ...settledGst(split.transactions, split.overrides, settles) }
-        : split;
+      : paid;
   const ruleFile = input.rules as RuleFile | undefined;
   const codingRules: RuleSet = { ...(ruleFile ?? {}), overrides: expanded.overrides };
   // Each line's code, worked out once: choosing the lines and resolving their

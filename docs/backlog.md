@@ -59,13 +59,6 @@ works).
   the ratio is applied to. The GST return says it is not done. Added 7
   November 2026; the rule is from the OpenAccountants guide, not yet checked
   by an accountant.
-- **Two New Zealand GST invoice-basis rules not applied** (from the
-  OpenAccountants NZ GST guide, checked 16 October 2026): a single supply over
-  $225,000 must go on the invoice basis whatever basis is chosen (unless
-  settled within 365 days), and on the invoice basis a payment received
-  before the invoice is issued makes the GST due when paid. Both rare for the
-  businesses OsaBooks is for; the GST return takes neither into account yet.
-
 ## QuickBooks and the United States
 
 - **QuickBooks invoices, bills and customers as documents.** The general ledger
