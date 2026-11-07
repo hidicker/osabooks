@@ -2884,6 +2884,7 @@ function renderGstReturn(body: HTMLElement, year: number): void {
     renderGstTransactions(body, result, money);
   } else {
     renderGstBoxes(body, result, money);
+    provisionalByRatio(body, result, money);
     // Printed with the return: worked out again from the books, a different
     // one means a figure has changed since.
     const print = note(
@@ -2933,6 +2934,49 @@ function renderGstReturn(body: HTMLElement, year: number): void {
       ),
     );
   }
+}
+
+/**
+ * Provisional tax paid with the GST return under the ratio option (GST103):
+ * the ratio Inland Revenue gave, times the period's taxable supplies less
+ * their GST. Shown where the entity has a ratio set.
+ */
+function provisionalByRatio(body: HTMLElement, result: GstReturnResult, money: (cents: Cents) => string): void {
+  if (booksCountry().id !== "nz") return;
+  const all = state.ledger.entities?.entities ?? [];
+  const entity = reportingEntity() ?? (all.length === 1 ? all[0] : undefined);
+  const ratio = entity?.provisionalRatio;
+  if (entity === undefined || ratio === undefined) return;
+  // Box 5 is the sales with their GST in, zero-rated ones included; Box 8 the
+  // GST on them. What is left is the taxable supplies the ratio is applied to.
+  const supplies = result.boxes.box5 - result.boxes.box8;
+  const tax = Math.max(0, Math.round((supplies * ratio) / 100));
+  const heading = document.createElement("h4");
+  heading.textContent = "Provisional tax with this return (GST103, ratio option)";
+  body.append(heading);
+  const table = document.createElement("table");
+  table.className = "report-table ir10-form gst-return-form";
+  const tbody = document.createElement("tbody");
+  for (const [label, value, total] of [
+    ["Taxable supplies less GST (Box 5 less Box 8)", money(supplies), false],
+    ["Ratio", `${ratio.toFixed(1)}%`, false],
+    ["Provisional tax for the period", money(tax), true],
+    ["GST and provisional tax together", money((result.boxes.outcome === "refund" ? -result.boxes.box15 : result.boxes.box15) + tax), true],
+  ] as const) {
+    const tr = document.createElement("tr");
+    if (total) tr.classList.add("ir10-total");
+    tr.append(nameCell(label), amountCell(value));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  body.append(table);
+  body.append(
+    note(
+      `${entity.name} pays provisional tax at ${ratio.toFixed(1)}% of its taxable supplies, with each two-monthly GST return; ` +
+        "a monthly filer pays with every second return. A fixed asset sold for at least $1,000 or 5% of the last 12 months' " +
+        "taxable supplies, whichever is larger, is taken out of the supplies first: that adjustment is not made here.",
+    ),
+  );
 }
 
 function renderGstBoxes(body: HTMLElement, result: GstReturnResult, money: (cents: Cents) => string): void {

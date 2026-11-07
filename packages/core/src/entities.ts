@@ -159,6 +159,11 @@ export interface Entity {
   legalName?: string;
   /** New Zealand Business Number, thirteen digits, printed on invoices. */
   nzbn?: string;
+  /**
+   * The provisional tax ratio Inland Revenue gave, as a percentage to one
+   * decimal place, where the entity pays provisional tax with its GST (GST103).
+   */
+  provisionalRatio?: number;
   /** How customers reach it, printed on invoices. */
   phone?: string;
   email?: string;
