@@ -77,6 +77,8 @@ const USER_KEY = "user";
  */
 export interface PayrollData {
   employerIrd?: string | undefined;
+  /** Small or large employer, which decides how soon each payday is filed. Small where unset. */
+  employerSize?: "small" | "large" | undefined;
   /** Who IR should contact about the payday filing return. */
   contact?: PayrollContact | undefined;
   /** Chart codes a pay run posts to; until wages, wages payable and PAYE payable are set, none post. */

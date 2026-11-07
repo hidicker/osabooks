@@ -134,6 +134,20 @@ export function isWorkingDay(date: IsoDate): boolean {
   return !nzPublicHolidays(y).has(date);
 }
 
+/**
+ * When a pay run's employment information is due with Inland Revenue: within
+ * two working days of payday for a large employer (PAYE and ESCT of $500,000
+ * or more a year), ten for a small one, counting from the day after payday.
+ */
+export function paydayFilingDue(payDate: IsoDate, size: "small" | "large" = "small"): IsoDate {
+  let day = payDate;
+  for (let left = size === "large" ? 2 : 10; left > 0; ) {
+    day = addDays(day, 1);
+    if (isWorkingDay(day)) left -= 1;
+  }
+  return day;
+}
+
 /** The date itself if it is a working day, otherwise the next one after it. */
 export function nextWorkingDay(date: IsoDate): IsoDate {
   let day = date;

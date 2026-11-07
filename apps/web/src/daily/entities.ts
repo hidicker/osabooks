@@ -920,13 +920,15 @@ export function renderEntities(): void {
     });
     gstWrap.append(frequency);
 
-    // Australia: the BAS can be lodged on the cash or the accruals basis.
-    if (au) {
+    // Australia's BAS on the cash or the accruals basis; New Zealand's GST on
+    // the payments or the invoice basis, the same two with their own names.
+    const nzBooks = booksCountry().id === "nz";
+    if (au || nzBooks) {
       const basis = document.createElement("select");
       basis.className = "entity-gst-frequency";
       for (const [value, caption] of [
-        ["cash", "Cash basis"],
-        ["accruals", "Accruals basis"],
+        ["cash", nzBooks ? "Payments basis" : "Cash basis"],
+        ["accruals", nzBooks ? "Invoice basis" : "Accruals basis"],
       ] as const) {
         const option = document.createElement("option");
         option.value = value;
@@ -935,15 +937,16 @@ export function renderEntities(): void {
         basis.append(option);
       }
       basis.hidden = !reportsNetOfGst(entity);
-      basis.title =
-        "When GST falls due: when the money moves (cash), or when the invoice or bill is issued (accruals), " +
-        "as the business is registered with the ATO.";
+      basis.title = nzBooks
+        ? "When GST falls due: when the money moves (payments basis), or when the invoice or bill is issued (invoice basis), as registered with Inland Revenue. The hybrid basis is not offered."
+        : "When GST falls due: when the money moves (cash), or when the invoice or bill is issued (accruals), " +
+          "as the business is registered with the ATO.";
       basis.addEventListener("change", () => {
         const live = state.ledger.entities ?? emptyEntityModel();
         const chosen = basis.value === "accruals" ? "accruals" : "cash";
         void saveEntities(
           { ...live, entities: live.entities.map((e) => (e.id === entity.id ? { ...e, gstBasis: chosen } : e)) },
-          `${entity.name} reports GST on the ${chosen} basis`,
+          `${entity.name} reports GST on the ${nzBooks ? (chosen === "cash" ? "payments" : "invoice") : chosen} basis`,
         );
       });
       gstWrap.append(basis);
@@ -1111,6 +1114,7 @@ export function renderEntities(): void {
     for (const [key, label, hint, wide] of [
       ...(words.taxId === null ? [] : ([["gstNumber", words.taxId, words.taxIdExample, false]] as const)),
       ["legalName", "Legal name, if not the name above", "e.g. Kea Coffee Roasters Limited", true],
+      ...(booksCountry().id === "nz" ? ([["nzbn", "NZBN", "9429041234567", false]] as const) : []),
       ["address", "Address", words.address, true],
       ["phone", "Phone", "e.g. 03 548 1234", false],
       ["email", "Email", "accounts@example.co.nz", false],

@@ -1036,11 +1036,13 @@ export function varianceInput(basis: "cash" | "accruals" = gstBasis()): Variance
 }
 
 /**
- * Whether these books report GST on the cash basis or on accruals. Asked of
- * Australian books only; everywhere else it is cash, as the return is worked.
+ * Whether these books report GST on the cash basis or on accruals: in New
+ * Zealand the payments basis or the invoice basis. Asked of New Zealand and
+ * Australian books; everywhere else it is cash, as the return is worked.
  */
 export function gstBasis(): "cash" | "accruals" {
-  if (booksCountry().id !== "au") return "cash";
+  const country = booksCountry().id;
+  if (country !== "au" && country !== "nz") return "cash";
   const model = state.ledger.entities ?? emptyEntityModel();
   const chosen = model.entities.find((e) => e.id === state.entityFilter);
   if (chosen !== undefined) return chosen.gstBasis ?? "cash";

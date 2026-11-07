@@ -157,6 +157,8 @@ export interface Entity {
   logo?: string;
   /** The legal name, where invoices should show it as well as the trading name. */
   legalName?: string;
+  /** New Zealand Business Number, thirteen digits, printed on invoices. */
+  nzbn?: string;
   /** How customers reach it, printed on invoices. */
   phone?: string;
   email?: string;

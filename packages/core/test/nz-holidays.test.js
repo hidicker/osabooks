@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { gstPayBy, gstPeriods, isWorkingDay, nextWorkingDay, nzPublicHolidays } from "../dist/index.js";
+import { gstPayBy, gstPeriods, isWorkingDay, nextWorkingDay, nzPublicHolidays, paydayFilingDue } from "../dist/index.js";
 
 test("the 2026-27 holidays are the ones Inland Revenue's own calendar (IR328) marks", () => {
   const h2026 = nzPublicHolidays(2026);
@@ -52,4 +52,11 @@ test("working days", () => {
   assert.equal(isWorkingDay("2026-09-24"), true);
   assert.equal(isWorkingDay("2026-09-26"), false, "a Saturday");
   assert.equal(nextWorkingDay("2026-12-25"), "2026-12-29", "Christmas, Saturday, Sunday, Boxing Day off");
+});
+
+test("payday filing is due two working days after payday for a large employer, ten for a small one", () => {
+  // Paid Friday 27 March 2026; Good Friday and Easter Monday are not working days.
+  assert.equal(paydayFilingDue("2026-03-27", "large"), "2026-03-31");
+  assert.equal(paydayFilingDue("2026-03-27", "small"), "2026-04-14");
+  assert.equal(paydayFilingDue("2026-03-27"), "2026-04-14", "small where not said");
 });

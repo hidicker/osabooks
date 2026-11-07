@@ -1,5 +1,5 @@
 import { moduleOn } from "./modules.js";
-import { bookYears, postedJournals, varianceInput } from "./books.js";
+import { bookYears, gstBasis, postedJournals, varianceInput } from "./books.js";
 import { ir3For, rentalSchedulesFor, reportLookups } from "./daily/reports.js";
 import { state } from "./state.js";
 import { note } from "./ui.js";
@@ -586,11 +586,15 @@ function gstBlock(period: Period): string[] {
   const lines: string[] = [
     `GST basis: ${returns[0]?.basis ?? "payments"}.`,
     "",
-    "NOTE ON THIS LEDGER: GST is filed on a payments basis, so the tax point rides on the",
-    "clearing line of the settling receipt rather than on the invoice. The accounts are the",
-    moduleOn("xero")
-      ? "same ones Xero uses; the GST timing differs, and that difference is deliberate."
-      : "same as on an invoice basis; the GST timing differs, and that difference is deliberate.",
+    ...(gstBasis() === "accruals"
+      ? ["NOTE ON THIS LEDGER: GST is filed on an invoice basis, so the tax point is the invoice or bill date."]
+      : [
+          "NOTE ON THIS LEDGER: GST is filed on a payments basis, so the tax point rides on the",
+          "clearing line of the settling receipt rather than on the invoice. The accounts are the",
+          moduleOn("xero")
+            ? "same ones Xero uses; the GST timing differs, and that difference is deliberate."
+            : "same as on an invoice basis; the GST timing differs, and that difference is deliberate.",
+        ]),
     "",
     "Each period below is as THESE BOOKS compute it, then what was filed against it, if",
     "anything. Box 5 total sales, 6 zero-rated, 7 exempt, 8 GST on sales, 9 adjustments and",

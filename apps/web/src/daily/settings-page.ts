@@ -47,7 +47,7 @@ function groups(): { title: string; rows: Row[] }[] {
       rows: [
         {
           name: "Organisation details",
-          what: `Each entity's name and legal name, ${nz ? "GST number" : "tax number"}, address, phone, email, website, bank account for payments, and logo, as invoices show them.`,
+          what: `Each entity's name and legal name, ${nz ? "GST number, NZBN" : "tax number"}, address, phone, email, website, bank account for payments, and logo, as invoices show them.`,
           where: [{ page: "entities", label: "Entities & accounts" }],
         },
         {
@@ -174,7 +174,7 @@ function groups(): { title: string; rows: Row[] }[] {
           name: `${tax === "VAT" ? "VAT" : tax === "GST" ? "GST" : "Sales tax"} registration`,
           what: country.salesTax === null
             ? "Sales tax rates are set for each place you collect it, on the sales tax report."
-            : `Each entity's registration, how often it files, and${country.id === "au" ? " cash or accruals" : " its basis"}. The rate is the country's: ${Math.round(country.salesTax.rate * 100)}%.`,
+            : `Each entity's registration, how often it files, and${country.id === "au" ? " cash or accruals" : nz ? " the payments or invoice basis" : " its basis"}. The rate is the country's: ${Math.round(country.salesTax.rate * 100)}%.`,
           where: country.salesTax === null
             ? [{ page: "reports", label: "Reports" }]
             : [{ page: "entities", label: "Entities & accounts" }],
@@ -193,7 +193,9 @@ function groups(): { title: string; rows: Row[] }[] {
       rows: [
         {
           name: "Payroll settings",
-          what: "The accounts pay runs post to, each employee's pay frequency, pay items and leave.",
+          what: nz
+            ? "The employer's IRD number and size (how soon each payday is filed), the accounts pay runs post to, each employee's pay frequency, pay items, leave and public holidays."
+            : "The accounts pay runs post to, each employee's pay frequency, pay items and leave.",
           where: country.id === "au"
             ? [{ page: "aupayroll", label: "Payroll", module: "aupayroll" }]
             : [{ page: "payroll", label: "Payroll", module: "payroll" }],

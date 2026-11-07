@@ -22,6 +22,7 @@ import {
   formatAmount,
   formatIrdNumber,
   generatePaydayFilingCsv,
+  paydayFilingDue,
   isValidIrdNumber,
   kiwiSaverDefaultRate,
   parseAmount,
@@ -230,7 +231,28 @@ function renderEmployerBar(container: HTMLElement): void {
 
   validate();
 
-  bar.append(label, input, feedback);
+  // Small or large: how soon each payday has to be filed.
+  const sizeLabel = document.createElement("label");
+  sizeLabel.className = "payroll-employer-label";
+  sizeLabel.innerHTML = "<strong>Employer size:</strong> ";
+  const size = document.createElement("select");
+  for (const [value, text] of [
+    ["small", "Small: file within 10 working days of payday"],
+    ["large", "Large ($500,000 or more PAYE and ESCT a year): within 2"],
+  ] as const) {
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = text;
+    option.selected = (payroll.employerSize ?? "small") === value;
+    size.append(option);
+  }
+  size.addEventListener("change", async () => {
+    payroll.employerSize = size.value === "large" ? "large" : "small";
+    await commitPayroll(payroll);
+  });
+  sizeLabel.append(size);
+
+  bar.append(label, input, feedback, sizeLabel);
   container.append(bar);
   renderContact(container, payroll);
   renderAccounts(container, payroll);
@@ -1407,7 +1429,11 @@ function renderPayRunsList(container: HTMLElement): void {
       </svg>
       <span>Download Payday Filing (myIR CSV)</span>
     `;
-    dlBtn.title = "Export Inland Revenue Employment Information (EI) CSV";
+    const fileBy = paydayFilingDue(run.payDate, payroll.employerSize ?? "small");
+    dlBtn.title = `Export Inland Revenue Employment Information (EI) CSV. File it by ${fileBy}.`;
+    const due = document.createElement("span");
+    due.className = "payroll-file-by";
+    due.textContent = `File by ${fileBy}`;
     dlBtn.addEventListener("click", async () => {
       const contact = payroll.contact ?? { name: "", phone: "", email: "" };
       const problems = paydayFilingProblems(run, contact);
@@ -1485,7 +1511,7 @@ function renderPayRunsList(container: HTMLElement): void {
       });
     });
 
-    actionsBar.append(dlBtn, slipsBtn, bankBtn, viewBtn, delBtn);
+    actionsBar.append(dlBtn, due, slipsBtn, bankBtn, viewBtn, delBtn);
     card.append(actionsBar);
     for (const said of run.notes ?? []) card.append(note(said));
 
