@@ -443,6 +443,7 @@ export {
   betweenEntityJournals,
   betweenAccountPlan,
   isSeparatePerson,
+  lineOwners,
   overdrawnCurrentAccounts,
   owedBetween,
   pairKey,

@@ -71,7 +71,7 @@ import {
   sharesFrom,
 } from "@nzosa/core";
 import type { Account, BusinessStructure, Cents, Entity, EntityKind, EntityModel, IsoDate, NonProfitForm, Owner, RuleSet } from "@nzosa/core";
-import { booksCountry, booksLocale, moneyPlaces, noSalesTax, gstPercent, invoiceDetailWords } from "../country.js";
+import { booksCountry, booksLocale, moneyPlaces, noSalesTax, gstPercent, invoiceDetailWords, sayTax } from "../country.js";
 
 /**
  * Account types offered on the accounts page.
@@ -185,7 +185,7 @@ export function addEntityForm(): HTMLElement {
   gst.type = "checkbox";
   gst.checked = !noSalesTax();
   gstWrap.hidden = noSalesTax();
-  gstWrap.append(gst, document.createTextNode(" GST registered"));
+  gstWrap.append(gst, document.createTextNode(` ${sayTax("GST registered")}`));
   // The usual answer for the kind chosen, still a tick to change: a household
   // is never registered and a residential rental almost never is, and a tick
   // left on from "Business" claimed GST on the groceries.
@@ -851,17 +851,19 @@ export function renderEntities(): void {
     const gstBox = document.createElement("input");
     gstBox.type = "checkbox";
     gstBox.checked = reportsNetOfGst(entity);
-    gstWrap.title =
-      "Registered: reports exclude GST. Not registered: GST paid is part of the cost, " +
-      "and reports include it.";
-    gstWrap.append(gstBox, document.createTextNode(" GST registered"));
+    gstWrap.title = sayTax(
+      "Registered: reports exclude GST. Not registered: GST paid is part of the cost, and reports include it.",
+    );
+    gstWrap.append(gstBox, document.createTextNode(` ${sayTax("GST registered")}`));
     gstWrap.hidden = noSalesTax();
     gstBox.addEventListener("change", async () => {
       const sure = await askOnPage(
-        `${entity.name} ${gstBox.checked ? "is" : "is not"} registered for GST?\n\n` +
-          `Lines not yet confirmed will be suggested ${gstBox.checked ? "with GST" : "with no GST"}. Lines already ` +
-          "confirmed keep the GST they were confirmed with: change any that need it on Reconcile, where the filter " +
-          '"GST differs from registration" lists them.',
+        sayTax(
+          `${entity.name} ${gstBox.checked ? "is" : "is not"} registered for GST?\n\n` +
+            `Lines not yet confirmed will be suggested ${gstBox.checked ? "with GST" : "with no GST"}. Lines already ` +
+            "confirmed keep the GST they were confirmed with: change any that need it on Reconcile, where the filter " +
+            '"GST differs from registration" lists them.',
+        ),
       );
       if (!sure) {
         gstBox.checked = !gstBox.checked;
@@ -875,7 +877,7 @@ export function renderEntities(): void {
             e.id === entity.id ? { ...e, gstRegistered: gstBox.checked } : e,
           ),
         },
-        `${entity.name} ${gstBox.checked ? "is" : "is not"} GST registered`,
+        sayTax(`${entity.name} ${gstBox.checked ? "is" : "is not"} GST registered`),
       );
     });
 
@@ -887,9 +889,9 @@ export function renderEntities(): void {
     const periods: readonly (readonly [string, string])[] = au
       ? [["3", "Quarterly BAS"]]
       : [
-          ["1", "Monthly GST"],
-          ["2", "Two-monthly GST"],
-          ["6", "Six-monthly GST"],
+          ["1", sayTax("Monthly GST")],
+          ["2", sayTax("Two-monthly GST")],
+          ["6", sayTax("Six-monthly GST")],
         ];
     for (const [value, caption] of periods) {
       const option = document.createElement("option");
@@ -901,7 +903,9 @@ export function renderEntities(): void {
     frequency.hidden = !reportsNetOfGst(entity);
     frequency.title = au
       ? "The BAS is worked out quarterly. Monthly GST reporting, required from $20 million turnover, is not worked out here."
-      : "How often the GST return is filed. Six-monthly is only for sales under $500,000 in " +
+      : booksCountry().id === "kr"
+        ? "How often the VAT return is filed."
+        : "How often the GST return is filed. Six-monthly is only for sales under $500,000 in " +
         "any 12 months; its periods end 30 September and 31 March.";
     frequency.addEventListener("change", () => {
       const live = state.ledger.entities ?? emptyEntityModel();
@@ -911,7 +915,7 @@ export function renderEntities(): void {
           ...live,
           entities: live.entities.map((e) => (e.id === entity.id ? { ...e, gstFrequency: months } : e)),
         },
-        `${entity.name} files GST ${months === 1 ? "monthly" : months === 3 ? "quarterly" : months === 6 ? "six-monthly" : "two-monthly"}`,
+        `${entity.name} files ${sayTax("GST")} ${months === 1 ? "monthly" : months === 3 ? "quarterly" : months === 6 ? "six-monthly" : "two-monthly"}`,
       );
     });
     gstWrap.append(frequency);
@@ -1033,7 +1037,7 @@ export function renderEntities(): void {
         : entity.kind === "nonprofit" && entity.nonprofit !== undefined
           ? nonProfitFormName(entity.nonprofit.form)
           : KIND_CAPTION[entity.kind ?? "business"],
-      noSalesTax() ? "" : reportsNetOfGst(entity) ? "GST registered" : "not GST registered",
+      noSalesTax() ? "" : sayTax(reportsNetOfGst(entity) ? "GST registered" : "not GST registered"),
       formatOwners(entity.owners ?? []),
     ]
       .filter((part) => part !== "")
@@ -1322,7 +1326,7 @@ export function renderEntities(): void {
   chartTable.className = "entity-table accounts-table";
   const chartHead = document.createElement("thead");
   chartHead.innerHTML =
-    "<tr><th>Code</th><th>Name</th><th>Type</th><th>GST</th>" +
+    `<tr><th>Code</th><th>Name</th><th>Type</th><th>${sayTax("GST")}</th>` +
     "<th>Entity, or which account</th><th></th></tr>";
   // YTD after the name, where an accounting system's chart has it.
   const yearly = chartHead.querySelector("th:nth-child(2)");
@@ -1585,7 +1589,7 @@ export function renderEntities(): void {
   // No sales tax, no GST column: taken out by its heading, wherever the
   // column has come to sit.
   if (noSalesTax()) {
-    const at = [...chartHead.querySelectorAll("th")].findIndex((th) => th.textContent === "GST");
+    const at = [...chartHead.querySelectorAll("th")].findIndex((th) => th.textContent === sayTax("GST"));
     if (at >= 0) for (const row of chartTable.rows) row.cells[at]?.remove();
   }
   body.append(wideTable(chartTable));
@@ -1774,10 +1778,10 @@ function addAccountForm(model: EntityModel, accountRows: readonly { label: strin
   ] as const) {
     const option = document.createElement("option");
     option.value = value;
-    option.textContent = caption;
+    option.textContent = sayTax(caption);
     gst.append(option);
   }
-  const gstField = field("GST", gst);
+  const gstField = field(sayTax("GST"), gst);
 
   const entity = document.createElement("select");
   const none = document.createElement("option");

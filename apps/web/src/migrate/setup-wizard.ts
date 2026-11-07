@@ -1547,8 +1547,8 @@ function renderSetupIntro(): void {
 export function countryBox(): HTMLElement | null {
   const set = state.ledger.jurisdiction;
   const box = document.createElement("section");
-  box.id = "setup-country";
-  box.className = "modules-box";
+  // A class, not an id: Setup and the guided start each draw one.
+  box.className = "modules-box setup-country";
   const heading = document.createElement("h3");
   heading.textContent = "Country";
   // Fixed once the books hold anything: said, not offered.

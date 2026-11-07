@@ -14,6 +14,7 @@ import {
   stpYearToDate,
   superDueDate,
   localToday,
+  nextPayPeriod,
 } from "@nzosa/core";
 import type { Account, AuEmployee, AuPayFrequency, AuPayRun, AuPayroll, IsoDate } from "@nzosa/core";
 
@@ -271,6 +272,15 @@ function employeesSection(body: HTMLElement): void {
 
 // --- a new pay run -----------------------------------------------------------------
 
+/** The first pay run's dates: one period of the usual frequency, ending and paid today. */
+function firstPayPeriod(day: IsoDate, frequency: AuPayFrequency): { periodStart: IsoDate; periodEnd: IsoDate; payDate: IsoDate } {
+  const at = new Date(`${day}T00:00:00Z`);
+  if (frequency === "monthly") at.setUTCMonth(at.getUTCMonth() - 1);
+  else at.setUTCDate(at.getUTCDate() - (frequency === "weekly" ? 7 : 14));
+  at.setUTCDate(at.getUTCDate() + 1);
+  return { periodStart: at.toISOString().slice(0, 10) as IsoDate, periodEnd: day, payDate: day };
+}
+
 function newPayRun(body: HTMLElement): void {
   const now = held();
   const active = now.employees.filter((e) => e.ended === undefined);
@@ -281,9 +291,18 @@ function newPayRun(body: HTMLElement): void {
 
   const fields = document.createElement("div");
   fields.className = "agent-fields";
-  const payDate = input("date", today());
-  const from = input("date");
-  const to = input("date");
+  // The period after the last pay run, paid as it was, as New Zealand's
+  // payroll does. Left to today, a run saved after the year's last one landed
+  // in the next tax year with a period of one day.
+  const usual =
+    (["weekly", "fortnightly", "monthly"] as const)
+      .map((f) => [f, active.filter((e) => e.payFrequency === f).length] as const)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] ?? "fortnightly";
+  const last = [...now.payRuns].sort((a, b) => b.periodEnd.localeCompare(a.periodEnd))[0];
+  const dates = last !== undefined ? nextPayPeriod(last, usual) : firstPayPeriod(today() as IsoDate, usual);
+  const payDate = input("date", dates.payDate);
+  const from = input("date", dates.periodStart);
+  const to = input("date", dates.periodEnd);
   fields.append(field("Payday", payDate), field("Period from", from), field("Period to", to));
   body.append(fields);
 
@@ -338,6 +357,10 @@ function newPayRun(body: HTMLElement): void {
           said.textContent = "Give the payday.";
           return;
         }
+        if (from.value === "" || to.value === "" || from.value > to.value) {
+          said.textContent = "Give the pay period: the day it starts and the day it ends.";
+          return;
+        }
         const runs = held().payRuns;
         const lines = rows
           .map((r) => {
@@ -353,8 +376,8 @@ function newPayRun(body: HTMLElement): void {
         const run: AuPayRun = {
           id: `run-${Date.now().toString(36)}`,
           payDate: date,
-          periodStart: (from.value || date) as IsoDate,
-          periodEnd: (to.value || date) as IsoDate,
+          periodStart: from.value as IsoDate,
+          periodEnd: to.value as IsoDate,
           lines,
         };
         void (async () => {

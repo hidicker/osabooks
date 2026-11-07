@@ -443,7 +443,7 @@ async function countryIsRight(): Promise<boolean> {
   );
   if (!right) {
     // The one on this page: Setup draws the same box, out of sight.
-    const box = [...document.querySelectorAll<HTMLSelectElement>("#setup-country select")].find((one) => one.offsetParent !== null);
+    const box = [...document.querySelectorAll<HTMLSelectElement>(".setup-country select")].find((one) => one.offsetParent !== null);
     box?.scrollIntoView({ behavior: "smooth", block: "center" });
     box?.focus();
   }

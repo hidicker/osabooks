@@ -83,6 +83,13 @@ export interface CashFlowOptions {
 export function cashFlowActivity(type: string | null, name = ""): CashFlowActivity {
   const t = (type ?? "").trim().toLowerCase();
   const n = name.toLowerCase();
+  // Drawings are the owner's money even in a chart that types them an expense.
+  if (/drawings|funds introduced|dividends? paid/.test(n)) return "financing";
+  // Income and expenses are operating whatever they are called: "Mortgage
+  // interest" is interest paid, not the mortgage, and went under financing.
+  if (/^(revenue|sales|income|other income|expense|expenses|overhead|direct costs?|cost of sales|depreciation)$/.test(t)) {
+    return "operating";
+  }
   // The name first where it says more than the type: a "Loan" filed as a
   // current liability is borrowing, and "Owner Drawings" is the owner's money
   // whatever type it was given.

@@ -1,6 +1,9 @@
 import { redraw, showPage } from "./app.js";
 import { filedByPeriod, filedKey,
   betweenEntityJournals,
+  lineOwners,
+  isSeparatePerson,
+  isShareholderCurrentAccount,
   bankOwner as coreBankOwner,
   betweenAccountPlan,
   suggestSuffix,
@@ -1255,7 +1258,16 @@ export function documentControl(invoice: Invoice): { code: string; name: string 
     if (booksCountry().id === "nz") return undefined;
     const type = invoice.kind === "sales" ? "accounts receivable" : "accounts payable";
     const own = state.chart.filter((a) => a.type.trim().toLowerCase() === type);
-    return own.length === 1 && own[0] !== undefined ? { code: own[0].code, name: own[0].name } : undefined;
+    if (own.length === 1 && own[0] !== undefined) return { code: own[0].code, name: own[0].name };
+    // The US and Korean starter charts type it a current asset or liability;
+    // its name says what it is ("1200 Accounts receivable", "108 외상매출금
+    // Accounts receivable"). Missed, the invoice went to a 610 not in the chart.
+    if (own.length === 0) {
+      const pattern = invoice.kind === "sales" ? /accounts\s+receivable/i : /accounts\s+payable/i;
+      const named = state.chart.filter((a) => pattern.test(a.name));
+      if (named.length === 1 && named[0] !== undefined) return { code: named[0].code, name: named[0].name };
+    }
+    return undefined;
   }
   return controlAccountFor(invoice.entityId, invoice.kind);
 }
@@ -1784,6 +1796,55 @@ function betweenJournalsFor(posted: readonly PostedJournal[]): PostedJournal[] {
   });
   lastChoices = { ledger: state.ledger, choices: result.choices };
   return result.journals;
+}
+
+/**
+ * The shareholder current accounts to report, in books with several entities:
+ * only a company's. A rental's or a person's funds introduced and drawings are
+ * their owners' equity, and counted in, every payment between the two sides
+ * cancelled out. The chosen entity's where it is a company, every company's
+ * on All entities. Undefined in books with one entity, where the chart's own
+ * names decide; null where the chosen entity is not a company.
+ */
+/** A company, an LTC included: a separate person that is not a trust or a society. */
+export function isCompanyEntity(e: Entity): boolean {
+  return isSeparatePerson(e) && e.kind !== "trust" && e.kind !== "nonprofit" && e.structure !== "trust";
+}
+
+export function companyCurrentAccounts(everyCompany = false): { introducedCodes: string[]; drawingsCodes: string[] } | null | undefined {
+  const model = state.ledger.entities ?? emptyEntityModel();
+  if (model.entities.length < 2) return undefined;
+  const isCompany = isCompanyEntity;
+  const chosen = everyCompany ? undefined : model.entities.find((e) => e.id === state.entityFilter);
+  if (chosen !== undefined && !isCompany(chosen)) return null;
+  const companies = new Set((chosen !== undefined ? [chosen] : model.entities.filter(isCompany)).map((e) => e.id));
+  if (companies.size === 0) return null;
+  const found = state.chart.filter(
+    (a) => isShareholderCurrentAccount(a.code, a.name, a.type ?? "") && companies.has(model.accounts[accountEntityKey(a)] ?? ""),
+  );
+  return {
+    introducedCodes: found.filter((a) => !/drawing/i.test(a.name)).map((a) => a.code),
+    drawingsCodes: found.filter((a) => /drawing/i.test(a.name)).map((a) => a.code),
+  };
+}
+
+/**
+ * Whose each line of a posted journal is, in books with several entities, by
+ * the rule the between-entity journals follow: an uncoded line goes with the
+ * bank account that moved. Undefined for every line in books with one entity.
+ */
+export function postedLineOwners(): (journal: PostedJournal) => (string | undefined)[] {
+  const model = state.ledger.entities ?? emptyEntityModel();
+  if (model.entities.length < 2) return (journal) => journal.lines.map(() => undefined);
+  const held = new Set(state.ledger.transactions.map((t) => t.account));
+  const stored = state.ledger.betweenLines ?? {};
+  const options = {
+    model,
+    bankOwner: (account: string) => coreBankOwner(model, account),
+    isBank: (code: string) => held.has(code),
+    stored: (id: string) => stored[id],
+  };
+  return (journal) => lineOwners(journal, options);
 }
 
 /**
@@ -2537,6 +2598,9 @@ export function bookYears(): number[] {
     ...(state.ledger.auPayroll?.payRuns ?? []).map((r) => r.payDate),
     ...(state.ledger.agentStatements ?? []).map((a) => a.to),
     ...(state.ledger.prepayments ?? []).map((p) => p.from),
+    // Invoices and bills are in the books too: books with only those, and no
+    // bank file yet, had no year to report on.
+    ...(state.ledger.invoices ?? []).filter((i) => isPosted(i)).map((i) => i.issued),
   ];
   const years = new Set(dates.filter((d) => d !== "").map((d) => taxYearOf(d)));
   for (const use of state.ledger.vehicleUse ?? []) years.add(use.year);
