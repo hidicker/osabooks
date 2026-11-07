@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { dayAfter, dayBefore, parseDate, fromExcelSerial, daysBetween, financialYear, financialYearOf, localToday, localStamp } from "../dist/index.js";
+import { dayAfter, dayBefore, parseDate, fromExcelSerial, daysBetween, financialYear, financialYearOf, localToday, localStamp, setBooksTimeZone } from "../dist/index.js";
 
 test("parses ISO dates", () => {
   assert.equal(parseDate("2024-07-01"), "2024-07-01");
@@ -144,4 +144,20 @@ test("a date with no order of its own is read as the books' country writes it", 
     setBooksDayFirst(true);
   }
   assert.equal(parseDate("3/4/2026"), "2026-04-03");
+});
+
+test("today is taken where the books are kept, when they keep a time zone", () => {
+  // A computer on Korea's clock is a day behind New Zealand books from
+  // midnight to 4am there; the books' zone decides.
+  const there = (zone) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  try {
+    setBooksTimeZone("Pacific/Auckland");
+    assert.equal(localToday(), there("Pacific/Auckland"));
+    setBooksTimeZone("America/Los_Angeles");
+    assert.equal(localToday(), there("America/Los_Angeles"));
+    assert.equal(localToday(new Date(2026, 0, 5)), "2026-01-05", "a given moment is still the computer's");
+  } finally {
+    setBooksTimeZone(undefined);
+  }
 });

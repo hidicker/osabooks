@@ -1,6 +1,6 @@
 import { redraw, showPage } from "../app.js";
 import { record } from "../books.js";
-import { booksCountry } from "../country.js";
+import { applyCountryRules, booksCountry, countryTimeZone, countryTimeZones } from "../country.js";
 import { moduleOn } from "../modules.js";
 import type { ModuleId } from "../modules.js";
 import { $, state } from "../state.js";
@@ -25,6 +25,8 @@ async function saveSettings(next: BookSettings, what: string): Promise<void> {
   state.ledger = { ...state.ledger, settings: next };
   state.persistent = await saveLedger(state.ledger);
   await record("settings", what, before, next);
+  // The time zone is taken up at once: today is where the books are kept.
+  applyCountryRules();
   redraw("settings");
 }
 
@@ -82,7 +84,8 @@ function groups(): { title: string; rows: Row[] }[] {
         },
         {
           name: "Invoice look",
-          what: "The entity's logo and details head every invoice. Templates and colour themes are not offered.",
+          what: "The entity's logo and details head every invoice, statement and reminder, in the colour chosen here. Templates of your own design are not offered.",
+          status: "here",
           where: [{ page: "entities", label: "Entities & accounts" }],
         },
         {
@@ -92,8 +95,8 @@ function groups(): { title: string; rows: Row[] }[] {
         },
         {
           name: "Online payments",
-          what: "Not offered: invoices show the bank account to pay into. A card or PayPal link is not taken.",
-          status: "missing",
+          what: "Online books connected to Stripe give each invoice a card payment link, and find the payments when they arrive. Books kept in this browser show the bank account to pay into. PayPal is not offered.",
+          where: [{ page: "invoices", label: "Invoices", module: "business" }],
         },
         {
           name: "Paying bills",
@@ -143,7 +146,8 @@ function groups(): { title: string; rows: Row[] }[] {
         },
         {
           name: "Fixed asset types",
-          what: "An asset's type is its fixed asset account. Choosing each type's depreciation expense account and default rate is not offered yet: depreciation goes to the account named Depreciation.",
+          what: "An asset's type is its fixed asset account. Each type's depreciation goes to the account chosen here; left as it is, to the Depreciation account of the asset's own entity. The rate and method are set on each asset.",
+          status: "here",
           where: [{ page: "assets", label: "Fixed assets", module: "assets" }],
         },
         {
@@ -153,8 +157,8 @@ function groups(): { title: string; rows: Row[] }[] {
         },
         {
           name: "Time zone",
-          what: "Today is the computer's today. A time zone kept with the books is not offered yet.",
-          status: "missing",
+          what: "Where today is for these books: the date new invoices, pay runs and entries start on, and the year in progress.",
+          status: "here",
         },
         {
           name: "Exporting",
@@ -178,7 +182,7 @@ function groups(): { title: string; rows: Row[] }[] {
         ...(country.id === "au"
           ? [{
               name: "PAYG instalments and other taxes",
-              what: "PAYG withholding comes from payroll. PAYG instalments, fuel tax credits, FBT and wine or luxury car tax are not on the BAS here.",
+              what: "PAYG withholding comes from payroll, and PAYG instalments are on the BAS. Fuel tax credits, FBT and wine or luxury car tax are not.",
               status: "missing" as const,
             }]
           : []),
@@ -197,10 +201,10 @@ function groups(): { title: string; rows: Row[] }[] {
       ],
     },
     {
-      title: "Not offered",
+      title: "Other",
       rows: [
         { name: "Expense claims", what: "Claims brought in from another system are kept; making new ones, with their own users and mileage rates, is not offered.", status: "missing" },
-        { name: "Links to other systems for a contact", what: "Not offered.", status: "missing" },
+        { name: "Link to another system", what: "A web address for each contact in another system, such as a CRM, with {name} where the contact's name goes. Each contact then has an Open elsewhere link.", status: "here" },
         { name: "Staff cost rates", what: "Time is kept and invoiced at a rate; what an hour costs is not kept.", status: "missing" },
       ],
     },
@@ -331,6 +335,129 @@ function hereControls(name: string): HTMLElement | null {
       box.append(wrap);
     }
     box.append(note("A number already used is never given again: the next is after the highest of the series, or the number set here if that is higher."));
+    return box;
+  }
+  if (name === "Invoice look") {
+    const box = document.createElement("div");
+    box.className = "settings-controls";
+    const wrap = document.createElement("label");
+    wrap.textContent = "Colour of headings and rules ";
+    const colour = document.createElement("input");
+    colour.type = "color";
+    colour.value = settings.documentAccent ?? "#1f4e79";
+    colour.addEventListener("change", () => {
+      const updated: BookSettings = { ...bookSettings() };
+      if (colour.value.toLowerCase() === "#1f4e79") delete updated.documentAccent;
+      else updated.documentAccent = colour.value;
+      void saveSettings(updated, `Documents in ${colour.value}`);
+    });
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.className = "small";
+    reset.textContent = "The usual blue";
+    reset.hidden = settings.documentAccent === undefined;
+    reset.addEventListener("click", () => {
+      const updated: BookSettings = { ...bookSettings() };
+      delete updated.documentAccent;
+      void saveSettings(updated, "Documents in the usual blue");
+    });
+    wrap.append(colour);
+    box.append(wrap, reset);
+    return box;
+  }
+  if (name === "Time zone") {
+    const box = document.createElement("div");
+    box.className = "settings-controls";
+    const id = booksCountry().id;
+    const usual = countryTimeZone(id);
+    const pick = document.createElement("select");
+    pick.setAttribute("aria-label", "Time zone");
+    const first = document.createElement("option");
+    first.value = "";
+    first.textContent = usual === undefined ? "This computer's" : `${usual.replace(/_/g, " ")} (the country's)`;
+    pick.append(first);
+    for (const zone of countryTimeZones(id).filter((z) => z !== usual)) {
+      const option = document.createElement("option");
+      option.value = zone;
+      option.textContent = zone.replace(/_/g, " ");
+      pick.append(option);
+    }
+    pick.value = settings.timeZone ?? "";
+    pick.addEventListener("change", () => {
+      const updated: BookSettings = { ...bookSettings() };
+      if (pick.value === "") delete updated.timeZone;
+      else updated.timeZone = pick.value;
+      void saveSettings(updated, `Time zone: ${pick.value === "" ? first.textContent : pick.value}`);
+    });
+    box.append(pick);
+    return box;
+  }
+  if (name === "Fixed asset types") {
+    const box = document.createElement("div");
+    box.className = "settings-controls settings-stack";
+    const types = [
+      ...new Set([
+        ...(state.ledger.assets ?? []).map((a) => a.type.trim()),
+        ...state.chart.filter((a) => /fixed asset/i.test(a.type) && !/accumulated/i.test(a.name)).map((a) => a.name.trim()),
+      ]),
+    ].filter((t) => t !== "").sort((a, b) => a.localeCompare(b));
+    const expenses = state.chart
+      .filter((a) => /expense|overhead|depreciation/i.test(a.type) && a.code.trim() !== "")
+      .sort((a, b) => Number(/depreciation/i.test(b.name)) - Number(/depreciation/i.test(a.name)) || a.code.localeCompare(b.code));
+    if (types.length === 0) {
+      box.append(note("No asset types yet: they come from the fixed asset accounts in the chart."));
+      return box;
+    }
+    for (const type of types) {
+      const wrap = document.createElement("label");
+      wrap.textContent = `${type} `;
+      const pick = document.createElement("select");
+      const usual = document.createElement("option");
+      usual.value = "";
+      usual.textContent = "The entity's Depreciation account";
+      pick.append(usual);
+      for (const a of expenses) {
+        const option = document.createElement("option");
+        option.value = a.code;
+        option.textContent = `${a.code} ${a.name}`;
+        pick.append(option);
+      }
+      pick.value = settings.assetExpense?.[type] ?? "";
+      pick.addEventListener("change", () => {
+        const chosen = { ...(bookSettings().assetExpense ?? {}) };
+        if (pick.value === "") delete chosen[type];
+        else chosen[type] = pick.value;
+        const updated: BookSettings = { ...bookSettings(), assetExpense: chosen };
+        if (Object.keys(chosen).length === 0) delete updated.assetExpense;
+        void saveSettings(updated, `${type}: depreciation to ${pick.value === "" ? "the entity's Depreciation account" : pick.value}`);
+      });
+      wrap.append(pick);
+      box.append(wrap);
+    }
+    return box;
+  }
+  if (name === "Link to another system") {
+    const box = document.createElement("div");
+    box.className = "settings-controls";
+    const link = document.createElement("input");
+    link.type = "url";
+    link.placeholder = "https://crm.example.com/search?q={name}";
+    link.size = 44;
+    link.value = settings.contactLink ?? "";
+    link.addEventListener("change", () => {
+      const text = link.value.trim();
+      if (text !== "" && !/^https:\/\//.test(text)) {
+        link.setCustomValidity("A web address starting https://");
+        link.reportValidity();
+        return;
+      }
+      link.setCustomValidity("");
+      const updated: BookSettings = { ...bookSettings() };
+      if (text === "") delete updated.contactLink;
+      else updated.contactLink = text;
+      void saveSettings(updated, text === "" ? "No link for contacts" : "Contacts link to another system");
+    });
+    box.append(link);
     return box;
   }
   if (name === "Display") {

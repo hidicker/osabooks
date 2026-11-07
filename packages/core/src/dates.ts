@@ -188,9 +188,27 @@ export function dayAfter(date: IsoDate): IsoDate {
  * yesterday until noon or 1pm, so an invoice made in the morning was dated the
  * day before.
  */
-export function localToday(now: Date = new Date()): IsoDate {
+export function localToday(now?: Date): IsoDate {
+  // Today where the books are kept, when they keep a time zone: a computer
+  // set to Korea's clock is still on yesterday for New Zealand books until 4am.
+  if (now === undefined && booksTimeZone !== undefined) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", { timeZone: booksTimeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      if (/^\d{4}-\d{2}-\d{2}$/.test(parts)) return parts as IsoDate;
+    } catch {
+      // An unknown zone: the computer's today, as before.
+    }
+  }
+  const at = now ?? new Date();
   const pad = (n: number): string => String(n).padStart(2, "0");
-  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` as IsoDate;
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` as IsoDate;
+}
+
+let booksTimeZone: string | undefined;
+
+/** The time zone "today" is taken in, from the books' settings; undefined for the computer's. */
+export function setBooksTimeZone(zone: string | undefined): void {
+  booksTimeZone = zone === undefined || zone.trim() === "" ? undefined : zone;
 }
 
 /** A moment as the person's own clock shows it, "2026-11-03 09:15", from a Date or an ISO time. */

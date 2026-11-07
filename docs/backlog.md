@@ -112,19 +112,6 @@ works).
 
 ## The app
 
-- **"Today" from the books' country, not the computer's clock.** Dates are
-  stored as plain days, so nothing saved moves, but "today" (a new invoice's
-  date, which year a page opens on, whether a period has ended) is the
-  computer's. A computer set to Korea time runs four hours behind New
-  Zealand, so between midnight and 4am it is still yesterday. Xero keeps a
-  time zone per organisation. New Zealand and Korea have one zone each;
-  Australia and the United States need a choice, defaulting to the
-  computer's zone when it is in that country. Raised 7 November 2026.
-- **Depreciation posts to the first account named "Depreciation"**, whichever
-  entity it belongs to. The balance sheet, the IR10 and its asset boxes keep
-  to the chosen entity (since 7 November 2026), but an asset of a second
-  entity has its depreciation expense in the first one's account. Fine for
-  books where one entity holds the assets.
 - **A currency with three decimals is held to two.** Dinars and rials are
   read with their third decimal but held, like every amount, in hundredths:
   12.345 BHD is 12.35. None of the four countries uses one, so only foreign

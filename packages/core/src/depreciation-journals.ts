@@ -28,6 +28,8 @@ export interface DepreciationJournalsOptions {
   chart: readonly Account[];
   /** Where the charge goes when the chart has no account named Depreciation. */
   fallbackExpenseCode?: string;
+  /** The expense account chosen for an asset type, by its code, where one was. */
+  expenseFor?: (type: string) => string | undefined;
   /**
    * Today, for the year in progress. That year is posted month by month, for
    * the months already finished, rather than as a whole year dated a 31 March
@@ -74,10 +76,19 @@ export function depreciationJournals(options: DepreciationJournalsOptions): Post
   const yearEnd = options.yearEnd ?? {};
   const years = [...new Set(transactions.map((t) => financialYearOf(t.date, yearEnd)))];
   const accumulated = chart.filter((a) => /accumulated depreciation/i.test(a.name));
-  const expense = chart.find((a) => /^depreciation$/i.test(a.name.trim()));
+  const named = chart.filter((a) => /^depreciation$/i.test(a.name.trim()));
+  const ending = (code: string): string => code.replace(/^[0-9]+/, "");
 
   const post = (type: string, amount: number, date: string): PostedJournal => {
     const contra = bestAccountMatch(accumulated, type);
+    // The type's own expense account where one was chosen; otherwise the
+    // Depreciation account of the asset's entity -- the one whose code ends
+    // as the contra's does (416KC beside 711KC) -- or the first there is.
+    const chosen = options.expenseFor?.(type);
+    const expense =
+      (chosen === undefined ? undefined : chart.find((a) => a.code === chosen)) ??
+      (contra === undefined ? undefined : named.find((a) => ending(a.code) === ending(contra.code))) ??
+      named[0];
     return postDepreciation({
       name: type,
       expenseCode: expense?.code ?? options.fallbackExpenseCode ?? "416",

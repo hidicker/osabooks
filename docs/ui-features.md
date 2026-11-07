@@ -183,6 +183,10 @@ at the top. Click an account to see its lines. Download as CSV or Excel.
 - [ ] **Start here**: the guided start (country, where the books come from,
   entities, modules, AI).
 - [ ] **Modules**.
+- [ ] **Settings**: every setting in one place, each opening its page; set
+  here: due dates and quote validity, numbering, document colour, the
+  reports' basis and display, time zone, each asset type's depreciation
+  account, a link for contacts to another system.
 - [ ] **Setup**: country, start again empty, source system, files, last
   year's return.
 - [ ] **Opening balances**: edit, balance check, Enter bank balances.
