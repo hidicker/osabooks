@@ -174,7 +174,7 @@ function groups(): { title: string; rows: Row[] }[] {
           name: `${tax === "VAT" ? "VAT" : tax === "GST" ? "GST" : "Sales tax"} registration`,
           what: country.salesTax === null
             ? "Sales tax rates are set for each place you collect it, on the sales tax report."
-            : `Each entity's registration, how often it files, and${country.id === "au" ? " cash or accruals" : nz ? " the payments or invoice basis" : " its basis"}. The rate is the country's: ${Math.round(country.salesTax.rate * 100)}%.`,
+            : `Each entity's registration, how often it files, and${country.id === "au" ? " cash or accruals" : nz ? " the payments or invoice basis, and a provisional tax ratio where paid with the GST return (GST103)" : " its basis"}. The rate is the country's: ${Math.round(country.salesTax.rate * 100)}%.`,
           where: country.salesTax === null
             ? [{ page: "reports", label: "Reports" }]
             : [{ page: "entities", label: "Entities & accounts" }],

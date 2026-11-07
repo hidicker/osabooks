@@ -951,6 +951,37 @@ export function renderEntities(): void {
       });
       gstWrap.append(basis);
     }
+    // New Zealand's ratio option: provisional tax paid with the GST return.
+    if (nzBooks) {
+      const ratio = document.createElement("input");
+      ratio.type = "number";
+      ratio.min = "0";
+      ratio.max = "100";
+      ratio.step = "0.1";
+      ratio.className = "payroll-tiny-input";
+      ratio.placeholder = "ratio %";
+      ratio.value = entity.provisionalRatio === undefined ? "" : String(entity.provisionalRatio);
+      ratio.hidden = !reportsNetOfGst(entity);
+      ratio.title =
+        "Provisional tax by the ratio option, paid with the GST return (GST103): the ratio Inland Revenue gave, as a percentage. Empty if not on the ratio option.";
+      ratio.setAttribute("aria-label", "Provisional tax ratio");
+      ratio.addEventListener("change", () => {
+        const live = state.ledger.entities ?? emptyEntityModel();
+        const n = ratio.value.trim() === "" ? undefined : Math.floor(Math.min(100, Math.max(0, Number(ratio.value))) * 10) / 10;
+        void saveEntities(
+          {
+            ...live,
+            entities: live.entities.map((e) => {
+              if (e.id !== entity.id) return e;
+              const { provisionalRatio: _drop, ...rest } = e;
+              return n === undefined || Number.isNaN(n) ? rest : { ...rest, provisionalRatio: n };
+            }),
+          },
+          n === undefined ? `${entity.name}: not on the ratio option` : `${entity.name}: provisional tax ratio ${n}%`,
+        );
+      });
+      gstWrap.append(ratio);
+    }
 
     // Only a residential property is caught by the interest limitation rules,
     // so only one is asked. Exempt means its interest is claimed in full in
