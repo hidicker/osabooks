@@ -145,6 +145,12 @@ export function redraw(page: PageName): void {
  * showing a page and knowing who draws it are the same question, and keeping
  * them apart meant the router had to import every page in the app.
  */
+/** Pages that are the same whichever entity is chosen: no entity picker on them. */
+const BOOK_WIDE_PAGES = new Set([
+  "settings", "apps", "setup", "migration", "books", "history", "ai", "connector", "aicheck",
+  "rules", "currencies", "items", "time", "opening", "import",
+]);
+
 export function showPage(page: string, scrollTo?: "top" | "bottom" | number): void {
   // Arriving at a page half way down it is disorienting: the sections are all
   // one scrolling document, so the position simply carried over from wherever
@@ -154,6 +160,10 @@ export function showPage(page: string, scrollTo?: "top" | "bottom" | number): vo
   // The bank feed used to be a page of its own and is now a section of the
   // import page. A ledger saved before that still names it.
   if (page === "feed") page = "import";
+  // The entity picker at the top only where the page follows it: on a page
+  // that is the same for every entity, such as Settings, it read as though
+  // the settings were the chosen entity's.
+  document.querySelector(".entity-filter")?.classList.toggle("not-here", BOOK_WIDE_PAGES.has(page));
   // The guided start shows the bank feed and the bank file import inside its
   // own steps, by moving them. Whatever it has, it gives back before anything
   // else draws -- including before the guided start draws again.
