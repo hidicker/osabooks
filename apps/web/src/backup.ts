@@ -1,6 +1,7 @@
 import type { LedgerEvent } from "./events.js";
 import { appendEvent, makeEvent } from "./events.js";
 import { resetLockBaseline } from "./lock.js";
+import { redraw } from "./app.js";
 import { state } from "./state.js";
 import {
   ledgerName,
@@ -171,8 +172,15 @@ export async function restoreBackup(
   // A restore replaces the books, locks and all: the comparison starts again.
   resetLockBaseline();
   const saved = await save(state.ledger);
-  if (parsed.rules) await saveRules(parsed.rules);
-  if (parsed.rulesArchive) await saveRulesArchive(parsed.rulesArchive);
+  // A backup is everything: one with no rules puts back books with none,
+  // rather than keeping the rules of the books it replaced. Kept, the last
+  // books' accounts came back into the chart through their rules: 105 New
+  // Zealand accounts in restored Korean books. An old ledger file holds no
+  // rules, so the rules there are kept.
+  if (isBackup) {
+    await saveRules(parsed.rules ?? null);
+    await saveRulesArchive(parsed.rulesArchive && Array.isArray(parsed.rulesArchive.entries) ? parsed.rulesArchive : { version: 1, entries: [] });
+  }
   // History becomes the backup's own, so nothing from the books it replaced is
   // left there, and it ends with the restore itself. An old ledger file has no
   // history: what was here is kept, and the restore added to it.
@@ -328,16 +336,24 @@ export function backupTools(body: HTMLElement, books: string, hosted: boolean): 
     }
     pick.disabled = true;
     pick.textContent = "Restoring…";
-    void restoreBackup(file).then((result) => {
-      if (result.ok) {
-        location.reload();
-        return;
-      }
-      pick.disabled = false;
-      pick.textContent = "Restore from a backup…";
-      said.textContent = result.why;
-      said.classList.add("bad");
-    });
+    void restoreBackup(file)
+      .catch((error: unknown) => ({ ok: false as const, why: `The backup could not be restored: ${(error as Error).message}` }))
+      .then(async (result) => {
+        if (result.ok) {
+          location.reload();
+          return;
+        }
+        // Said in a message, not only on the page: the restore can redraw the
+        // Books page while it works, and a reason written into the old one
+        // was never seen -- the page was left blank, as though nothing had
+        // happened. Then the page is drawn again as it now is.
+        pick.disabled = false;
+        pick.textContent = "Restore from a backup…";
+        said.textContent = result.why;
+        said.classList.add("bad");
+        await tellOnPage(result.why);
+        redraw("books");
+      });
   });
 
   const row = document.createElement("div");

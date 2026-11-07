@@ -2805,6 +2805,10 @@ function chartName(code: string): string {
   return state.chart.find((a) => a.code === code)?.name ?? code;
 }
 
+export function booksGstAccount(): { code: string; name: string } {
+  return gstAccount();
+}
+
 function gstAccount(): { code: string; name: string } {
   // Korea's chart keeps VAT payable at 255; its 820 is Repairs.
   const korea = booksCountry().id === "kr";

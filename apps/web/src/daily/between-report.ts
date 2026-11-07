@@ -2,7 +2,7 @@ import { betweenEntities } from "../books.js";
 import { state } from "../state.js";
 import { showPage } from "../app.js";
 import { amountCell, nameCell, note } from "../ui.js";
-import { booksLocale, moneyPlaces } from "../country.js";
+import { booksLocale, moneyPlaces, sayTax } from "../country.js";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
 import { emptyEntityModel, personPositions,
   owedBetween,
@@ -33,10 +33,12 @@ export function renderBetweenReport(body: HTMLElement, year: number): void {
   body.append(heading);
   body.append(
     note(
-      "Where a line is for one entity but went through another's bank account, such as a rental's repair on the " +
-        "joint card, the profit and the GST are that entity's, and the money came from, or went to, the account's " +
-        "owner. For things owned directly, that is the owners' funds introduced and drawings, by their shares; with a " +
-        "company, trust or society, a loan. The choice for each pair of entities is under Rules, Money between entities.",
+      sayTax(
+        "Where a line is for one entity but went through another's bank account, such as a rental's repair on the " +
+          "joint card, the profit and the GST are that entity's, and the money came from, or went to, the account's " +
+          "owner. For things owned directly, that is the owners' funds introduced and drawings, by their shares; with a " +
+          "company, trust or society, a loan. The choice for each pair of entities is under Rules, Money between entities.",
+      ),
     ),
   );
 

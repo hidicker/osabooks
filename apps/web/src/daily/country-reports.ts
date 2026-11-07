@@ -43,7 +43,7 @@ import { note } from "../ui.js";
 import { computeOurReturns } from "../variance.js";
 import { entityPeriodReport, entityYearReport, scheduleName } from "./reports.js";
 import { taxYearEnd, taxYearEndShort, taxYearStart } from "../tax-year.js";
-import { booksMoney } from "../country.js";
+import { booksCountry, booksMoney } from "../country.js";
 import { ownersInYear, percentInYear } from "../owners.js";
 
 /**
@@ -90,10 +90,19 @@ function formTable(filled: FormSchedule): HTMLElement {
       line.allowed === line.amount ? money(line.amount) : `${money(line.allowed)} (of ${money(line.amount)})`;
     row(line.title, shown, line.accounts.map((a) => a.name).join(", "));
   }
-  if (filled.costOfSales !== 0) row("Cost of goods sold", money(filled.costOfSales), "", true);
-  row("Total income", money(filled.totalIncome), "", true);
-  row("Total expenses", money(filled.totalExpenses), "", true);
-  row(filled.net < 0 ? "Net loss" : "Net income", money(filled.net), "", true);
+  // In the order the net is worked: income, less the cost of what was sold,
+  // less the running costs. Korea's words beside the English in its books.
+  const kr = booksCountry().id === "kr";
+  const said = (ko: string, en: string): string => (kr ? `${ko} ${en}` : en);
+  row(said("총수입금액", "Total income"), money(filled.totalIncome), "", true);
+  if (filled.costOfSales !== 0) row(said("매출원가", "Cost of goods sold"), money(filled.costOfSales), "", true);
+  row(
+    filled.costOfSales !== 0 ? said("판매비와관리비", "Operating expenses") : said("필요경비", "Total expenses"),
+    money(filled.totalExpenses),
+    "",
+    true,
+  );
+  row(filled.net < 0 ? said("소득금액", "Net loss") : said("소득금액", "Net income"), money(filled.net), "", true);
   table.append(body);
   return table;
 }

@@ -1669,7 +1669,15 @@ function startAgainInCountry(current: string): HTMLElement {
   }
   const go = document.createElement("button");
   go.type = "button";
-  go.textContent = "Start again in this country";
+  // Named for the country chosen: "this country" read as the books' own.
+  const names = new Map(countryChoices(current));
+  const say = (): void => {
+    const name = names.get(select.value) ?? "this country";
+    go.dataset["label"] = select.value === current ? `Start again empty in ${name}` : `Start again in ${name}`;
+    go.textContent = go.dataset["label"];
+  };
+  say();
+  select.addEventListener("change", say);
   go.addEventListener("click", () => void startAgainIn(select.value, go));
   const row = document.createElement("div");
   row.className = "page-actions";
@@ -1710,13 +1718,13 @@ async function startAgainIn(country: string, button: HTMLButtonElement): Promise
     if (backendKind() === "cloud" && !(await emptyCloudBooks())) {
       await tellOnPage("These books could not be emptied on the server, so they are as they were or part emptied. Reload to see which, and try again.");
       button.disabled = false;
-      button.textContent = "Start again in this country";
+      button.textContent = button.dataset["label"] ?? "Start again";
       return;
     }
     if (!(await wipe())) {
       await tellOnPage("These books could not be emptied. Nothing has been changed. Try again in a moment.");
       button.disabled = false;
-      button.textContent = "Start again in this country";
+      button.textContent = button.dataset["label"] ?? "Start again";
       return;
     }
     forgetOnboarding();
@@ -1729,7 +1737,7 @@ async function startAgainIn(country: string, button: HTMLButtonElement): Promise
   } catch (error) {
     await tellOnPage(`Could not start these books again: ${(error as Error).message}`);
     button.disabled = false;
-    button.textContent = "Start again in this country";
+    button.textContent = button.dataset["label"] ?? "Start again";
   }
 }
 

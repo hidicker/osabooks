@@ -1,4 +1,4 @@
-import { NO_SALES_TAX, jurisdictionOf, minorUnits, salesTaxFraction, setBooksDayFirst, setBooksTimeZone, setGstControlCode, setSalesTaxFraction } from "@nzosa/core";
+import { NO_SALES_TAX, jurisdictionOf, minorUnits, salesTaxFraction, setBooksCurrency, setBooksDayFirst, setBooksTimeZone, setGstControlCode, setSalesTaxFraction } from "@nzosa/core";
 import type { Jurisdiction } from "@nzosa/core";
 import { state } from "./state.js";
 import { addCountryReports } from "./daily/country-reports.js";
@@ -44,6 +44,10 @@ export function applyCountryRules(): Jurisdiction {
   // The GST or VAT control account's code: Korea's chart keeps VAT payable
   // at 255, and its 820 is Repairs, which took the VAT on every sale.
   setGstControlCode(country.id === "kr" ? "255" : "820");
+  // Amounts written with no currency named are in the books' own: won with
+  // no decimals. Reconcile, the invoice editor and several reports showed
+  // 5500000.00 in Korean books.
+  setBooksCurrency(country.currency);
   // Today where the books are kept: the zone chosen on Settings, or the
   // country's own where it has only one.
   setBooksTimeZone(state.ledger.settings?.timeZone ?? countryTimeZone(country.id));

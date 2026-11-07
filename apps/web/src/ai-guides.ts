@@ -215,7 +215,7 @@ export const IRD_GUIDES: readonly IrdGuide[] = [
       "ESCT: the rate bands and how the rate is set for each employee.",
       "Student loan, child support and other deductions.",
       "Extra pays (bonuses, holiday pay, redundancy) and how the guide says to tax them.",
-      "Payday filing: due within two working days of payday, and new and departing employee details.",
+      `Payday filing: due within ${state.ledger.payroll?.employerSize === "large" ? "two working days of payday (a large employer)" : "ten working days of payday (a small employer)"}, and new and departing employee details.`,
       "When deductions must be paid to Inland Revenue.",
       "Records the guide says an employer must keep that these books do not show.",
     ],

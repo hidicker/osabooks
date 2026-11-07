@@ -35,6 +35,8 @@ import {
   ledgerFromStart,
   invoicesInPlay,
   entityView,
+  booksGstAccount,
+  gstBasis,
   companyCurrentAccounts,
   isCompanyEntity,
 } from "../books.js";
@@ -276,8 +278,15 @@ function statementDisplay(): { label: (text: string) => string; money: (cents: n
   return {
     label: (text) => {
       if (s.hideCodes !== true) return text;
-      const { name } = splitAccountLabel(text);
-      return name.trim() === "" ? text : name;
+      // Only a code the chart has: a card called kea-card-4021 keeps its digits.
+      const { code, name } = splitAccountLabel(text);
+      const account = state.chart.find((a) => a.code.trim() !== "" && a.code.trim() === code.trim());
+      if (account === undefined || name.trim() === "") return text;
+      // With several entities, the same name is several accounts: each says whose.
+      const model = state.ledger.entities ?? emptyEntityModel();
+      if (model.entities.length < 2 || state.entityFilter !== "") return name;
+      const owner = model.entities.find((e) => e.id === model.accounts[accountEntityKey(account)]);
+      return owner === undefined ? name : `${name} (${owner.name})`;
     },
     money: (cents) => {
       if (s.wholeUnits !== true) return booksMoney(cents);
@@ -1992,7 +2001,9 @@ function renderJournal(body: HTMLElement, year: number): void {
   }
 
   const balance = trialBalance(journals);
-  const tax = taxSummary(journals);
+  // On the basis the books' returns are on: invoices and bills when issued on
+  // the invoice basis (always in Korea), as they are paid otherwise.
+  const tax = taxSummary(journals, { basis: gstBasis() === "accruals" ? "invoice" : "payments" });
   const money = (cents: number): string =>
     booksMoney(cents);
 
@@ -2053,8 +2064,10 @@ function renderJournal(body: HTMLElement, year: number): void {
     body.append(summary);
     body.append(
       note(
-        "Taken from each line's GST treatment, not the GST account balance; a line posted to " +
-          "the GST account with no tax type reaches no " + (country === "au" ? "label." : "box."),
+        sayTax(
+          "Taken from each line's GST treatment, not the GST account balance; a line posted to " +
+            "the GST account with no tax type reaches no " + (country === "au" ? "label." : "box."),
+        ),
       ),
     );
   }
@@ -3011,12 +3024,27 @@ function provisionalByRatio(body: HTMLElement, result: GstReturnResult, money: (
   if (booksCountry().id !== "nz") return;
   const all = state.ledger.entities?.entities ?? [];
   const entity = reportingEntity() ?? (all.length === 1 ? all[0] : undefined);
-  const ratio = entity?.provisionalRatio;
-  if (entity === undefined || ratio === undefined) return;
+  if (entity === undefined) {
+    // Each entity files its own return: said, rather than left out unseen.
+    const withRatio = all.filter((e) => e.provisionalRatio !== undefined).map((e) => e.name);
+    if (withRatio.length > 0) {
+      body.append(
+        note(
+          `Provisional tax by the ratio option (GST103) is on each entity's own return: choose ${withRatio.join(" or ")} at the top to see it.`,
+        ),
+      );
+    }
+    return;
+  }
+  const ratio = entity.provisionalRatio;
+  if (ratio === undefined) return;
   // Box 5 is the sales with their GST in, zero-rated ones included; Box 8 the
   // GST on them. What is left is the taxable supplies the ratio is applied to.
   const supplies = result.boxes.box5 - result.boxes.box8;
   const tax = Math.max(0, Math.round((supplies * ratio) / 100));
+  // A refund larger than the provisional tax leaves a refund: said as one.
+  const net = (result.boxes.outcome === "refund" ? -result.boxes.box15 : result.boxes.box15) + tax;
+  const together = (): string => (net < 0 ? `${money(-net)} refund` : `${money(net)} to pay`);
   const heading = document.createElement("h4");
   heading.textContent = "Provisional tax with this return (GST103, ratio option)";
   body.append(heading);
@@ -3027,7 +3055,7 @@ function provisionalByRatio(body: HTMLElement, result: GstReturnResult, money: (
     ["Taxable supplies less GST (Box 5 less Box 8)", money(supplies), false],
     ["Ratio", `${ratio.toFixed(1)}%`, false],
     ["Provisional tax for the period", money(tax), true],
-    ["GST and provisional tax together", money((result.boxes.outcome === "refund" ? -result.boxes.box15 : result.boxes.box15) + tax), true],
+    ["GST and provisional tax together", together(), true],
   ] as const) {
     const tr = document.createElement("tr");
     if (total) tr.classList.add("ir10-total");
@@ -4328,7 +4356,7 @@ function renderReportsHome(body: HTMLElement): void {
     about.className = "reports-about";
     about.textContent =
       "One workbook with the general ledger, bank coding, revenue and expenses, unusual " +
-      `transactions, depreciation schedule, trial balance, ${noSalesTax() ? "" : "GST returns "}and all underlying tables.`;
+      `transactions, depreciation schedule, trial balance, ${noSalesTax() ? "" : sayTax("GST returns ")}and all underlying tables.`;
 
     const controls = document.createElement("div");
     controls.className = "excel-extract-controls";
@@ -4372,7 +4400,7 @@ function renderReportsHome(body: HTMLElement): void {
     about.className = "reports-about";
     about.textContent =
       "One zip for a year: profit and loss, balance sheet, trial balance, general ledger, manual journals, " +
-      `aged receivables and payables, bank reconciliation, assets and depreciation, ${noSalesTax() ? "" : "GST returns, "}` +
+      `aged receivables and payables, bank reconciliation, assets and depreciation, ${noSalesTax() ? "" : sayTax("GST returns, ")}` +
       "the chart of accounts, and any changes made in a locked period.";
     const controls = document.createElement("div");
     controls.className = "excel-extract-controls";
@@ -4640,10 +4668,10 @@ export function renderReportsPage(): void {
     reportsHint(basisNow, kindNow) +
     (kindNow === "pl" && !noSalesTax()
       ? basisNow === "accrual"
-        ? " Figures exclude GST."
+        ? sayTax(" Figures exclude GST.")
         : gstSelect.value === "gross"
-          ? " Figures include GST."
-          : " Figures exclude GST, as filed on a return."
+          ? sayTax(" Figures include GST.")
+          : sayTax(" Figures exclude GST, as filed on a return.")
       : "");
 
   const years = bookYears();
@@ -5113,6 +5141,8 @@ function extractFor(year: number) {
     accountName: (id: string) => labels.get(id) ?? id,
     country: booksCountry().id,
     standardRate: gstPercent(),
+    // The books' own GST or VAT account: Korea's is 255, and its 820 is Repairs.
+    gstAccount: `${booksGstAccount().name} - ${booksGstAccount().code}`,
     invoiceOf: (t: Transaction) => {
       const number = settled[t.id];
       return number === undefined ? "" : (invoices.get(number)?.number ?? number);
