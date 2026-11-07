@@ -4029,6 +4029,7 @@
   ],
   "accounts": {
    "1100": "studio",
+   "2000": "studio",
    "3100": "studio",
    "3900": "studio",
    "4000": "studio",
@@ -4236,6 +4237,15 @@
    "code": "1100",
    "name": "Accounts Receivable",
    "type": "Accounts Receivable",
+   "taxCode": "Tax Exempt",
+   "description": "",
+   "entity": "Ellis Design Studio",
+   "entityKind": "business"
+  },
+  {
+   "code": "2000",
+   "name": "Accounts Payable",
+   "type": "Accounts Payable",
    "taxCode": "Tax Exempt",
    "description": "",
    "entity": "Ellis Design Studio",

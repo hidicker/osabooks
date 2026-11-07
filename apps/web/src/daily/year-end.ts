@@ -10,7 +10,7 @@ import {
 import { state } from "../state.js";
 import { savePart } from "../store.js";
 import { amountCell, nameCell, note } from "../ui.js";
-import { E12_ROWS, KILOMETRE_RATES, NOT_IN_E12, NO_LOGBOOK_LIMIT, emptyEntityModel } from "@nzosa/core";
+import { E12_ROWS, KILOMETRE_RATES, NOT_IN_E12, NO_LOGBOOK_LIMIT, accountEntityKey, emptyEntityModel } from "@nzosa/core";
 import type { Cents, Entity, PostedJournal, Prepayment, VehicleFuel, VehicleUse } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
 import { reportMoney } from "../country.js";
@@ -409,7 +409,16 @@ let prepaymentDraft: boolean = false;
 function candidates(posted: readonly PostedJournal[], year: number) {
   const from = taxYearStart(year);
   const to = taxYearEnd(year);
-  const expense = new Set(state.chart.filter((a) => isExpense(a.type)).map((a) => a.code));
+  // A business's expenses only, as the section says: a rental's and a
+  // person's have their own year-end pages.
+  const model = state.ledger.entities ?? emptyEntityModel();
+  const kindOf = new Map(model.entities.map((e) => [e.id, e.kind ?? "business"]));
+  const business = (code: string, name: string): boolean => {
+    const owner = model.accounts[accountEntityKey({ code, name })];
+    const kind = owner === undefined ? "business" : kindOf.get(owner) ?? "business";
+    return kind !== "residential" && kind !== "commercial" && kind !== "personal";
+  };
+  const expense = new Set(state.chart.filter((a) => isExpense(a.type) && business(a.code, a.name)).map((a) => a.code));
   const out: { transactionId: string; code: string; label: string; amount: Cents }[] = [];
   for (const journal of posted) {
     if (journal.source === "adjustment" || journal.source === "depreciation") continue;

@@ -71,7 +71,7 @@ export function renderAiCheck(): void {
   }
 
   body.append(
-    step("What this is", `Year-end review against ${booksCountry().id === "generic" ? "the" : `${booksCountry().name}'s`} tax rules`),
+    step("What this is", `Year-end review against ${booksCountry().id === "generic" ? "the" : booksCountry().id === "us" ? "the United States'" : `${booksCountry().name}'s`} tax rules`),
     note(
       "Reviews the finished year: whether each account holds what belongs in it, " +
         (noSalesTax() ? "" : `whether ${booksCountry().salesTax?.name ?? "GST"} treatments match each entity's registration, `) +
@@ -164,7 +164,7 @@ function sourceNote(): HTMLElement {
   why.append(
     document.createTextNode(
       "The rules come from OpenAccountants — tax guides written against primary sources, " +
-        `the law and ${booksCountry().taxAuthority.name}'s own material — rather than from the model's memory. ` +
+        `the law and ${booksCountry().id === "nz" ? "" : "the "}${booksCountry().taxAuthority.name}'s own material — rather than from the model's memory. ` +
         "For more information on OpenAccountants: ",
     ),
   );
