@@ -2024,6 +2024,7 @@ main:has(#page-check:not([hidden])) { max-width: none; }
 #page-setup .page-actions { min-width: 0; max-width: 100%; }
 /* Settings ---------------------------------------------------------------- */
 .settings-group h3 { margin-bottom: 0.4rem; }
+.entity-filter.not-here { display: none !important; }
 .settings-row { display: flex; gap: 0.8rem; align-items: flex-start; justify-content: space-between;
   padding: 0.55rem 0; border-top: 1px solid rgba(128,128,128,0.2); flex-wrap: wrap; }
 .settings-row > div:first-child { flex: 1 1 18rem; min-width: 0; }
