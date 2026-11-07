@@ -32,6 +32,65 @@ async function mayMoveLocks(): Promise<boolean> {
   return (await rpc<boolean>("has_role", { book, roles: ["owner", "accountant"] })) === true;
 }
 
+interface Noticed {
+  noticed_at: string;
+  part: string;
+  by_email: string | null;
+  what: { locks?: { year?: string | null; gst?: string | null }; changed?: { kind: string; key: string; date: string }[] };
+}
+
+let watched: { book: string; rows: Noticed[] | null; denied?: boolean } | null = null;
+
+/**
+ * What the server noticed: each save that changed something dated in a locked
+ * period, whoever made it and from wherever. For now it only notices; it
+ * refuses nothing. Shown to the owner and the accountant.
+ */
+function serverWatch(): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "locked-changes";
+  const heading = document.createElement("h4");
+  heading.textContent = "Noticed by the server";
+  box.append(heading);
+  const book = openCloudBookId();
+  if (watched === null || watched.book !== book) {
+    watched = { book, rows: null };
+    void rpc<Noticed[]>("lock_watch_list", { p_book: book })
+      .then((rows) => {
+        if (watched?.book === book) watched.rows = Array.isArray(rows) ? rows : [];
+      })
+      .catch(() => {
+        // Not the owner or the accountant: the list is theirs.
+        if (watched?.book === book) watched = { book, rows: [], denied: true };
+      })
+      .finally(() => redraw("settings"));
+    box.append(note("Asking the server…"));
+    return box;
+  }
+  if (watched.denied === true) return document.createElement("div");
+  const rows = watched.rows ?? [];
+  box.append(
+    note(
+      "The server notes every save that changes a record dated in a locked period: a bank line, its coding, an invoice or a manual journal. " +
+        "For now it only notices; the page refuses such changes as before. " +
+        (rows.length === 0 ? "Nothing noticed." : `${rows.length} noticed, newest first:`),
+    ),
+  );
+  for (const row of rows.slice(0, 20)) {
+    const changed = row.what.changed ?? [];
+    const kinds = [...new Set(changed.map((c) => c.kind))].join(", ");
+    const dates = changed.map((c) => c.date).sort();
+    box.append(
+      note(
+        `${new Date(row.noticed_at).toLocaleString(booksLocale())}${row.by_email ? `, ${row.by_email}` : ""}: ` +
+          `${changed.length} ${kinds || "change"}${changed.length === 1 ? "" : "s"} dated ${dates[0] ?? ""}${dates.length > 1 ? ` to ${dates[dates.length - 1]}` : ""}` +
+          ` (locked to ${row.what.locks?.year ?? row.what.locks?.gst ?? "?"}).`,
+      ),
+    );
+  }
+  return box;
+}
+
 /** Lines dated up to `day` still waiting to be confirmed on Reconcile. */
 function unconfirmedThrough(day: string): number {
   return reconcileRows().all.filter((one) => one.transaction.date <= day && !settledAlready(one)).length;
@@ -147,6 +206,8 @@ export function renderLockDates(): void {
   });
   body.append(saveIt, said);
   body.append(lockedChangesList());
+  // Books online: what the server noticed changing in a locked period.
+  if (backendKind() === "cloud" && openCloudBookId() !== "") body.append(serverWatch());
   body.append(numberPadSettings());
   body.append(stripeSettings());
 }
