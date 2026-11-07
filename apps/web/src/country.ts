@@ -1,4 +1,4 @@
-import { NO_SALES_TAX, jurisdictionOf, minorUnits, salesTaxFraction, setBooksDayFirst, setSalesTaxFraction } from "@nzosa/core";
+import { NO_SALES_TAX, jurisdictionOf, minorUnits, salesTaxFraction, setBooksDayFirst, setBooksTimeZone, setSalesTaxFraction } from "@nzosa/core";
 import type { Jurisdiction } from "@nzosa/core";
 import { state } from "./state.js";
 import { addCountryReports } from "./daily/country-reports.js";
@@ -41,7 +41,24 @@ export function applyCountryRules(): Jurisdiction {
   const tax = country.salesTax;
   setSalesTaxFraction(tax === null ? NO_SALES_TAX : tax.fraction);
   setBooksDayFirst(country.dayFirst);
+  // Today where the books are kept: the zone chosen on Settings, or the
+  // country's own where it has only one.
+  setBooksTimeZone(state.ledger.settings?.timeZone ?? countryTimeZone(country.id));
   return country;
+}
+
+/** The one time zone a country keeps, where it keeps one; undefined for the computer's. */
+export function countryTimeZone(id: string): string | undefined {
+  return id === "nz" ? "Pacific/Auckland" : id === "kr" ? "Asia/Seoul" : undefined;
+}
+
+/** The time zones offered for a country's books: the main ones it has. */
+export function countryTimeZones(id: string): string[] {
+  if (id === "nz") return ["Pacific/Auckland", "Pacific/Chatham"];
+  if (id === "kr") return ["Asia/Seoul"];
+  if (id === "au") return ["Australia/Sydney", "Australia/Melbourne", "Australia/Brisbane", "Australia/Adelaide", "Australia/Darwin", "Australia/Perth", "Australia/Hobart"];
+  if (id === "us") return ["America/New_York", "America/Chicago", "America/Denver", "America/Phoenix", "America/Los_Angeles", "America/Anchorage", "Pacific/Honolulu"];
+  return [];
 }
 
 /** Whether these books are kept where there is no national sales tax, so no GST to show or choose. */
@@ -107,10 +124,15 @@ export function documentOptions(): {
   dateStyle?: "dmy" | "mdy" | "ymd";
   lang?: string;
   taxIdLabel?: string;
+  accent?: string;
 } {
   const country = booksCountry();
-  if (country.id === "nz") return {};
+  // The colour chosen on Settings, for headings and rules.
+  const accent = state.ledger.settings?.documentAccent;
+  const coloured = accent === undefined ? {} : { accent };
+  if (country.id === "nz") return coloured;
   return {
+    ...coloured,
     ...(noSalesTax() ? { noTax: true } : {}),
     dateStyle: country.id === "us" ? "mdy" : country.id === "kr" ? "ymd" : "dmy",
     lang: country.locale,

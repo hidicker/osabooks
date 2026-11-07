@@ -131,3 +131,22 @@ test("on the last day of the year every month is posted, and they add up to the 
   const lastDay = depreciationJournals({ assets: [ASSET], transactions, chart, today: "2027-03-31" });
   assert.equal(lastDay.length, 11, "March not yet finished on its last day");
 });
+
+test("depreciation goes to the asset's own entity's account, or the one chosen for its type", () => {
+  // In books with several entities each has a Depreciation account; the
+  // first one in the chart took every entity's charge.
+  const chart = [
+    account("416RL", "Depreciation", "Expense"),
+    account("416KC", "Depreciation", "Expense"),
+    account("731KC", "Less Accumulated Depreciation on Roasting Equipment"),
+    account("417KC", "Depreciation of plant", "Expense"),
+  ];
+  const debit = (journals) => journals[0].lines.find((l) => l.amount > 0).accountCode;
+  const usual = depreciationJournals({ assets: [ASSET], transactions: [txn("2025-06-01")], chart });
+  assert.equal(debit(usual), "416KC");
+  const chosen = depreciationJournals({
+    assets: [ASSET], transactions: [txn("2025-06-01")], chart,
+    expenseFor: (type) => (type === "Roasting Equipment" ? "417KC" : undefined),
+  });
+  assert.equal(debit(chosen), "417KC");
+});

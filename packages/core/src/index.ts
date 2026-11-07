@@ -210,6 +210,7 @@ export {
   inRange,
   localToday,
   localStamp,
+  setBooksTimeZone,
 } from "./dates.js";
 export type {
   IsoDate,

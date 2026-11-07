@@ -812,6 +812,18 @@ export function renderContacts(): void {
       });
       actions.append(statement);
     }
+    // The contact in another system, by the link set on Settings.
+    const template = state.ledger.settings?.contactLink;
+    if (template !== undefined && /^https:\/\//.test(template)) {
+      const open = document.createElement("a");
+      open.className = "small";
+      open.href = template.replace(/\{name\}/g, encodeURIComponent(contact.name));
+      open.target = "_blank";
+      open.rel = "noopener noreferrer";
+      open.textContent = "Open elsewhere";
+      open.title = "This contact in your other system, by the link on Settings";
+      actions.append(" ", open);
+    }
     tr.append(actions);
     tbody.append(tr);
     if (editing === contact.id) {

@@ -165,6 +165,14 @@ export interface BookSettings {
   wholeUnits?: boolean;
   /** Reports: accounts with nothing in them still listed. */
   showEmpty?: boolean;
+  /** Invoices, statements and reminders: the colour of headings and rules. */
+  documentAccent?: string;
+  /** The time zone "today" is taken in; the country's own where unset. */
+  timeZone?: string;
+  /** Each asset type's depreciation expense account, by the type, where chosen. */
+  assetExpense?: Record<string, string>;
+  /** A link to another system for each contact, with {name} for the contact's name. */
+  contactLink?: string;
 }
 
 export interface StoredLedger {

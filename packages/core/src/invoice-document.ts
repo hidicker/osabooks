@@ -84,6 +84,8 @@ export interface InvoiceDocumentOptions {
   taxIdLabel?: string;
   /** What the due date is called: "Due" by default, "Valid until" on a quote. */
   dueLabel?: string;
+  /** The colour of headings and rules, as "#rrggbb"; a deep blue by default. */
+  accent?: string;
   /**
    * Where there is no GST but the invoice charges sales tax on top (the
    * United States): what its total row says, "Sales tax (Seattle, WA 10.35%)".
@@ -130,6 +132,12 @@ function lineRow(line: InvoiceLine, noTax = false): string {
     `<td class="n">${formatAmount(noTax ? line.net : line.gross)}</td>` +
     "</tr>"
   );
+}
+
+/** The documents' style, in the accent colour chosen where one was. */
+function styleFor(options: InvoiceDocumentOptions): string {
+  const accent = options.accent ?? "";
+  return /^#[0-9a-fA-F]{6}$/.test(accent) ? STYLE.replace("--accent: #1f4e79", `--accent: ${accent}`) : STYLE;
 }
 
 const STYLE = `
@@ -222,7 +230,7 @@ export function invoiceDocument(
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(title)} ${escapeHtml(invoice.number)}</title>
-<style>${STYLE}</style>
+<style>${styleFor(options)}</style>
 </head>
 <body>
   <div class="head">
@@ -382,7 +390,7 @@ export function customerStatement(
 <head>
 <meta charset="utf-8">
 <title>Statement ${escapeHtml(customer)}</title>
-<style>${STYLE}</style>
+<style>${styleFor(options)}</style>
 </head>
 <body>
   <div class="head">
@@ -484,7 +492,7 @@ export function collectionLetter(
 <head>
 <meta charset="utf-8">
 <title>${escapeHtml(said.title)} ${escapeHtml(customer)}</title>
-<style>${STYLE}</style>
+<style>${styleFor(options)}</style>
 </head>
 <body>
   <div class="head">

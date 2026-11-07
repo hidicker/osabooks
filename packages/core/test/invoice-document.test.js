@@ -195,3 +195,16 @@ test("a card payment link is printed and emailed while it is for what is owed, a
   assert.ok(!invoiceEmail(invoice({ payLink: { ...link, paidAt: "2026-05-03T01:00:00Z" } }), supplier).body.includes("buy.stripe.com"));
   assert.ok(!invoiceDocument(invoice({ payLink: { ...link, url: "javascript:alert(1)" } }), supplier).includes("javascript:"));
 });
+
+test("a document carries the supplier's contact details, the chosen colour, and a quote's valid-until date", () => {
+  const html = invoiceDocument(
+    invoice({ due: "2026-12-07" }),
+    { ...supplier, legalName: "Kea Coffee Roasters Limited", phone: "03 548 1234", email: "accounts@kea.example", website: "kea.example" },
+    { title: "Quote", dueLabel: "Valid until", accent: "#b03a2e" },
+  );
+  for (const text of ["Kea Coffee Roasters Limited", "03 548 1234", "accounts@kea.example", "kea.example", "Valid until", "--accent: #b03a2e"]) {
+    assert.ok(html.includes(text), text);
+  }
+  const plain = invoiceDocument(invoice({}), supplier, { accent: "red; } body { display: none" });
+  assert.ok(plain.includes("--accent: #1f4e79"), "only a colour is taken");
+});

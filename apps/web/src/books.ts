@@ -2273,6 +2273,8 @@ function depreciationJournals(): PostedJournal[] {
     chart: state.chart,
     // Today where the books are kept: the year in progress is posted month by month.
     today: localToday(),
+    // Each asset type's own expense account, where Settings chose one.
+    expenseFor: (type) => state.ledger.settings?.assetExpense?.[type],
     ...depreciationRules(),
   });
 }
