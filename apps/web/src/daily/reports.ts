@@ -2064,8 +2064,9 @@ function renderJournal(body: HTMLElement, year: number): void {
   body.append(
     tbHeading,
     note(
-      "Balance sheet accounts at their closing balance, from the opening balances and every posting since; income and expenses for the period. " +
-        "It agrees with the balance sheet on the same day. The proof above is of the period's postings.",
+      "Debit and Credit are each account's postings in the period, which the proof above adds up. Closing debit and Closing credit are the balance " +
+        "on the last day: balance sheet accounts from the opening balances and every posting since, income and expenses for the period, so they " +
+        "agree with the balance sheet on the same day.",
     ),
   );
   const table = document.createElement("table");
@@ -2076,26 +2077,45 @@ function renderJournal(body: HTMLElement, year: number): void {
   const display = statementDisplay();
   const codes = bookSettings().hideCodes !== true;
   head.innerHTML =
-    `<tr>${codes ? "<th>Code</th>" : ""}<th>Account</th><th>Lines</th><th>Debit</th><th>Credit</th></tr>`;
+    `<tr>${codes ? "<th>Code</th>" : ""}<th>Account</th><th>Lines</th><th>Debit</th><th>Credit</th><th>Closing debit</th><th>Closing credit</th></tr>`;
   const tbody = document.createElement("tbody");
 
-  const listed = closingTrialBalance(view, from, to).sort((a, b) => Math.abs(b.balance) - Math.abs(a.balance));
+  // Each account's postings in the period, and its closing balance beside
+  // them: the first prove the period, the second agree with the balance sheet.
+  type Row = { accountCode: string; accountName: string; lines: number; moved: number; closing: number };
+  const rows = new Map<string, Row>();
+  const keyOf = (code: string, name: string): string => code.trim() || name;
+  for (const r of balance.rows) {
+    const key = keyOf(r.accountCode, r.accountName);
+    const held = rows.get(key) ?? { accountCode: r.accountCode, accountName: r.accountName, lines: 0, moved: 0, closing: 0 };
+    held.lines += r.lines;
+    held.moved += r.balance;
+    rows.set(key, held);
+  }
+  for (const r of closingTrialBalance(view, from, to)) {
+    const key = keyOf(r.accountCode, r.accountName);
+    const held = rows.get(key) ?? { accountCode: r.accountCode, accountName: r.accountName, lines: 0, moved: 0, closing: 0 };
+    held.closing += r.balance;
+    rows.set(key, held);
+  }
   if (display.showEmpty) {
-    const there = new Set(listed.map((r) => r.accountCode.trim()));
     for (const account of state.chart) {
       const code = account.code.trim();
-      if (code === "" || there.has(code) || account.inactive === true) continue;
-      listed.push({ accountCode: code, accountName: account.name, lines: 0, balance: 0 } as (typeof listed)[number]);
+      if (code === "" || rows.has(code) || account.inactive === true) continue;
+      rows.set(code, { accountCode: code, accountName: account.name, lines: 0, moved: 0, closing: 0 });
     }
   }
+  const listed = [...rows.values()].sort((a, b) => Math.abs(b.moved) - Math.abs(a.moved) || Math.abs(b.closing) - Math.abs(a.closing));
   for (const row of listed) {
     const tr = document.createElement("tr");
     for (const [text, cls] of [
       ...(codes ? [[/^[a-z][a-z-]*$/.test(row.accountCode) ? "" : row.accountCode, "report-name"] as const] : []),
       [row.accountName, "report-name"],
       [row.lines === 0 ? "" : String(row.lines), "report-amount"],
-      [row.balance > 0 ? display.money(row.balance) : "", "report-amount"],
-      [row.balance < 0 ? display.money(-row.balance) : "", "report-amount"],
+      [row.moved > 0 ? display.money(row.moved) : "", "report-amount"],
+      [row.moved < 0 ? display.money(-row.moved) : "", "report-amount"],
+      [row.closing > 0 ? display.money(row.closing) : "", "report-amount"],
+      [row.closing < 0 ? display.money(-row.closing) : "", "report-amount"],
     ] as const) {
       const td = document.createElement("td");
       td.textContent = text;
@@ -2107,11 +2127,14 @@ function renderJournal(body: HTMLElement, year: number): void {
 
   const total = document.createElement("tr");
   total.className = "report-net";
-  const debits = balance.rows.reduce((n, r) => n + (r.balance > 0 ? r.balance : 0), 0);
-  const credits = balance.rows.reduce((n, r) => n + (r.balance < 0 ? -r.balance : 0), 0);
+  const debits = listed.reduce((n, r) => n + (r.moved > 0 ? r.moved : 0), 0);
+  const credits = listed.reduce((n, r) => n + (r.moved < 0 ? -r.moved : 0), 0);
+  const closingDebits = listed.reduce((n, r) => n + (r.closing > 0 ? r.closing : 0), 0);
+  const closingCredits = listed.reduce((n, r) => n + (r.closing < 0 ? -r.closing : 0), 0);
   for (const [text, cls] of [
     ...(codes ? [["", "report-name"] as const] : []), ["Total", "report-name"], ["", "report-amount"],
     [display.money(debits), "report-amount"], [display.money(credits), "report-amount"],
+    [display.money(closingDebits), "report-amount"], [display.money(closingCredits), "report-amount"],
   ] as const) {
     const td = document.createElement("td");
     td.textContent = text;
