@@ -1,5 +1,5 @@
 import { redraw, showPage } from "../app.js";
-import { record } from "../books.js";
+import { record, reportEngine } from "../books.js";
 import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { amountCell, askOnPage, askTextOnPage, download, nameCell, note } from "../ui.js";
@@ -128,6 +128,12 @@ function issueForm(entity: Entity, receipts: DonationReceipt[]): HTMLElement {
   // or, for cash handed over, a date and an amount.
   const used = new Set(receipts.filter((r) => r.voided === undefined).flatMap((r) => r.transactionIds ?? []));
   const needle = finding.trim().toLowerCase();
+  // Gifts first: lines coded to a donations account, then the rest, each
+  // with what it is coded to, so bar takings and subscriptions are not
+  // mistaken for gifts.
+  const engine = reportEngine();
+  const codedTo = (t: Transaction): string => engine?.codeOf(t) ?? "";
+  const isGift = (t: Transaction): boolean => /donat|koha|gift|bequest/i.test(codedTo(t));
   const loose = linesFor(entity)
     .filter((t) => t.amount > 0 && !used.has(t.id))
     .filter(
@@ -136,7 +142,7 @@ function issueForm(entity: Entity, receipts: DonationReceipt[]): HTMLElement {
         needle === "" ||
         `${t.otherParty} ${t.particulars} ${t.reference} ${(t.amount / 100).toFixed(2)} ${t.date}`.toLowerCase().includes(needle),
     )
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => Number(isGift(b)) - Number(isGift(a)) || b.date.localeCompare(a.date));
 
   const find = document.createElement("input");
   find.type = "text";
@@ -167,10 +173,21 @@ function issueForm(entity: Entity, receipts: DonationReceipt[]): HTMLElement {
     tick.addEventListener("change", () => {
       if (tick.checked) ticked.add(t.id);
       else ticked.delete(t.id);
+      // The payer is usually the donor: their name, where none is typed yet.
+      if (tick.checked && donorBox.value.trim() === "" && t.otherParty.trim() !== "") {
+        donor = t.otherParty.trim();
+        donorBox.value = donor;
+      }
     });
     const strong = document.createElement("strong");
     strong.textContent = money(t.amount);
-    label.append(tick, ` ${t.date}  ${[t.otherParty.trim(), t.particulars.trim()].filter((x) => x !== "").join(" · ")}  `, strong);
+    const coded = codedTo(t);
+    label.append(
+      tick,
+      ` ${t.date}  ${[t.otherParty.trim(), t.particulars.trim()].filter((x) => x !== "").join(" · ")}  `,
+      strong,
+      coded === "" ? "" : `  (${coded})`,
+    );
     box.append(label);
   }
   if (loose.length > 40) box.append(note(`${loose.length - 40} more. Type in the box to narrow them.`));

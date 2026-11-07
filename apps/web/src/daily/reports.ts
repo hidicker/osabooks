@@ -3923,8 +3923,8 @@ const REPORT_DESCRIPTIONS: Record<string, string> = {
   bankreconcile: "Each day's bank balance here against the statement, the bank feed and your previous system.",
   owner: "Income and expenses by owner, for property held jointly.",
   agedpayables: "What is owed to each supplier on a day, by how late, agreed to Accounts Payable.",
-  bycustomer: "What each customer was invoiced in the period, before GST, less credit notes.",
-  byitem: "What each product or service sold for in the period, and how many, from the invoice lines.",
+  bycustomer: "What each customer was invoiced in the period, before GST, less credit notes. Invoices and sales receipts only.",
+  byitem: "What each product or service sold for in the period, and how many, from the invoice lines. Invoices and sales receipts only.",
   agedreceivables: "What each customer owes on a day, by how late, agreed to Accounts Receivable.",
   charts: "The year's income and spending, month by month.",
   schedulee: "Each rental property on Schedule E's lines, from its own accounts.",
@@ -5045,6 +5045,14 @@ function renderSalesBy(body: HTMLElement, year: number, by: "customer" | "item")
   const heading = document.createElement("h3");
   heading.textContent = `${by === "customer" ? "Income by customer" : "Sales by product or service"}, ${periodHeading(year)}`;
   body.append(heading);
+  // Said, because the total is usually far below the profit and loss's
+  // income: money coded straight from a bank line has no invoice to count.
+  body.append(
+    note(
+      "From sales invoices and sales receipts only. Income coded straight from bank lines, with no invoice, " +
+        "is not in it: the profit and loss has all the income.",
+    ),
+  );
   if (result.rows.length === 0) {
     body.append(note("No sales invoices in this period."));
     return;

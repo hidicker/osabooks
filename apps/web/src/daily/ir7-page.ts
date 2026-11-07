@@ -418,7 +418,7 @@ export function renderIr7Page(): void {
     for (const a of sheet.attributions) {
       const d = document.createElement("details");
       const sum = document.createElement("summary");
-      sum.textContent = `${a.name} · ${a.percent}%${a.irdNumber !== "" ? ` · ${a.irdNumber}` : ""} · total $${money(a.total)}`;
+      sum.textContent = `${a.name} · ${a.percent}%${a.irdNumber !== "" ? ` · ${a.irdNumber}` : ""} · total ${a.total < 0 ? "-" : ""}$${money(Math.abs(a.total))}`;
       d.append(sum, rowsTable(ir7AttributionRows(a), ["26K"]));
       body.append(d);
     }

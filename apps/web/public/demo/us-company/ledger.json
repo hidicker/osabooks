@@ -5930,6 +5930,7 @@
   "accounts": {
    "1100": "landscaping",
    "1500": "landscaping",
+   "2000": "landscaping",
    "2100": "landscaping",
    "2110": "landscaping",
    "2120": "landscaping",
@@ -6132,6 +6133,15 @@
    "code": "1100",
    "name": "Accounts Receivable",
    "type": "Accounts Receivable",
+   "taxCode": "Tax Exempt",
+   "description": "",
+   "entity": "Cedar Ridge Landscaping, Inc.",
+   "entityKind": "business"
+  },
+  {
+   "code": "2000",
+   "name": "Accounts Payable",
+   "type": "Accounts Payable",
    "taxCode": "Tax Exempt",
    "description": "",
    "entity": "Cedar Ridge Landscaping, Inc.",

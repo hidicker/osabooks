@@ -114,6 +114,18 @@ function build(kind: InvoiceKind, asAt: string): AgedReport {
  * plus every posting since. Payables are a credit, so they are turned round to
  * read as an amount owed.
  */
+/**
+ * The chart's one receivable or payable, by its type or its name, in books
+ * whose entities have none of their own: a US chart's 2000, not New
+ * Zealand's 800.
+ */
+function chartControl(kind: InvoiceKind): string | undefined {
+  const word = kind === "purchase" ? /accounts\s+payable/i : /accounts\s+receivable/i;
+  const byType = state.chart.filter((a) => word.test(a.type));
+  const found = byType.length > 0 ? byType : state.chart.filter((a) => word.test(a.name));
+  return found.length === 1 ? found[0]?.code : undefined;
+}
+
 function ledgerBalance(kind: InvoiceKind, asAt: string): { codes: string[]; owed: number } {
   const chosen = state.entityFilter;
   const entities = chosen === ""
@@ -122,7 +134,7 @@ function ledgerBalance(kind: InvoiceKind, asAt: string): { codes: string[]; owed
   const own = entities
     .map((e) => controlAccountFor(e.id, kind)?.code)
     .filter((c): c is string => c !== undefined);
-  const codes = own.length > 0 ? [...new Set(own)] : [kind === "purchase" ? "800" : "610"];
+  const codes = own.length > 0 ? [...new Set(own)] : [chartControl(kind) ?? (kind === "purchase" ? "800" : "610")];
 
   const opening = state.ledger.openingBalances;
   const openedBy = opening !== undefined && opening.asAt <= asAt ? opening : undefined;

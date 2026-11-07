@@ -60,6 +60,7 @@ const ACCOUNTS = [
   ["6310", "Payroll taxes", "Expense"],
   ["6320", "Payroll service fees", "Expense"],
   ["1100", "Accounts Receivable", "Accounts Receivable"],
+  ["2000", "Accounts Payable", "Accounts Payable"],
   ["1500", "Equipment", "Fixed Asset"],
   ["2100", "Wages payable", "Current Liability"],
   ["2110", "Federal income tax withheld", "Current Liability"],

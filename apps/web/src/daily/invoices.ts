@@ -1,4 +1,4 @@
-import { documentMoney } from "../fx-books.js";
+import { accountingDocument, documentMoney } from "../fx-books.js";
 import { moduleOn } from "../modules.js";
 import { creditOnAccountSection, usedInPart } from "./credit-ui.js";
 import { attachmentsControl } from "./attachments-ui.js";
@@ -1695,7 +1695,13 @@ export function renderInvoices(): void {
   const owed = invoiceBalanceMap();
   const summaryBalances = [...owed.values()].filter((b) => shows(b.invoice));
   const count = (status: string) => summaryBalances.filter((b) => b.status === status).length;
-  const totalOwing = summaryBalances.reduce((sum, b) => sum + Math.max(0, b.remaining), 0);
+  // In the books' currency, as the aged report and the balance sheet hold it:
+  // a US dollar invoice's 1,000.00 is not 1,000.00 of these books' money.
+  const inBooks = (b: { invoice: Invoice; remaining: number }): number => {
+    if (!isForeign(b.invoice.currency, booksCurrency()) || b.invoice.total === 0) return b.remaining;
+    return Math.round((b.remaining * accountingDocument(b.invoice).total) / b.invoice.total);
+  };
+  const totalOwing = summaryBalances.reduce((sum, b) => sum + Math.max(0, inBooks(b)), 0);
 
   for (const [value, label] of [
     [String(count("paid")), "settled in full"],

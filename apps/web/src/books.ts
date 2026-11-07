@@ -2593,7 +2593,9 @@ export function bookYears(): number[] {
   const dates: string[] = [
     ...state.ledger.transactions.map((t) => t.date),
     ...(state.ledger.journals ?? []).map((j) => j.date),
-    ...(state.ledger.manualJournals ?? []).map((j) => j.date),
+    // Not a reversal on its own: a year-end entry reversing the next day put
+    // the next year, with nothing else in it, at the top of every report.
+    ...(state.ledger.manualJournals ?? []).filter((j) => j.reverses === undefined && j.deleted === undefined).map((j) => j.date),
     ...(state.ledger.payroll?.payRuns ?? []).map((r) => r.payDate),
     ...(state.ledger.auPayroll?.payRuns ?? []).map((r) => r.payDate),
     ...(state.ledger.agentStatements ?? []).map((a) => a.to),
