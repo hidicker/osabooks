@@ -51,6 +51,7 @@ const ACCOUNTS = [
   ["2000", "Accounts Payable", "Accounts Payable", studio],
   ["3100", "Owner draws", "Equity", studio],
   ["3900", "Retained earnings", "Equity", studio],
+  ["3910", "Owner's equity - 48 Larch Court", "Equity", duplex],
 ];
 const account = new Map(ACCOUNTS.map(([code, name, type, entity]) => [code, { code, name, type, entity }]));
 
@@ -148,7 +149,9 @@ line(RENTAL, month(8, 27), -cents(212.75), "Reyes Hardware", "6120", "Unit B doo
 line(RENTAL, month(9, 17), -cents(165), "Clearwater Plumbing", undefined);
 
 // --- put it together -----------------------------------------------------------
-const opening = { [BUSINESS]: cents(14500), [RENTAL]: cents(4200), "3900": -cents(18700) };
+// Each entity's own equity against its own bank: one shared retained earnings
+// left each entity's balance sheet out by the other's opening bank balance.
+const opening = { [BUSINESS]: cents(14500), [RENTAL]: cents(4200), "3900": -cents(14500), "3910": -cents(4200) };
 if (Object.values(opening).reduce((s, v) => s + v, 0) !== 0) throw new Error("opening balances do not balance");
 
 const sorted = [...lines].sort((a, b) => a.date.localeCompare(b.date) || a.bank.localeCompare(b.bank) || b.amount - a.amount);

@@ -5880,7 +5880,8 @@
    "825": "studio",
    "826": "studio",
    "880": "studio",
-   "960": "studio"
+   "960": "studio",
+   "961": "banksia"
   },
   "banks": {
    "au-business": [
@@ -6211,13 +6212,24 @@
    "entity": "Wattle & Lens Photography",
    "gstTreatment": "out-of-scope",
    "entityKind": "business"
+  },
+  {
+   "code": "961",
+   "name": "Owner's equity - 7 Banksia Street",
+   "type": "Equity",
+   "taxCode": "BAS Excluded",
+   "description": "",
+   "entity": "7 Banksia Street, Newcastle",
+   "gstTreatment": "out-of-scope",
+   "entityKind": "residential"
   }
  ],
  "openingBalances": {
   "asAt": "2025-07-01",
   "source": "Last year's records",
   "accounts": {
-   "960": -2800000,
+   "960": -2280000,
+   "961": -520000,
    "au-business": 2280000,
    "au-rental": 520000
   }

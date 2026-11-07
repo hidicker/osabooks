@@ -144,7 +144,19 @@ export interface PostedJournal {
  * entity its own.
  */
 export function isGstControlCode(code: string): boolean {
-  return /^820(?:[A-Z]{1,3})?$/.test(code.trim());
+  return new RegExp(`^${gstControlStem}(?:[A-Z]{1,3})?$`).test(code.trim());
+}
+
+/** The GST control account's code, before any entity's ending: 820, or a country's own. */
+let gstControlStem = "820";
+
+/**
+ * Set the GST control account's code for the books' country: 820 where the
+ * chart is Xero's (New Zealand, Australia), 255 in Korea, where 820 is Repairs
+ * and the VAT payable account is 255 부가세예수금.
+ */
+export function setGstControlCode(code: string): void {
+  gstControlStem = /^[0-9]{2,6}$/.test(code) ? code : "820";
 }
 
 export interface PostingOptions {

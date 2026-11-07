@@ -95,6 +95,39 @@ export function transactionIdsIn(event: DayEvent): string[] {
 }
 
 /**
+ * The documents an invoice or manual-journal change touched, as their
+ * postings name them: an invoice by its number, a manual journal as
+ * "manual:<id>". Only those that differ between before and after, so saving
+ * one journal does not name every journal in the books.
+ */
+export function documentsChangedIn(event: DayEvent): string[] {
+  const keyOf = (item: unknown): string | null => {
+    if (item === null || typeof item !== "object") return null;
+    const shape = item as { id?: unknown; number?: unknown };
+    if (event.kind === "manualJournal") return typeof shape.id === "string" && shape.id !== "" ? `manual:${shape.id}` : null;
+    return typeof shape.number === "string" && shape.number !== "" ? shape.number : null;
+  };
+  const index = (value: unknown): Map<string, string> => {
+    const out = new Map<string, string>();
+    const list = Array.isArray(value) ? value : value === null || value === undefined ? [] : [value];
+    for (const item of list) {
+      const key = keyOf(item);
+      if (key !== null) out.set(key, JSON.stringify(item));
+    }
+    return out;
+  };
+  const before = index(event.before);
+  const after = index(event.after);
+  const changed = new Set<string>();
+  for (const [key, text] of after) if (before.get(key) !== text) changed.add(key);
+  for (const key of before.keys()) if (!after.has(key)) changed.add(key);
+  if (event.targetId !== undefined && event.targetId !== "") {
+    changed.add(event.kind === "manualJournal" && !event.targetId.startsWith("manual:") ? `manual:${event.targetId}` : event.targetId);
+  }
+  return [...changed];
+}
+
+/**
  * The bank lines a posted journal came from.
  *
  * A journal's id is not always a transaction id. A split posts under `id:1`,
@@ -146,8 +179,18 @@ export function daysWork(options: DaysWorkOptions): DaysWork {
     .slice()
     .sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 
+  // An invoice or a manual journal is a document, not a bank line: what
+  // changed is matched to its own posting (the invoice's number, a journal's
+  // "manual:<id>"), and never reported as a line missing from the books.
   const wanted = new Set<string>();
-  for (const event of events) for (const id of transactionIdsIn(event)) wanted.add(id);
+  const documents = new Set<string>();
+  for (const event of events) {
+    if (event.kind === "invoice" || event.kind === "manualJournal") {
+      for (const key of documentsChangedIn(event)) documents.add(key);
+    } else {
+      for (const id of transactionIdsIn(event)) wanted.add(id);
+    }
+  }
 
   // A transfer posts once for the pair, so the partner's journal belongs to
   // this day's work as much as the leg that was decided.
@@ -169,6 +212,7 @@ export function daysWork(options: DaysWorkOptions): DaysWork {
   found.sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
 
   const mine = (journal: PostedJournal): boolean =>
+    documents.has(journal.transactionId) ||
     sourceIdsOf(journal.transactionId).some((id) => wanted.has(id) || partners.has(id));
   const arising = journals.filter(mine);
 

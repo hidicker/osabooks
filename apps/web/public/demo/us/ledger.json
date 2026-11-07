@@ -4032,6 +4032,7 @@
    "2000": "studio",
    "3100": "studio",
    "3900": "studio",
+   "3910": "duplex",
    "4000": "studio",
    "4100": "duplex",
    "6000": "studio",
@@ -4268,13 +4269,23 @@
    "description": "",
    "entity": "Ellis Design Studio",
    "entityKind": "business"
+  },
+  {
+   "code": "3910",
+   "name": "Owner's equity - 48 Larch Court",
+   "type": "Equity",
+   "taxCode": "Tax Exempt",
+   "description": "",
+   "entity": "48 Larch Court (duplex)",
+   "entityKind": "residential"
   }
  ],
  "openingBalances": {
   "asAt": "2026-01-01",
   "source": "Last year's records",
   "accounts": {
-   "3900": -1870000,
+   "3900": -1450000,
+   "3910": -420000,
    "us-business": 1450000,
    "us-rental": 420000
   }

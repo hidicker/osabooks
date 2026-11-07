@@ -202,3 +202,26 @@ test("a transfer's single journal is found from either leg", () => {
     assert.equal(out.credits, 9717);
   }
 });
+
+test("a manual journal or an invoice saved today is counted by its own posting, not as a missing bank line", () => {
+  // Saving one journal recorded the whole list before and after: every
+  // journal's id was read as a bank line no longer in the books, and the one
+  // that posted was not found.
+  const older = { id: "j1", date: "2026-05-01", narration: "old", lines: [] };
+  const added = { id: "j2", date: "2026-06-01", narration: "QA journal", lines: [] };
+  const event = (kind, before, after) => ({ id: "e", at: "2026-06-01T01:00:00Z", kind, summary: "", who: "", before, after });
+  const posted = (transactionId) => ({
+    transactionId, date: "2026-06-01", narration: transactionId, source: "manual", taxBasis: "both",
+    lines: [{ accountCode: "400", accountName: "Advertising", amount: 2500, taxType: "NONE", description: "" },
+      { accountCode: "804", accountName: "Wages payable", amount: -2500, taxType: "NONE", description: "" }],
+  });
+  const work = daysWork({
+    events: [event("manualJournal", [older], [older, added]), event("invoice", [], [{ number: "INV-9", total: 100 }])],
+    transactions: [],
+    journals: [posted("manual:j1"), posted("manual:j2"), posted("INV-9")],
+    on: "2026-06-01",
+  });
+  assert.deepEqual(work.missing, []);
+  assert.deepEqual(work.journals.map((j) => j.transactionId).sort(), ["INV-9", "manual:j2"]);
+  assert.equal(work.debits, 5000);
+});

@@ -26,7 +26,7 @@ Books are kept in the browser's storage, so a private window starts clean.
 | A person with a rental flat | New Zealand | Personal year end, IR3, rental schedules |
 | A plumbing company with staff | Australia | BAS, PAYG, super, Australian payroll |
 | A photographer with a rental | Australia | Sole trader, rental property schedule, income tax estimate |
-| A landscaping company with staff | United States | Schedule C, 1099-NEC, Form 941, sales tax |
+| A landscaping company with staff | United States | Schedule C, 1099-NEC, Form 941 (Oregon, so no sales tax) |
 | A US freelancer with a rental | United States | Schedule C and E, self-employment tax |
 
 South Korea has no demo books: start empty Korean books from Setup.

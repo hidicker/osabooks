@@ -55,6 +55,7 @@ export {
   taxSummary,
   taxTypeFor,
   isGstControlCode,
+  setGstControlCode,
 } from "./posting.js";
 export type {
   JournalSource,

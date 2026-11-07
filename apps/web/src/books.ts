@@ -95,6 +95,7 @@ import type {
   CodingEngine,
   DatedPayment,
   Entity,
+  OpeningBalances,
   EntityModel,
   Invoice,
   IsoDate,
@@ -1042,6 +1043,9 @@ export function varianceInput(basis: "cash" | "accruals" = gstBasis()): Variance
  */
 export function gstBasis(): "cash" | "accruals" {
   const country = booksCountry().id;
+  // Korean VAT falls due when the supply is made, on the tax invoice, never
+  // when it is paid: an unpaid invoice was missing from the return.
+  if (country === "kr") return "accruals";
   if (country !== "au" && country !== "nz") return "cash";
   const model = state.ledger.entities ?? emptyEntityModel();
   const chosen = model.entities.find((e) => e.id === state.entityFilter);
@@ -1827,6 +1831,45 @@ export function companyCurrentAccounts(everyCompany = false): { introducedCodes:
   return {
     introducedCodes: found.filter((a) => !/drawing/i.test(a.name)).map((a) => a.code),
     drawingsCodes: found.filter((a) => /drawing/i.test(a.name)).map((a) => a.code),
+  };
+}
+
+/**
+ * The journals and opening balances of the entity chosen at the top: each line
+ * by the rule the between-entity journals follow, so an uncoded line stays
+ * with the bank account that moved. Everything, with no entity chosen or
+ * only one entity in the books. The balance sheet, the IR10 and the Excel
+ * extract all narrow this way, so they agree.
+ */
+export function entityView(
+  journals: readonly PostedJournal[],
+  opening: OpeningBalances | undefined,
+): { journals: PostedJournal[]; opening: OpeningBalances | undefined } {
+  const entity = state.entityFilter;
+  const model = state.ledger.entities ?? emptyEntityModel();
+  if (entity === "" || model.entities.length < 2) return { journals: [...journals], opening };
+  const banks = new Set(entityBankAccounts());
+  const mine = (code: string, name = ""): boolean =>
+    banks.has(code) || model.accounts[accountEntityKey({ code, name })] === entity;
+  const owners = postedLineOwners();
+  const kept = journals
+    .map((j) => {
+      const whose = owners(j);
+      return { ...j, lines: j.lines.filter((l, i) => (whose[i] !== undefined ? whose[i] === entity : mine(l.accountCode, l.accountName))) };
+    })
+    .filter((j) => j.lines.length > 0);
+  if (opening === undefined) return { journals: kept, opening };
+  const only = (accounts: Record<string, Cents>): Record<string, Cents> =>
+    Object.fromEntries(Object.entries(accounts).filter(([code]) => mine(code)));
+  return {
+    journals: kept,
+    opening: {
+      ...opening,
+      accounts: only(opening.accounts),
+      ...(opening.byDate !== undefined
+        ? { byDate: Object.fromEntries(Object.entries(opening.byDate).map(([d, a]) => [d, only(a as Record<string, Cents>)])) }
+        : {}),
+    },
   };
 }
 
@@ -2669,11 +2712,14 @@ function chartName(code: string): string {
 }
 
 function gstAccount(): { code: string; name: string } {
+  // Korea's chart keeps VAT payable at 255; its 820 is Repairs.
+  const korea = booksCountry().id === "kr";
+  const stem = korea ? "255" : "820";
   const account =
-    state.chart.find((a) => a.code === "820") ??
+    state.chart.find((a) => a.code === stem) ??
     state.chart.find((a) => isGstControlCode(a.code)) ??
-    state.chart.find((a) => /^gst\b/i.test(a.name.trim()));
-  return { code: account?.code ?? "820", name: account?.name ?? "GST" };
+    state.chart.find((a) => (korea ? /부가세예수금|vat payable/i : /^gst\b/i).test(a.name.trim()));
+  return { code: account?.code ?? stem, name: account?.name ?? (korea ? "부가세예수금 VAT payable" : "GST") };
 }
 
 /**

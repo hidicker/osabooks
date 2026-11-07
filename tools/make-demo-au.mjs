@@ -62,6 +62,7 @@ const ACCOUNTS = [
   ["820", "GST", "Current Liability", studio, "BAS Excluded", "out-of-scope"],
   ["880", "Owner A Drawings", "Equity", studio, "BAS Excluded", "out-of-scope"],
   ["960", "Retained Earnings", "Equity", studio, "BAS Excluded", "out-of-scope"],
+  ["961", "Owner's equity - 7 Banksia Street", "Equity", rental, "BAS Excluded", "out-of-scope"],
 ];
 const account = new Map(ACCOUNTS.map(([code, name, type, entity, taxCode, treatment]) => [code, { code, name, type, entity, taxCode, treatment }]));
 
@@ -202,7 +203,8 @@ for (const q of [...quarters, { from: "2026-04-01", to: "2026-06-30" }]) {
 for (const paid of ["2025-10-28", "2026-02-27", "2026-04-28"]) line(BUSINESS, paid, -cents(1240), "ATO", "880", "PAYG instalment");
 
 // --- put it together -----------------------------------------------------------
-const opening = { [BUSINESS]: cents(22800), [RENTAL]: cents(5200), "960": -cents(28000) };
+// Each entity's own equity against its own bank, as in the US books.
+const opening = { [BUSINESS]: cents(22800), [RENTAL]: cents(5200), "960": -cents(22800), "961": -cents(5200) };
 if (Object.values(opening).reduce((s, v) => s + v, 0) !== 0) throw new Error("opening balances do not balance");
 
 const sorted = [...lines].sort((a, b) => a.date.localeCompare(b.date) || a.bank.localeCompare(b.bank) || b.amount - a.amount);
