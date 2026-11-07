@@ -199,10 +199,27 @@ export function invoicePrefix(kind: InvoiceKind): string {
  * Padding matters because it is what keeps a list sorting correctly: INV-0010
  * after INV-0009, where INV-10 would sort before INV-9.
  */
-export function nextInvoiceNumber(kind: InvoiceKind, existing: readonly Invoice[]): string {
+/** A series chosen in the books' settings: its own prefix, and where it starts. */
+export interface Numbering {
+  prefix?: string;
+  /** The lowest number the next one may have. */
+  next?: number;
+}
+
+export function nextInvoiceNumber(kind: InvoiceKind, existing: readonly Invoice[], numbering?: Numbering): string {
   const numbered = existing
     .map((i) => splitInvoiceNumber(i.number))
     .filter((n): n is NumberedInvoice => n !== null);
+  if (numbering !== undefined && (numbering.prefix !== undefined || numbering.next !== undefined)) {
+    // A series of its own: counted from its own prefix only, and never below
+    // the number it was set to start from.
+    const prefix = numbering.prefix ?? invoicePrefix(kind);
+    const mine = numbered.filter((n) => n.prefix.toLowerCase() === prefix.toLowerCase());
+    const highest = mine.reduce((best, n) => Math.max(best, n.value), 0);
+    const value = Math.max(highest + 1, numbering.next ?? 1);
+    const width = Math.max(4, ...mine.map((n) => n.digits.length));
+    return prefix + String(value).padStart(width, "0");
+  }
   const prefix = invoicePrefix(kind);
   if (numbered.length === 0) return `${prefix}0001`;
 

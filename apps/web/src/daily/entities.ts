@@ -1110,7 +1110,11 @@ export function renderEntities(): void {
     billing.className = "entity-billing";
     for (const [key, label, hint, wide] of [
       ...(words.taxId === null ? [] : ([["gstNumber", words.taxId, words.taxIdExample, false]] as const)),
+      ["legalName", "Legal name, if not the name above", "e.g. Kea Coffee Roasters Limited", true],
       ["address", "Address", words.address, true],
+      ["phone", "Phone", "e.g. 03 548 1234", false],
+      ["email", "Email", "accounts@example.co.nz", false],
+      ["website", "Website", "www.example.co.nz", false],
       ["payTo", "Payment", words.payTo, true],
     ] as const) {
       const wrap = document.createElement("label");

@@ -31,6 +31,12 @@ export interface InvoiceSupplier {
   payTo?: string;
   /** An image data URI for the top left; see `cleanLogo`. */
   logo?: string;
+  /** The legal name, printed under the trading name where it differs. */
+  legalName?: string;
+  /** How to reach the supplier, each printed when there is one. */
+  phone?: string;
+  email?: string;
+  website?: string;
 }
 
 /** The largest logo taken, in bytes of image. */
@@ -76,6 +82,8 @@ export interface InvoiceDocumentOptions {
   lang?: string;
   /** What the supplier's tax number is called: "GST" by default, "ABN" in Australia. */
   taxIdLabel?: string;
+  /** What the due date is called: "Due" by default, "Valid until" on a quote. */
+  dueLabel?: string;
   /**
    * Where there is no GST but the invoice charges sales tax on top (the
    * United States): what its total row says, "Sales tax (Seattle, WA 10.35%)".
@@ -221,14 +229,16 @@ export function invoiceDocument(
     <div class="who">
       ${logo === null ? "" : `<img class="logo" src="${logo}" alt="">`}
       <strong>${escapeHtml(supplier.name)}</strong>
+      ${supplier.legalName && supplier.legalName.trim() !== "" && supplier.legalName.trim() !== supplier.name.trim() ? `<div>${escapeHtml(supplier.legalName.trim())}</div>` : ""}
       ${supplier.address ? asLines(supplier.address) : ""}
+      ${[supplier.phone, supplier.email, supplier.website].filter((x): x is string => x !== undefined && x.trim() !== "").map((x) => `<div>${escapeHtml(x.trim())}</div>`).join("")}
       ${registered ? `<div>${escapeHtml(options.taxIdLabel ?? "GST")} ${escapeHtml(gstNumber)}</div>` : ""}
     </div>
     <div class="meta">
       <h1>${escapeHtml(title)}</h1>
       ${detail("Number", escapeHtml(invoice.number))}
       ${detail("Date", nzDate(invoice.issued))}
-      ${invoice.due === null ? "" : detail("Due", nzDate(invoice.due))}
+      ${invoice.due === null ? "" : detail(escapeHtml(options.dueLabel ?? "Due"), nzDate(invoice.due))}
       ${detail("Reference", escapeHtml(invoice.reference))}
     </div>
   </div>

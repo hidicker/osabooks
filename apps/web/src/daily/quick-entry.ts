@@ -17,6 +17,7 @@ import {
 import { redraw } from "../app.js";
 import { billEntities, controlAccountFor, record } from "../books.js";
 import { booksCountry, booksCurrency, booksMoney, noSalesTax, sayTax } from "../country.js";
+import { numberingFor } from "../book-settings.js";
 import { state } from "../state.js";
 import { savePart } from "../store.js";
 import { askOnPage, noteBriefly, tellOnPage } from "../ui.js";
@@ -346,6 +347,7 @@ export function openQuickEntry(kind: InvoiceKind): void {
         currency: booksCurrency(),
         status: "Awaiting Payment",
         ...(owner !== undefined ? { entityId: owner } : {}),
+        ...(numberingFor(kind) !== undefined ? { numbering: numberingFor(kind)! } : {}),
       });
       // A supplier's number already on file is most often the same bill twice.
       if (bills) {

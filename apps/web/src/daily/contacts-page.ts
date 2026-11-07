@@ -4,6 +4,7 @@ import { invoiceBalanceMap, record } from "../books.js";
 import { supplierFor } from "./invoices.js";
 import { booksLocale, booksMoney, documentOptions } from "../country.js";
 import { $, state } from "../state.js";
+import { numberingFor } from "../book-settings.js";
 import { save as saveLedger, savePart } from "../store.js";
 import { askOnPage, askTextOnPage, download, note, tellOnPage } from "../ui.js";
 import {
@@ -363,7 +364,7 @@ async function draftLateFee(customer: string, pastDue: number): Promise<void> {
   const late = salesFor(customer).filter((b) => b.remaining > 0 && (b.invoice.due ?? b.invoice.issued) < today());
   const issued = today();
   const draft: Invoice = {
-    number: nextInvoiceNumber("sales", state.ledger.invoices ?? []),
+    number: nextInvoiceNumber("sales", state.ledger.invoices ?? [], numberingFor("sales")),
     kind: "sales",
     contact: customer,
     reference: "Late fee",

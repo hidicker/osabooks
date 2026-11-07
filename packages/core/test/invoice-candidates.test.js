@@ -124,3 +124,12 @@ test("the highest number wins, not the last one in the list", () => {
   ]);
   assert.equal(found, "INV-0101");
 });
+
+test("a series set in Settings keeps its own prefix and never goes below its start", () => {
+  const existing = [inv({ number: "INV-0042" }), inv({ number: "KEA-0007" })];
+  assert.equal(nextInvoiceNumber("sales", existing, { prefix: "KEA-" }), "KEA-0008");
+  assert.equal(nextInvoiceNumber("sales", existing, { prefix: "KEA-", next: 500 }), "KEA-0500");
+  assert.equal(nextInvoiceNumber("sales", existing, { next: 10 }), "INV-0043");
+  assert.equal(nextInvoiceNumber("purchase", existing, { prefix: "PO-" }), "PO-0001");
+  assert.equal(nextInvoiceNumber("sales", existing), "INV-0043", "unchanged without a setting");
+});

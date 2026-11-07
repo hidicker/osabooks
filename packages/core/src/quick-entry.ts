@@ -3,6 +3,7 @@ import type { IsoDate } from "./dates.js";
 import type { Invoice, InvoiceKind } from "./invoices.js";
 import { gstContent } from "./gst.js";
 import { nextInvoiceNumber } from "./invoice-candidates.js";
+import type { Numbering } from "./invoice-candidates.js";
 
 /**
  * Quick entry: a backlog of paper invoices or bills typed in a row each, and
@@ -35,11 +36,11 @@ export function documentsFromRows(
   rows: readonly QuickEntryRow[],
   kind: InvoiceKind,
   existing: readonly Invoice[],
-  options: { taxed: (taxType: string) => boolean; currency: string; status: string; entityId?: string },
+  options: { taxed: (taxType: string) => boolean; currency: string; status: string; entityId?: string; numbering?: Numbering },
 ): Invoice[] {
   const made: Invoice[] = [];
   for (const row of rows) {
-    const number = nextInvoiceNumber(kind, [...existing, ...made]);
+    const number = nextInvoiceNumber(kind, [...existing, ...made], options.numbering);
     const tax = options.taxed(row.taxType) ? gstContent(row.gross) : 0;
     made.push({
       number,

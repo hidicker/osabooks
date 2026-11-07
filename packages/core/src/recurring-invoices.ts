@@ -2,6 +2,7 @@ import type { IsoDate } from "./dates.js";
 import { daysInMonth } from "./dates.js";
 import type { Invoice, InvoiceLine } from "./invoices.js";
 import { nextInvoiceNumber } from "./invoice-candidates.js";
+import type { Numbering } from "./invoice-candidates.js";
 
 /**
  * Invoices that repeat.
@@ -129,6 +130,7 @@ export function generateDue(
   schedules: readonly RecurringInvoice[],
   existing: readonly Invoice[],
   asOf: IsoDate,
+  numbering?: Numbering,
 ): RecurringRun {
   const invoices: Invoice[] = [];
   const skipped: ScheduleProblem[] = [];
@@ -152,7 +154,7 @@ export function generateDue(
 
     while (at !== null && at <= asOf && count < MAX_CATCH_UP) {
       const invoice: Invoice = {
-        number: nextInvoiceNumber("sales", known),
+        number: nextInvoiceNumber("sales", known, numbering),
         kind: "sales",
         contact: schedule.contact,
         reference: schedule.reference,
