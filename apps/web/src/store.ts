@@ -175,6 +175,11 @@ export interface BookSettings {
   assetExpense?: Record<string, string>;
   /** A link to another system for each contact, with {name} for the contact's name. */
   contactLink?: string;
+  /**
+   * Reminders sent by themselves to customers with invoices past due: on the
+   * chosen days overdue, above a minimum. Online books only.
+   */
+  reminders?: { on: boolean; days: number[]; minimum?: number };
 }
 
 export interface StoredLedger {
@@ -421,6 +426,12 @@ export interface StoredLedger {
   emailWording?: Partial<Record<WordingKind, Wording>>;
   /** Settings with no other page: due dates and the reports' basis. */
   settings?: BookSettings;
+  /**
+   * The stage each invoice has been reminded at, by its number, for books not
+   * on the server: kept as reminders are opened from Settings. Books on the
+   * server keep theirs in the 'reminders' part, written by the server.
+   */
+  remindersSent?: Record<string, number>;
   /** Messages for the foot of an invoice, to choose from; one may start each new invoice. */
   invoiceMessages?: InvoiceMessage[];
   /** Files attached to documents, journals, contacts and register lines: what each is. */
@@ -928,6 +939,7 @@ function decisionsOf(ledger: StoredLedger): Record<string, unknown> {
     ...(ledger.invoiceMessages && ledger.invoiceMessages.length > 0 ? { invoiceMessages: ledger.invoiceMessages } : {}),
     ...(ledger.emailWording && Object.keys(ledger.emailWording).length > 0 ? { emailWording: ledger.emailWording } : {}),
     ...(ledger.settings && Object.keys(ledger.settings).length > 0 ? { settings: ledger.settings } : {}),
+    ...(ledger.remindersSent && Object.keys(ledger.remindersSent).length > 0 ? { remindersSent: ledger.remindersSent } : {}),
     ...(ledger.timeApproval === true ? { timeApproval: true } : {}),
     transfers: ledger.transfers ?? {},
     legitimateDuplicates: ledger.legitimateDuplicates ?? [],
@@ -1781,6 +1793,16 @@ export async function readSuggestedPart(): Promise<unknown | null> {
   } catch {
     return null;
   }
+}
+
+/**
+ * What the reminders run has sent from these books, on the server: the stage
+ * each invoice was reminded at, the log, and the last run. Null elsewhere.
+ */
+export async function readRemindersPart(): Promise<unknown | null> {
+  if (backend !== "cloud" || cloudBook === null) return null;
+  const held = await loadCloudPart(cloudBook.id, "reminders");
+  return held === null ? null : held.data;
 }
 
 /**

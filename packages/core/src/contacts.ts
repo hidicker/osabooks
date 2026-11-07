@@ -42,6 +42,8 @@ export interface Contact {
   notes?: string;
   /** Left off lists and pickers when false; never deleted, so history keeps its name. */
   active?: boolean;
+  /** Never sent a payment reminder by itself, whatever the books' settings. */
+  noReminders?: boolean;
   /** Where it was read from, when it was read from another system. */
   source?: string;
 }

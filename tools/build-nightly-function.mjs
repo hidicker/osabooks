@@ -27,3 +27,18 @@ await build({
   banner: { js: "// Built by tools/build-nightly-function.mjs from apps/web/src/nightly-run.ts. Do not edit.\n// @ts-nocheck" },
   logLevel: "warning",
 });
+
+// The reminders, the same way: the page's own code (apps/web/src/reminders-run.ts),
+// for supabase/functions/reminders.
+await build({
+  entryPoints: [join(root, "apps", "web", "src", "reminders-run.ts")],
+  bundle: true,
+  platform: "neutral",
+  mainFields: ["module", "main"],
+  format: "esm",
+  target: ["es2022"],
+  define: { __NZOSA_EDITION__: JSON.stringify(process.env.NZOSA_EDITION ?? "nz") },
+  outfile: join(root, "supabase", "functions", "reminders", "run.js"),
+  banner: { js: "// Built by tools/build-nightly-function.mjs from apps/web/src/reminders-run.ts. Do not edit.\n// @ts-nocheck" },
+  logLevel: "warning",
+});

@@ -140,6 +140,23 @@ npx supabase functions deploy gemini-demo --use-api --project-ref <your-ref>
 `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are given to every function by
 Supabase itself — you set nothing for them.
 
+**Optional: payment reminders sent by themselves.** Books with reminders
+turned on in Settings are sent them each morning at 21:00 UTC (the
+`*_reminders.sql` migration schedules it, with the morning run's key). Build
+the run, then deploy:
+
+```bash
+node tools/build-nightly-function.mjs
+npx supabase functions deploy reminders --no-verify-jwt --use-api --project-ref <your-ref>
+```
+
+It sends through the same SMTP secrets as the invitations (`SMTP_HOST`,
+`SMTP_USER`, `SMTP_PASSWORD`), from `SMTP_USER`'s address. To send through
+Resend instead, set `RESEND_API_KEY` and `REMINDERS_FROM` (an address on a
+domain verified with Resend). Each email comes in the business's name, with
+replies to the business's own email; at most 50 go from one set of books in
+a morning.
+
 **Optional: a shared AI allowance.** If you want people using your copy to try
 AI suggestions before they add a key of their own, set a Gemini API key as a
 function secret (**Edge Functions → Secrets**, or the CLI):

@@ -1,3 +1,4 @@
+import { remindersCanSend, remindersDueCount } from "./reminders-ui.js";
 import { anyModuleOn, moduleOn, yearEndFigure } from "../modules.js";
 import { showPage } from "../app.js";
 import { showBetween } from "./between-report.js";
@@ -128,6 +129,20 @@ export function actionItems(): ActionItem[] {
         showPage("actions");
         document.getElementById("suggested-inbox")?.scrollIntoView({ behavior: "smooth", block: "start" });
       },
+    });
+  }
+
+  // Reminders due: books without a server open each from Settings; books on
+  // the server send them by themselves, so they are not a job for anybody.
+  const reminders = remindersCanSend() ? 0 : remindersDueCount();
+  if (reminders > 0) {
+    items.push({
+      key: "reminders",
+      what: "Payment reminders due",
+      count: reminders,
+      urgency: "amber",
+      detail: `${reminders} ${reminders === 1 ? "customer is" : "customers are"} due a reminder. Open each from Settings, in your own mail program.`,
+      go: () => showPage("settings"),
     });
   }
 

@@ -186,7 +186,10 @@ at the top. Click an account to see its lines. Download as CSV or Excel.
 - [ ] **Settings**: every setting in one place, each opening its page; set
   here: due dates and quote validity, numbering, document colour, the
   reports' basis and display, time zone, each asset type's depreciation
-  account, a link for contacts to another system.
+  account, a link for contacts to another system; payment reminders (on the
+  days overdue chosen, above a minimum): sent by themselves for online
+  books, listed to open one by one for books in the browser, with a card
+  under Actions required; a contact's "No payment reminders" tick.
 - [ ] **Setup**: country, start again empty, source system, files, last
   year's return.
 - [ ] **Opening balances**: edit, balance check, Enter bank balances.
