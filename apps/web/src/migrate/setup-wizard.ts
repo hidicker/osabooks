@@ -40,7 +40,6 @@ import {
   startBankBalancesFromFile,
 } from "../daily/opening-balances.js";
 import { balanceChecksNow } from "../daily/bank-import.js";
-import { renderLockDates } from "../daily/lock-dates.js";
 import { incomeReturnPanel } from "../daily/income-returns.js";
 import { addStandardForAll, openStandardAccounts } from "../daily/standard-accounts-panel.js";
 import { describeRules } from "../rules-ui.js";
@@ -1742,7 +1741,6 @@ export function renderSetup(): void {
   }
   renderSetupIntro();
   redraw("setupBody");
-  renderLockDates();
 }
 
 export function renderSetupBody(): void {

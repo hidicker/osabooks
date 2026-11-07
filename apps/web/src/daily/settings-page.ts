@@ -8,6 +8,7 @@ import { save as saveLedger } from "../store.js";
 import type { BookSettings } from "../store.js";
 import { note } from "../ui.js";
 import { remindersPanel } from "./reminders-ui.js";
+import { renderLockDates } from "./lock-dates.js";
 
 /**
  * Settings: every setting these books have, in one place, grouped as an
@@ -54,7 +55,7 @@ function groups(): { title: string; rows: Row[] }[] {
         {
           name: "Country and year end",
           what: `Kept in ${country.id === "us" ? "the " : ""}${country.name}: year to ${country.yearEnd.endDay}/${country.yearEnd.endMonth}, ${country.currency}. The country decides the tax year and the returns.`,
-          where: [{ page: "setup", label: "Setup" }],
+          where: [{ page: "setup", label: "Initial set-up" }],
         },
         {
           name: "Users",
@@ -129,7 +130,7 @@ function groups(): { title: string; rows: Row[] }[] {
         {
           name: "Lock dates",
           what: "Lock the books up to a date, so filed periods stay as they were filed.",
-          where: [{ page: "setup", label: "Setup" }],
+          status: "here",
         },
         {
           name: "Opening balances",
@@ -342,6 +343,12 @@ function hereControls(name: string): HTMLElement | null {
     return box;
   }
   if (name === "Reminders") return remindersPanel();
+  if (name === "Lock dates") {
+    const box = document.createElement("div");
+    box.id = "settings-locks";
+    box.className = "setup-locks";
+    return box;
+  }
   if (name === "Invoice look") {
     const box = document.createElement("div");
     box.className = "settings-controls";
@@ -528,4 +535,6 @@ export function renderSettings(): void {
     }
     body.append(section);
   }
+  // Drawn into its place once it is on the page.
+  renderLockDates();
 }

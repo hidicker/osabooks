@@ -238,7 +238,7 @@ export function renderPersonalYearEnd(): void {
         (lastYear
           ? "Last year's return is held, so its carried-forward figures are used."
           : "Last year's return is not held: enter any residential deductions carried forward " +
-            "from it, or load it on Setup."),
+            "from it, or load it on Initial set-up."),
       detailsBox,
     ),
   );

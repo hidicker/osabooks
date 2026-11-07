@@ -711,7 +711,7 @@ export function renderContacts(): void {
   if (all.length === 0 && editing !== "new") {
     body.append(
       note(
-        "No customers or vendors yet. Add one, or drop a list exported from your other system on Setup: " +
+        "No customers or vendors yet. Add one, or drop a list exported from your other system on Initial set-up: " +
           "invoices and bills name them already, and bringing in a QuickBooks ledger adds them by name.",
       ),
     );
