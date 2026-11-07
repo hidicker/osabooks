@@ -131,7 +131,7 @@ function statementLines(mine: readonly { invoice: Invoice; remaining: number }[]
  * in the books' own wording, to attach it to. Nothing is sent from here.
  * True when an email was opened.
  */
-function sendStatement(name: string, kind: "statement" | "reminder", email: string | undefined): boolean {
+export function sendStatement(name: string, kind: "statement" | "reminder", email: string | undefined): boolean {
   const mine = salesFor(name);
   const first = mine[0]?.invoice;
   const supplier = first === undefined ? null : supplierFor(first);
@@ -531,7 +531,13 @@ function form(existing: Contact | null): HTMLElement {
   tenLabel.append(is1099, document.createTextNode(" Send a 1099-NEC"));
   const exemptLabel = document.createElement("label");
   exemptLabel.append(exempt, document.createTextNode(" Tax exempt: no sales tax on their invoices"));
-  ticks.append(w9Label, tenLabel, exemptLabel);
+  // Left out of the reminders Settings sends or lists, whatever is owed.
+  const noReminders = document.createElement("input");
+  noReminders.type = "checkbox";
+  noReminders.checked = existing?.noReminders === true;
+  const noRemindersLabel = document.createElement("label");
+  noRemindersLabel.append(noReminders, document.createTextNode(" No payment reminders"));
+  ticks.append(w9Label, tenLabel, exemptLabel, noRemindersLabel);
 
   const problem = document.createElement("p");
   problem.className = "cloud-said";
@@ -576,6 +582,7 @@ function form(existing: Contact | null): HTMLElement {
       ...(w9.checked ? { w9: true } : {}),
       ...(is1099.checked ? { is1099: true } : {}),
       ...(exempt.checked ? { taxExempt: true } : {}),
+      ...(noReminders.checked ? { noReminders: true } : {}),
       ...(limitCents !== null && limitCents > 0 ? { creditLimit: limitCents } : {}),
       ...(usual.value !== "" ? { defaultAccount: usual.value } : {}),
       ...(bank.value.trim() !== "" ? { bankAccount: bank.value.trim() } : {}),

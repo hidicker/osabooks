@@ -7,6 +7,7 @@ import { $, state } from "../state.js";
 import { save as saveLedger } from "../store.js";
 import type { BookSettings } from "../store.js";
 import { note } from "../ui.js";
+import { remindersPanel } from "./reminders-ui.js";
 
 /**
  * Settings: every setting these books have, in one place, grouped as an
@@ -89,8 +90,9 @@ function groups(): { title: string; rows: Row[] }[] {
           where: [{ page: "entities", label: "Entities & accounts" }],
         },
         {
-          name: "Reminders and late fees",
-          what: "Statements and reminders to overdue customers, and late fees, made when you choose. Sending them on a schedule by itself is not offered: nothing here sends email.",
+          name: "Reminders",
+          what: "Payment reminders to customers with invoices past due, on the days overdue chosen here. Statements, one-off reminders and late fees are on Customers & vendors.",
+          status: "here",
           where: [{ page: "contacts", label: "Customers & vendors", module: "contacts" }],
         },
         {
@@ -339,6 +341,7 @@ function hereControls(name: string): HTMLElement | null {
     box.append(note("A number already used is never given again: the next is after the highest of the series, or the number set here if that is higher."));
     return box;
   }
+  if (name === "Reminders") return remindersPanel();
   if (name === "Invoice look") {
     const box = document.createElement("div");
     box.className = "settings-controls";
