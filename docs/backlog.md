@@ -53,6 +53,12 @@ works).
   entity's line.** A line on an account that pays for a GST-registered entity
   and an unregistered one cannot be told apart until it is coded, so it is held
   back. Coding it first, then deciding, would be more precise.
+- **Provisional tax by the ratio option (GST103): a fixed asset sale is not
+  taken out first.** A fixed asset sold for at least $1,000 or 5% of the last
+  12 months' taxable supplies, whichever is larger, comes out of the supplies
+  the ratio is applied to. The GST return says it is not done. Added 7
+  November 2026; the rule is from the OpenAccountants guide, not yet checked
+  by an accountant.
 - **Two New Zealand GST invoice-basis rules not applied** (from the
   OpenAccountants NZ GST guide, checked 16 October 2026): a single supply over
   $225,000 must go on the invoice basis whatever basis is chosen (unless
@@ -78,7 +84,8 @@ works).
   QuickBooks" lesson to offer.
 - **US income tax** stops at the single filer with the standard deduction: no
   QBI deduction, credits, other filing statuses or state tax.
-- **Form 941/940, W-2 and sales tax payable reports**: none yet.
+- **Form 940 and W-2**: none yet. The Form 941 worksheet and the sales tax
+  report are there.
 
 ## Imports from other software
 
@@ -256,6 +263,13 @@ works).
   (`supabase/functions/simplefin`, a `simplefin_secret` table and RPCs), as
   `supabase/functions/wise` does for Wise. Left because it changes the
   production database. 18 October 2026.
+- **Payment reminders: what the first version leaves out.** They go from the
+  OsaBooks mailbox in the business's name, with replies to the business, not
+  from the business's own address (that needs each business's domain set up
+  to send). Only online books send them by themselves; books in the browser
+  or a folder list them to open one by one. At most 50 a morning from one set
+  of books. If the record of what was sent fails to save after sending, the
+  same reminders go again the next morning. Added 7 November 2026.
 - **Card payments with Stripe: what the first version leaves out.**
   (`supabase/functions/stripe`, `apps/web/src/daily/stripe-ui.ts`). Books kept
   online only: books in a folder or the browser have nowhere safe for the key

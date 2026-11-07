@@ -81,11 +81,14 @@ Each page has a short hint under its title saying what it does.
   Difference, Finish this statement, Undo.
 
 ### Sales
-- [ ] **Invoices**: New invoice, New sales receipt, Quick entry, quotes,
-  repeating invoices, saved messages, Load invoices, document (print/PDF),
-  email, currencies, Matched / Owing.
+- [ ] **Invoices**: New invoice, New sales receipt, Quick entry, quotes (with
+  a valid-until date from Settings), repeating invoices, saved messages, Load
+  invoices, document (print/PDF: the entity's legal name, NZBN, phone, email,
+  website and colour), email, currencies (the "still owing" card in the
+  books' currency), Matched / Owing; numbers from Settings' numbering.
 - [ ] **Customers & vendors**: contacts, default coding, statements to overdue
-  customers, write off small balances, email wording.
+  customers, write off small balances, email wording, "No payment reminders",
+  and an "Open elsewhere" link where Settings has one.
 - [ ] **Products & services**: products, stocked items, reorder point, Count
   stock.
 - [ ] **Time**: add time, Make invoice.
@@ -93,10 +96,11 @@ Each page has a short hint under its title saying what it does.
 ### Purchases & payroll
 - [ ] **Bills**: New bill, Approve, Save as draft, Quick entry, the entity, bank
   payment file.
-- [ ] **Payroll** (New Zealand): employees, IR330 tax codes, KiwiSaver, New pay
-  run, payslips, Payday filing file, bank file, leave.
+- [ ] **Payroll** (New Zealand): employer IRD number and size (small or large),
+  employees, IR330 tax codes, KiwiSaver, New pay run, payslips, Payday filing
+  file with each run's "File by" date, bank file, leave.
 - [ ] **Payroll** (Australia): employees, TFN declaration, super fund, New pay
-  run, PAYG and super, STP year figures.
+  run (dates follow the last run), PAYG and super, STP year figures.
 
 ### Non-profit (New Zealand)
 - [ ] **Grants**: add a grant, conditions, Link bank lines, Funder's report, Post
@@ -121,7 +125,10 @@ Each page has a short hint under its title saying what it does.
 
 ### Tax (New Zealand)
 - [ ] **GST reconciliation**: periods, Mark as filed, Record a filed return,
-  differences and explanations, the lock offer.
+  differences and explanations, the lock offer. Payments or invoice basis
+  from each entity's GST settings.
+- [ ] **GST return**: the boxes, and provisional tax by the ratio option
+  (GST103) where the entity has a ratio set.
 - [ ] **Tax return (IR4)**, **(IR7)**: company and partnership returns.
 - [ ] **IRD records**: myIR files beside the books.
 
@@ -139,12 +146,16 @@ Each page has a short hint under its title saying what it does.
 Choose the report, the year, the basis (Accrual from our postings, Accrual
 from an imported file, Cash), GST in or out, compare columns, and the entity
 at the top. Click an account to see its lines. Download as CSV or Excel.
+Settings' display choices (no account codes, whole amounts, accounts with
+nothing in them) apply to the P&L, balance sheet and trial balance. One
+entity's balance sheet, IR10 and Excel extract keep to its own lines.
 
 - [ ] Profit and loss
 - [ ] Balance sheet
 - [ ] Cash flow statement
 - [ ] Depreciation schedule
-- [ ] Journal report and trial balance
+- [ ] Journal report and trial balance (the period's postings proved, then a
+  trial balance at closing balances that agrees with the balance sheet)
 - [ ] General ledger detail
 - [ ] Manual journals
 - [ ] Bank reconciliation
@@ -211,7 +222,9 @@ at the top. Click an account to see its lines. Download as CSV or Excel.
 - [ ] **AI accounts check**: the year-end prompt, for each country.
 
 ### Books
-- [ ] **History and Undo**: every change, filter, Undo, Save a copy.
+- [ ] **History and Undo**: every change, filter (bills apart from
+  invoices), Undo, Save a copy; "Today" counts journals and invoices made
+  today as well as bank lines.
 - [ ] **Books** (top of the page): backup and restore, clear, online books,
   your own Supabase project.
 
@@ -226,4 +239,4 @@ web-only tester should skip them:
 - bank feeds (Akahu, SimpleFIN, Wise) and the nightly fetch;
 - online books: signing in, inviting an accountant, shared books;
 - the AI connector itself, and AI with a key;
-- sending email.
+- sending email, and payment reminders sent by themselves (online books only).
