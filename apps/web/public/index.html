@@ -409,7 +409,7 @@
               <option value="nocode">Nothing suggested</option>
               <option value="coded">Coded</option>
               <option value="between">Between entities</option>
-              <option value="gstdiff" data-module="nz au kr">GST differs from registration</option>
+              <option value="gstdiff" data-module="nz au kr" data-say-tax>GST differs from registration</option>
               <option value="all">All</option>
             </select>
             <button id="reconcile-sort" type="button">Oldest first ↑</button>
@@ -429,7 +429,7 @@
         <p id="reconcile-ai-notice" class="page-hint ai-notice" hidden></p>
         <div id="reconcile-ai-paste" class="ai-paste" hidden></div>
         <p class="page-hint" id="reconcile-hint">
-          Each line has a suggested account and GST treatment. Accept or change it to code the line.
+          Each line has a suggested account and <span data-say-tax>GST</span> treatment. Accept or change it to code the line.
         </p>
         <div id="reconcile-body"></div>
       </section>
@@ -634,7 +634,7 @@
           </div>
         </div>
         <p class="page-hint">
-          What is owed to suppliers. A bill is a draft until approved; approving it books the cost<span data-module="nz au kr"> and its GST</span> on the bill date. Match its payment on Reconcile.
+          What is owed to suppliers. A bill is a draft until approved; approving it books the cost<span data-module="nz au kr" data-say-tax> and its GST</span> on the bill date. Match its payment on Reconcile.
         </p>
         <div id="bill-editor"></div>
         <div id="bills-body"></div>
@@ -908,8 +908,8 @@
               <option value="cash">Cash (bank data)</option>
             </select>
             <select id="report-gst" title="Whether the figures include GST">
-              <option value="net">Excluding GST</option>
-              <option value="gross">Including GST</option>
+              <option value="net" data-say-tax>Excluding GST</option>
+              <option value="gross" data-say-tax>Including GST</option>
             </select>
             <label id="report-unadjusted-wrap" class="checkbox" hidden title="The books as they stood before the year-end and accountant's adjusting entries">
               <input id="report-unadjusted" type="checkbox"> Before adjusting entries
@@ -1017,7 +1017,7 @@
           </div>
         </div>
         <p class="page-hint">
-          Each account belongs to one entity; a bank account can serve several. <span data-module="nz au kr">The GST treatment set here is used on the GST returns for anything coded to the account.</span>
+          Each account belongs to one entity; a bank account can serve several. <span data-module="nz au kr" data-say-tax>The GST treatment set here is used on the GST returns for anything coded to the account.</span>
         </p>
         <div id="entities-body"></div>
       </section>
@@ -1034,7 +1034,7 @@
           </div>
         </div>
         <p class="page-hint">
-          The position on the day these books start. Enter bank balances gives each bank account and loan its balance, from a statement on any date<span data-module="nz"> or from the bank feed</span>. Where there is more than that &ndash; debtors, assets, <span data-module="nz au kr">GST owing</span><span data-module="us">loans</span> &ndash; import a trial balance from the previous year end.
+          The position on the day these books start. Enter bank balances gives each bank account and loan its balance, from a statement on any date<span data-module="nz"> or from the bank feed</span>. Where there is more than that &ndash; debtors, assets, <span data-module="nz au kr" data-say-tax>GST owing</span><span data-module="us">loans</span> &ndash; import a trial balance from the previous year end.
         </p>
         <div id="opening-body"></div>
       </section>

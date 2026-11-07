@@ -16,7 +16,7 @@ import {
 } from "@nzosa/core";
 import { redraw } from "../app.js";
 import { billEntities, controlAccountFor, record } from "../books.js";
-import { booksCountry, booksCurrency, booksMoney, noSalesTax } from "../country.js";
+import { booksCountry, booksCurrency, booksMoney, noSalesTax, sayTax } from "../country.js";
 import { state } from "../state.js";
 import { savePart } from "../store.js";
 import { askOnPage, noteBriefly, tellOnPage } from "../ui.js";
@@ -130,7 +130,7 @@ export function openQuickEntry(kind: InvoiceKind): void {
   const head = document.createElement("thead");
   head.innerHTML =
     `<tr><th>Date</th><th>${bills ? "Supplier" : "Customer"}</th><th>${bills ? "Their number" : "Reference"}</th>` +
-    `<th>Description</th><th>Account</th>${hideTax ? "" : "<th>GST</th>"}<th class="n">Amount</th><th></th></tr>`;
+    `<th>Description</th><th>Account</th>${hideTax ? "" : `<th>${sayTax("GST")}</th>`}<th class="n">Amount</th><th></th></tr>`;
   const body = document.createElement("tbody");
   table.append(head, body);
   scroll.append(table);
@@ -189,7 +189,7 @@ export function openQuickEntry(kind: InvoiceKind): void {
     for (const t of TAX_TYPES[kind]) {
       const option = document.createElement("option");
       option.value = t.value;
-      option.textContent = t.label;
+      option.textContent = sayTax(t.label);
       tax.append(option);
     }
     if (hideTax) tax.value = "No GST";

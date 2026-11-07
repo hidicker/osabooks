@@ -75,7 +75,7 @@ import type {
   Transaction,
 } from "@nzosa/core";
 import { loadInvoices } from "../migrate/file-intake.js";
-import { booksCountry, booksCurrency, booksMoney, documentOptions, noSalesTax, gstPercent, taxTypeLabel } from "../country.js";
+import { booksCountry, booksCurrency, booksMoney, documentOptions, noSalesTax, gstPercent, sayTax, taxTypeLabel } from "../country.js";
 
 /**
  * Writing an invoice by hand.
@@ -822,8 +822,7 @@ export function renderInvoiceEditor(): void {
           `Total ${formatAmount(total)}`
         : noSalesTax()
           ? `Total ${formatAmount(total)}`
-          : `Total ${formatAmount(total)} · GST ${formatAmount(tax)} · ` +
-            `excluding GST ${formatAmount(total - tax)}`;
+          : sayTax(`Total ${formatAmount(total)} · GST ${formatAmount(tax)} · excluding GST ${formatAmount(total - tax)}`);
   }
 
   function addLine(line: InvoiceLine): void {

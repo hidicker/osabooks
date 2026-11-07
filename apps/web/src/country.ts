@@ -25,6 +25,11 @@ export function applyCountry(): void {
   if (country.id !== "nz") dropNewZealandReports();
   const dayFirst = document.getElementById("day-first");
   if (dayFirst instanceof HTMLInputElement) dayFirst.checked = country.dayFirst;
+  // The page's own words for the tax, in a country that does not call it GST.
+  for (const el of document.querySelectorAll<HTMLElement>("[data-say-tax]")) {
+    el.dataset["sayTaxNz"] ??= el.textContent ?? "";
+    el.textContent = sayTax(el.dataset["sayTaxNz"]);
+  }
   // The books' flag in the header, beside Donate a coffee.
   const flag = document.getElementById("books-flag");
   if (flag !== null) flag.replaceChildren(flagIcon(country.id, `Books kept in ${country.name}`));
@@ -63,7 +68,33 @@ export function taxTypeLabel(name: string): string {
     if (/^zero.?rated/i.test(name)) return "GST-free";
     if (/exempt/i.test(name)) return "Input taxed";
   }
-  return name.replace(/\b15%/, `${gstPercent()}%`);
+  if (noSalesTax() && /^no gst$/i.test(name.trim())) return "No tax";
+  return sayTax(name.replace(/\b15%/, `${gstPercent()}%`));
+}
+
+/**
+ * The name of the tax on sales where these books are kept: GST in New
+ * Zealand and Australia, VAT in Korea, sales tax in the United States.
+ */
+export function taxWord(): string {
+  const id = booksCountry().id;
+  if (id === "nz" || id === "au") return "GST";
+  return booksCountry().salesTax?.name ?? "sales tax";
+}
+
+/**
+ * Words written for New Zealand, with "GST" said as these books' country
+ * says it. New Zealand's and Australia's come back unchanged.
+ */
+export function sayTax(text: string): string {
+  const word = taxWord();
+  if (word === "GST") return text;
+  const said = text
+    .replace(/\bNo GST\b/g, word === "VAT" ? "No VAT" : "No tax")
+    .replace(/\bGST registered\b/g, `registered for ${word}`)
+    .replace(/\bGST\b/g, word);
+  // "GST paid is part of the cost" starts a sentence; "sales tax paid" must too.
+  return /^[A-Z]/.test(text) ? said.charAt(0).toUpperCase() + said.slice(1) : said;
 }
 
 /**

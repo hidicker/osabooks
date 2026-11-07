@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { betweenAccountPlan, betweenEntityJournals, overdrawnCurrentAccounts, personPositions, pairKey } from "../dist/index.js";
+import { betweenAccountPlan, betweenEntityJournals, lineOwners, overdrawnCurrentAccounts, personPositions, pairKey } from "../dist/index.js";
 
 const model = {
   entities: [
@@ -188,4 +188,21 @@ test("a stored owner stands even when the account is later given to someone else
   const kept = betweenEntityJournals([repair], { ...options(), model: moved, bankOwner: movedOwner, stored: () => ({ owner: "both", with: { totara: "usual" } }) });
   assert.equal(kept.choices.get("repair").owner, "both");
   assert.ok(linesOf(kept).includes("Tom: drawings 57500"), "still Both's money, half Tom's");
+});
+
+test("an uncoded line belongs to the owner of the bank account that moved", () => {
+  // Left with no entity, one entity's own report kept the bank side of an
+  // uncoded line and dropped the other, and its balance sheet was out by it.
+  const uncoded = journal("odd", "2026-03-02", [["totara1", 62975], ["", -62975]]);
+  assert.deepEqual(lineOwners(uncoded, options()), ["totara", "totara"]);
+});
+
+test("each side of a payment for another entity is its own entity's, and the between lines theirs", () => {
+  const paid = journal("repair", "2026-03-24", [["cobank", -51750], ["429KR", 51750]]);
+  assert.deepEqual(lineOwners(paid, options()), ["co", "kowhai"]);
+  const [between] = betweenEntityJournals([paid], options()).journals;
+  const owners = lineOwners(between, options());
+  for (const [i, line] of between.lines.entries()) {
+    assert.ok(line.accountCode.startsWith(`between:${owners[i]}:`), line.accountCode);
+  }
 });

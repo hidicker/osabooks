@@ -26,7 +26,7 @@ import {
   localToday,
 } from "@nzosa/core";
 import type { DocumentStatus, Entity, Invoice, InvoiceBalance, OutsidePayment } from "@nzosa/core";
-import { booksCountry, booksMoney, noSalesTax } from "../country.js";
+import { booksCountry, booksMoney, noSalesTax, sayTax } from "../country.js";
 import { openPaymentFile } from "./payment-file-ui.js";
 import { creditOnAccountSection } from "./credit-ui.js";
 import { openQuickEntry } from "./quick-entry.js";
@@ -145,7 +145,7 @@ export function renderBills(): void {
   if (bills.length === 0) {
     body.append(
       note(
-        `No bills yet. Press New bill to enter one. Approving it puts the cost${noSalesTax() ? "" : " and its GST"} in the ` +
+        `No bills yet. Press New bill to enter one. Approving it puts the cost${noSalesTax() ? "" : sayTax(" and its GST")} in the ` +
           "books on the bill date; matching its payment on Reconcile clears it.",
       ),
     );
@@ -264,7 +264,7 @@ function actionsCell(bill: Invoice, balance: InvoiceBalance, status: DocumentSta
   td.append(button("edit", () => editBill(bill.number)));
   if (status === "Draft") {
     const approve = button("approve", () => void approveBill(bill.number),
-      "Post it: the cost and GST on the bill date, the amount owing in Accounts Payable.");
+      sayTax("Post it: the cost and GST on the bill date, the amount owing in Accounts Payable."));
     approve.className = "primary";
     td.append(approve);
   }
@@ -365,7 +365,7 @@ function payPanel(bill: Invoice, balance: InvoiceBalance): HTMLElement {
       "the GST period of the payment date.",
     "If the money left a bank account that is in these books, match that bank line to the bill on " +
       "Reconcile instead. Recording it here as well would pay the bill twice and claim its GST twice.",
-  ];
+  ].map(sayTax);
   for (const line of lines) {
     const p = document.createElement("p");
     p.textContent = line;

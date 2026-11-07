@@ -1,4 +1,4 @@
-import { gstFrequency, postedJournals } from "./books.js";
+import { companyCurrentAccounts, gstFrequency, postedJournals } from "./books.js";
 import { reviewFacts } from "./ai-review.js";
 import { ir3For } from "./daily/reports.js";
 import { state } from "./state.js";
@@ -149,12 +149,14 @@ export const IRD_GUIDES: readonly IrdGuide[] = [
       return c.length > 0 ? `${c.map((e) => e.name).join(", ")} ${c.length === 1 ? "is" : "are"} a company` : null;
     },
     facts: (year) => {
+      const accounts = companyCurrentAccounts(true);
       const schedule = shareholderSchedule({
         from: taxYearStart(year),
         to: taxYearEnd(year),
         journals: postedJournals(),
         ...(state.ledger.openingBalances ? { openingBalances: state.ledger.openingBalances } : {}),
         chart: state.chart,
+        ...(accounts ? { accounts } : {}),
       });
       const lines = [
         "Shareholder current account for the year:",

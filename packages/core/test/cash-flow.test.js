@@ -65,6 +65,14 @@ test("a loan or drawings is financing whatever type it was given; money lent out
   assert.equal(cashFlowActivity("Expense", "Rates"), "operating");
 });
 
+test("interest is operating, even on a mortgage or a loan", () => {
+  // "Mortgage interest" matched "mortgage" and went under financing.
+  assert.equal(cashFlowActivity("Expense", "Mortgage interest"), "operating");
+  assert.equal(cashFlowActivity("Overhead", "Interest on loan - 437RL"), "operating");
+  assert.equal(cashFlowActivity("Revenue", "Interest on loan to Tui Ridge"), "operating");
+  assert.equal(cashFlowActivity("Expense", "Owner Drawings"), "financing");
+});
+
 test("a loan account is not cash: money moved to it is financing, by loan", () => {
   const s = cashFlowStatement({
     transactions: [

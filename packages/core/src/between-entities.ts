@@ -315,6 +315,48 @@ function sideLines(
   return missing ? null : lines;
 }
 
+/** Each line's entity where it is known, and the journal's anchor. */
+function knownOwners(
+  journal: PostedJournal,
+  options: Pick<BetweenOptions, "model" | "bankOwner" | "isBank" | "stored">,
+): { owners: (string | undefined)[]; anchor: string | undefined } {
+  const stored = options.stored?.(journal.transactionId);
+  const entityOfLine = (line: PostedLine): string | undefined => {
+    if (line.accountCode.startsWith(BETWEEN_PREFIX)) return undefined;
+    if (options.isBank(line.accountCode)) return options.bankOwner(line.accountCode);
+    return options.model.accounts[accountEntityKey({ code: line.accountCode, name: line.accountName })];
+  };
+  // A stored choice says whose money paid it, whoever owns the account now.
+  const owners = journal.lines.map((line) =>
+    stored !== undefined && options.isBank(line.accountCode) && journal.source === "bank" ? stored.owner : entityOfLine(line),
+  );
+  const bankIndex = journal.lines.findIndex((l, i) => options.isBank(l.accountCode) && owners[i] !== undefined);
+  const anchor = bankIndex >= 0 ? owners[bankIndex] : owners.find((o) => o !== undefined);
+  return { owners, anchor };
+}
+
+/**
+ * Whose each line of a posted journal is, by the rule the between-entity
+ * journals use: a bank line its account's owner's, any other line its
+ * account's entity's, and a line of no known entity -- an uncoded bank line's
+ * other side -- the journal's anchor's, the owner of the bank account that
+ * moved. A line on a made-up between account is the entity its code names.
+ * Undefined where nothing in the journal names an entity.
+ */
+export function lineOwners(
+  journal: PostedJournal,
+  options: Pick<BetweenOptions, "model" | "bankOwner" | "isBank" | "stored">,
+): (string | undefined)[] {
+  const { owners, anchor } = knownOwners(journal, options);
+  return journal.lines.map((line, i) => {
+    if (line.accountCode.startsWith(BETWEEN_PREFIX)) {
+      const id = line.accountCode.slice(BETWEEN_PREFIX.length).split(":")[0];
+      if (id !== undefined && options.model.entities.some((e) => e.id === id)) return id;
+    }
+    return owners[i] ?? anchor;
+  });
+}
+
 /**
  * The between-entity journals for a set of posted journals, and the accounts
  * they post to.
@@ -340,21 +382,10 @@ export function betweenEntityJournals(
   const find = (entityId: string, role: BetweenRole, who: string, fallback: BetweenAccount): BetweenAccount | undefined =>
     planned === null ? fallback : planned.get(wantKey(entityId, role, who));
 
-  const entityOfLine = (line: PostedLine): string | undefined => {
-    if (line.accountCode.startsWith(BETWEEN_PREFIX)) return undefined;
-    if (options.isBank(line.accountCode)) return options.bankOwner(line.accountCode);
-    return model.accounts[accountEntityKey({ code: line.accountCode, name: line.accountName })];
-  };
-
   for (const journal of journals) {
     if (journal.source === "between") continue;
     const stored = options.stored?.(journal.transactionId);
-    // A stored choice says whose money paid it, whoever owns the account now.
-    const owners = journal.lines.map((line) =>
-      stored !== undefined && options.isBank(line.accountCode) && journal.source === "bank" ? stored.owner : entityOfLine(line),
-    );
-    const bankIndex = journal.lines.findIndex((l, i) => options.isBank(l.accountCode) && owners[i] !== undefined);
-    const anchor = bankIndex >= 0 ? owners[bankIndex] : owners.find((o) => o !== undefined);
+    const { owners, anchor } = knownOwners(journal, options);
     if (anchor === undefined) continue;
     const net = new Map<string, number>();
     journal.lines.forEach((line, i) => {

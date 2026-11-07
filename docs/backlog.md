@@ -120,12 +120,11 @@ works).
   time zone per organisation. New Zealand and Korea have one zone each;
   Australia and the United States need a choice, defaulting to the
   computer's zone when it is in that country. Raised 7 November 2026.
-- **The balance sheet does not narrow to the chosen entity.** The P&L, the
-  journal reports and (since 7 November 2026) the IR10 keep to the chosen
-  entity's accounts; the balance sheet still shows every entity's. The
-  IR10's depreciation boxes also still read the whole asset register, and
-  depreciation posts to the first account named "Depreciation" whichever
-  entity it belongs to. Fine for books where one entity holds the assets.
+- **Depreciation posts to the first account named "Depreciation"**, whichever
+  entity it belongs to. The balance sheet, the IR10 and its asset boxes keep
+  to the chosen entity (since 7 November 2026), but an asset of a second
+  entity has its depreciation expense in the first one's account. Fine for
+  books where one entity holds the assets.
 - **A currency with three decimals is held to two.** Dinars and rials are
   read with their third decimal but held, like every amount, in hundredths:
   12.345 BHD is 12.35. None of the four countries uses one, so only foreign
