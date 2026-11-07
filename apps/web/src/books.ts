@@ -995,6 +995,8 @@ export function recomputeVariance(): void {
  */
 export function varianceInput(basis: "cash" | "accruals" = gstBasis()): VarianceInput {
   const accruals = basis === "accruals";
+  const nz = booksCountry().id === "nz";
+  const large = accruals ? new Set<string>() : largeSalesOnInvoice();
   return {
     transactions: accountingLines(),
     splits: accountingSplitParts(),
@@ -1030,9 +1032,22 @@ export function varianceInput(basis: "cash" | "accruals" = gstBasis()): Variance
     // basis. On the accruals basis every document counts when issued, so
     // their payments are not counted again.
     otherPurchases: (period) => [...(accruals ? [] : otherPurchasesFor(period)), ...journalGstIn(period).purchases],
-    otherSales: (period) => [...(accruals ? [] : otherSalesFor(period)), ...journalGstIn(period).sales],
+    otherSales: (period) => [...(accruals ? [] : otherSalesFor(period, large)), ...journalGstIn(period).sales],
     settles: settlementOf,
-    ...(accruals ? { accrualDocuments: accrualDocumentLines() } : {}),
+    // The invoice basis: every document when issued, or, in New Zealand, when
+    // paid where that came first. The payments basis: a sale over $225,000
+    // still counts when invoiced, unless paid in full within the year.
+    ...(accruals
+      ? { accrualDocuments: accrualDocumentLines({ paidEarly: nz }) }
+      : large.size > 0
+        ? {
+            accrualDocuments: accrualDocumentLines({ only: (doc) => large.has(doc.number) }),
+            documentSettles: (id: string) => {
+              const settled = settlementOf(id);
+              return settled !== undefined && large.has(settled.number) ? settled : undefined;
+            },
+          }
+        : {}),
   };
 }
 
@@ -1060,52 +1075,130 @@ export function gstBasis(): "cash" | "accruals" {
  * line carries, a sale or a purchase by the document rather than by the sign.
  * Drafts are left out, as they are of the books.
  */
-function accrualDocumentLines(): AccrualDocumentLine[] {
+function accrualDocumentLines(options: { only?: (invoice: Invoice) => boolean; paidEarly?: boolean } = {}): AccrualDocumentLine[] {
   const known = knownCodes(state.rules, state.ledger.overrides ?? {});
   const out: AccrualDocumentLine[] = [];
+  const payments = options.paidEarly === true ? documentPayments() : new Map<string, { date: string; amount: number }[]>();
   for (const raw of invoicesInPlay()) {
     if (!documentIsPosted(raw) || !documentCounts(raw)) continue;
+    if (options.only !== undefined && !options.only(raw)) continue;
     const doc = accountingDocument(raw);
+    // New Zealand: a payment made before the invoice is issued makes the GST
+    // on it due when it was paid. That share of each line is dated then; the
+    // rest on the day of issue.
+    const total = Math.abs(raw.total);
+    const early = (payments.get(raw.number) ?? []).filter((p) => p.date < doc.issued);
+    const shares: { date: string; share: number }[] = [];
+    let left = 1;
+    for (const p of early) {
+      if (total === 0 || left <= 0) break;
+      const share = Math.min(left, Math.abs(p.amount) / total);
+      shares.push({ date: p.date, share });
+      left -= share;
+    }
+    if (left > 0) shares.push({ date: doc.issued, share: left });
     doc.lines.forEach((line, index) => {
       if (line.gross === 0) return;
-      const read = accountTreatmentOfCode({ code: "", name: "", type: "", taxCode: line.taxType, description: "" });
-      const treatment: GstTreatment = read?.treatment ?? (line.tax !== 0 ? "standard" : "out-of-scope");
-      const side: GstSide =
-        read?.side === "imports"
-          ? "imports"
-          : treatment === "out-of-scope"
-            ? "none"
-            : doc.kind === "sales"
-              ? "sales"
-              : "purchases";
-      out.push({
-        transaction: {
-          id: `doc:${doc.kind}:${doc.number}:${index}`,
-          date: doc.issued,
-          amount: (doc.kind === "sales" ? line.gross : -line.gross) as Cents,
-          currency: doc.currency,
-          serial: "",
-          trn: "",
-          particulars: line.description,
-          code: line.accountCode,
-          reference: doc.number,
-          otherParty: doc.contact,
-          origin: "",
-          type: "",
-          batch: "",
-          otherPartyAccount: "",
-          account: "",
-          occurrence: 1,
-          source: { importer: "document", file: "", line: index },
-          extras: {},
-        } as Transaction,
-        treatment,
-        side,
-        code: canonicalCodeForNumber(line.accountCode, known) ?? line.accountCode,
+      let given = 0;
+      shares.forEach(({ date, share }, part) => {
+        const last = part === shares.length - 1;
+        const gross = last ? line.gross - given : Math.round(line.gross * share);
+        given += gross;
+        if (gross === 0) return;
+        out.push(documentLine(doc, line, index, part, date, gross, known));
       });
     });
   }
   return out;
+}
+
+/** Each document's payments, with their dates: bank lines settling it and payments outside the bank. */
+function documentPayments(): Map<string, { date: string; amount: number }[]> {
+  const byId = new Map(state.ledger.transactions.map((t) => [t.id, t]));
+  const out = new Map<string, { date: string; amount: number }[]>();
+  const add = (number: string, date: string, amount: number): void => {
+    const list = out.get(number) ?? [];
+    list.push({ date, amount });
+    out.set(number, list);
+  };
+  for (const [id, number] of invoiceAssignments()) {
+    const t = byId.get(id);
+    if (t !== undefined) add(number, t.date, t.amount);
+  }
+  for (const doc of invoicesInPlay()) {
+    for (const p of doc.paidOutside ?? []) if (p.writeOff !== true) add(doc.number, p.date, p.amount);
+  }
+  for (const list of out.values()) list.sort((a, b) => a.date.localeCompare(b.date));
+  return out;
+}
+
+/**
+ * New Zealand's payments basis, for a large sale: a supply for more than
+ * $225,000 is counted when invoiced, not as it is paid, unless it was paid in
+ * full within 365 days of the invoice. The sales it covers, by number.
+ */
+function largeSalesOnInvoice(): Set<string> {
+  const out = new Set<string>();
+  if (booksCountry().id !== "nz") return out;
+  const payments = documentPayments();
+  for (const raw of invoicesInPlay()) {
+    if (raw.kind !== "sales" || !documentIsPosted(raw)) continue;
+    const total = Math.abs(accountingDocument(raw).total);
+    if (total <= 22_500_000) continue;
+    const paid = payments.get(raw.number) ?? [];
+    const sum = paid.reduce((n, p) => n + Math.abs(p.amount), 0);
+    const last = paid[paid.length - 1]?.date;
+    const yearOn = new Date(Date.parse(`${raw.issued}T00:00:00Z`) + 365 * 86_400_000).toISOString().slice(0, 10);
+    const paidInAYear = sum >= Math.abs(raw.total) && last !== undefined && last <= yearOn;
+    if (!paidInAYear) out.add(raw.number);
+  }
+  return out;
+}
+
+function documentLine(
+  doc: Invoice,
+  line: Invoice["lines"][number],
+  index: number,
+  part: number,
+  date: string,
+  gross: number,
+  known: ReturnType<typeof knownCodes>,
+): AccrualDocumentLine {
+  const read = accountTreatmentOfCode({ code: "", name: "", type: "", taxCode: line.taxType, description: "" });
+  const treatment: GstTreatment = read?.treatment ?? (line.tax !== 0 ? "standard" : "out-of-scope");
+  const side: GstSide =
+    read?.side === "imports"
+      ? "imports"
+      : treatment === "out-of-scope"
+        ? "none"
+        : doc.kind === "sales"
+          ? "sales"
+          : "purchases";
+  return {
+    transaction: {
+      id: part === 0 ? `doc:${doc.kind}:${doc.number}:${index}` : `doc:${doc.kind}:${doc.number}:${index}:${part}`,
+      date,
+      amount: (doc.kind === "sales" ? gross : -gross) as Cents,
+      currency: doc.currency,
+      serial: "",
+      trn: "",
+      particulars: line.description,
+      code: line.accountCode,
+      reference: doc.number,
+      otherParty: doc.contact,
+      origin: "",
+      type: "",
+      batch: "",
+      otherPartyAccount: "",
+      account: "",
+      occurrence: 1,
+      source: { importer: "document", file: "", line: index },
+      extras: {},
+    } as Transaction,
+    treatment,
+    side,
+    code: canonicalCodeForNumber(line.accountCode, known) ?? line.accountCode,
+  };
 }
 
 function gstBelongsTo(): { belongsTo?: (account: string, code: string) => boolean } {
@@ -1388,8 +1481,9 @@ function otherPurchasesFor(period: { from: string; to: string }): OtherPurchase[
 }
 
 /** Sales paid other than through a bank line -- cash at the counter -- for Box 5. */
-function otherSalesFor(period: { from: string; to: string }): OtherPurchase[] {
-  return outsideSales(invoicesInPlay(), period, documentCounts);
+function otherSalesFor(period: { from: string; to: string }, counted: ReadonlySet<string> = new Set()): OtherPurchase[] {
+  // A sale already counted when invoiced is not counted again as it is paid.
+  return outsideSales(invoicesInPlay().filter((i) => !counted.has(i.number)), period, documentCounts);
 }
 
 /**
