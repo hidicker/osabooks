@@ -439,7 +439,7 @@ export const LESSONS: readonly Lesson[] = [
       },
       {
         title: "Payday filing",
-        body: "The Employment Information file for myIR, due within two working days of each payday. One press makes it.",
+        body: "The Employment Information file for myIR, due within ten working days of payday for a small employer, two for a large one. One press makes it.",
         target: withText("#payroll-body button", /Payday Filing/),
       },
       {

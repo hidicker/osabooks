@@ -1,7 +1,7 @@
 import { changesByLine } from "../events.js";
 import { afterNextFrame } from "../busy.js";
 import { xeroSettles } from "../migrate/coding-reconciliation.js";
-import { booksCountry, booksLocale, noSalesTax, gstPercent, taxTypeLabel } from "../country.js";
+import { booksCountry, booksLocale, noSalesTax, gstPercent, sayTax, taxTypeLabel } from "../country.js";
 import { offerAsset } from "./assets.js";
 import { redraw, showPage } from "../app.js";
 import { lastFeedStatus } from "../feed-route.js";
@@ -637,7 +637,7 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
     : (state.ledger.splits ?? {})[one.transaction.id]
       ? "Coded by the split below. Tick to confirm."
       : settlesInvoice !== ""
-        ? `Settles ${settlesInvoice}; the GST is on the invoice. Tick to confirm.`
+        ? sayTax(`Settles ${settlesInvoice}; the GST is on the invoice. Tick to confirm.`)
         : fromModel !== undefined
         ? // Named as a model's, and never as a rule's. Somebody deciding whether
           // to press the tick is owed the difference between "your own rule says

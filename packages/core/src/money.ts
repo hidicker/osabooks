@@ -165,11 +165,19 @@ export function fromMinorUnits(value: number, currency: string): Cents {
   return Math.round(value * 10 ** (HELD_PLACES - minorUnits(currency)));
 }
 
+/** The books' own currency, for an amount written without one: set as the books open. */
+let booksCurrencyDefault = "NZD";
+
+/** Write amounts given no currency in the books' own: won with no decimals, dollars with two. */
+export function setBooksCurrency(code: string): void {
+  booksCurrencyDefault = /^[A-Za-z]{3}$/.test(code) ? code.toUpperCase() : "NZD";
+}
+
 /**
  * Render an amount as a plain decimal string, e.g. `-78.08`, to the places
  * its currency is written with (none for won), from the hundredths it is held in.
  */
-export function formatAmount(cents: Cents, currency = "NZD"): string {
+export function formatAmount(cents: Cents, currency = booksCurrencyDefault): string {
   const places = Math.min(HELD_PLACES, minorUnits(currency));
   if (places < HELD_PLACES) {
     const shown = (Math.abs(cents) / 100).toFixed(places);

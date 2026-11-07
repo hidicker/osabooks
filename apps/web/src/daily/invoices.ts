@@ -533,7 +533,7 @@ export function renderInvoiceEditor(): void {
   field(
     asBill ? "Bill date" : asReceipt ? "Sold on" : "Issued",
     issued,
-    asBill ? "The date on the bill: when the cost and its GST fall." : asReceipt ? "And paid for, the same day." : undefined,
+    asBill ? sayTax("The date on the bill: when the cost and its GST fall.") : asReceipt ? "And paid for, the same day." : undefined,
   );
 
   const due = document.createElement("input");

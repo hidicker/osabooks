@@ -5,7 +5,7 @@ import { state } from "../state.js";
 import { backendKind, openCloudBookId, save } from "../store.js";
 import { addTransactions } from "./bank-import.js";
 import { askOnPage, nameCell, note, tellOnPage } from "../ui.js";
-import { booksLocale, moneyPlaces, noSalesTax } from "../country.js";
+import { booksLocale, moneyPlaces, noSalesTax, sayTax } from "../country.js";
 import { firstOpenDay, furthestLocks, localToday } from "@nzosa/core";
 import { numberPadSettings } from "../number-pad.js";
 import { stripeSettings } from "./stripe-ui.js";
@@ -137,8 +137,8 @@ export function renderLockDates(): void {
       "Finished periods stay as they were finished. " +
         (noSalesTax()
           ? "The year lock keeps everything up to a signed-off year end from changing. "
-          : "The GST lock keeps filed GST returns from changing; the year lock keeps everything " +
-            "up to a signed-off year end from changing. ") +
+          : sayTax("The GST lock keeps filed GST returns from changing; the year lock keeps everything " +
+            "up to a signed-off year end from changing. ")) +
         "A change that would alter a locked figure is refused, whichever page it comes from.",
     ),
   );
