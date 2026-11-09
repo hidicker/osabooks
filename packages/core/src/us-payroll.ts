@@ -69,6 +69,22 @@ export interface CaDe4 {
   exempt?: boolean;
 }
 
+/** New York's IT-2104. Head of household withholds as single. */
+export interface NyIt2104 {
+  status: "single" | "married";
+  /** New York State allowances. */
+  allowances: number;
+  /** Extra New York State withholding each paycheck. */
+  extra?: Cents;
+  /** Lives in New York City: city tax is withheld too. */
+  nyc?: boolean;
+  /** New York City allowances, where they differ from the state's. */
+  nycAllowances?: number;
+  /** Extra New York City withholding each paycheck. */
+  nycExtra?: Cents;
+  exempt?: boolean;
+}
+
 export interface UsEmployee {
   id: string;
   name: string;
@@ -80,6 +96,8 @@ export interface UsEmployee {
   state?: string;
   /** California's DE 4, where the employee works in California. */
   de4?: CaDe4;
+  /** New York's IT-2104, where the employee works in New York. */
+  it2104?: NyIt2104;
   /** Bank routing and account numbers, for the direct deposit file. */
   routing?: string;
   account?: string;
@@ -112,6 +130,8 @@ export interface UsPayLine {
   stateIncome: Cents;
   /** California SDI, and other employee state taxes. */
   stateOther: Cents;
+  /** Local income tax withheld: New York City, or one given by hand. Absent on runs saved before it was kept. */
+  localIncome?: Cents;
   net: Cents;
   employerSocialSecurity: Cents;
   employerMedicare: Cents;
@@ -122,7 +142,7 @@ export interface UsPayLine {
   /** The state the paycheck was worked for. */
   state: string;
   /** Federal or state withholding changed by hand, rather than worked out. */
-  entered?: ("federal" | "stateIncome")[];
+  entered?: ("federal" | "stateIncome" | "localIncome")[];
 }
 
 export interface UsPayRun {
@@ -268,7 +288,7 @@ function underLimit(gross: Cents, before: Cents, limit: Cents): Cents {
 export interface UsStateRules {
   name: string;
   /** "none": no income tax on wages. "ca": California's Method B. Undefined: entered on each pay run. */
-  income?: "none" | "ca";
+  income?: "none" | "ca" | "ny";
   /** The unemployment wage base, per employee per year. */
   suiWageBase?: Cents;
   /** Employee state disability insurance, percent, by year; no wage limit. */
@@ -284,6 +304,11 @@ export const US_STATE_PAYROLL: Readonly<Record<string, UsStateRules>> = {
   CA: { name: "California", income: "ca", suiWageBase: 700_000, sdi: { 2025: 1.2, 2026: 1.3 }, newEmployerRate: 3.4, ett: true },
   // TWC: the first $9,000 (set by statute); 2.7% for a new employer.
   TX: { name: "Texas", income: "none", suiWageBase: 900_000, newEmployerRate: 2.7 },
+  // Florida DOR reemployment tax: the first $7,000; 2.7% for a new employer.
+  FL: { name: "Florida", income: "none", suiWageBase: 700_000, newEmployerRate: 2.7 },
+  // NYS-50 (12/25): the 2026 UI wage base is $17,600; a new employer's rate is 4.1% with the
+  // Re-employment Service Fund. Disability (DBL) and Paid Family Leave are withheld: nyEmployeeInsurance.
+  NY: { name: "New York", income: "ny", suiWageBase: 1_760_000, newEmployerRate: 4.1 },
 };
 
 // California, EDD 2026 Method B, annual payroll period (Tables 1-7).
@@ -348,6 +373,86 @@ export function californiaWithholding(gross: Cents, frequency: UsPayFrequency, d
   return Math.round(yearly / periods) + (de4.extra ?? 0);
 }
 
+// New York, NYS-50-T-NYS and NYS-50-T-NYC (1/26), Method II, exact calculation:
+// the deduction and exemption allowances (tables B and C) come off the
+// paycheck's wages, then the payroll period's table. [at least, rate, plus].
+type PeriodRow = readonly [number, number, number];
+
+const NY_DEDUCTION: Record<"single" | "married", Record<UsPayFrequency, number>> = {
+  single: { weekly: 142.3, biweekly: 284.6, semimonthly: 308.35, monthly: 616.7 },
+  married: { weekly: 152.9, biweekly: 305.8, semimonthly: 331.25, monthly: 662.5 },
+};
+const NYC_DEDUCTION: Record<"single" | "married", Record<UsPayFrequency, number>> = {
+  single: { weekly: 96.15, biweekly: 192.3, semimonthly: 208.35, monthly: 416.7 },
+  married: { weekly: 105.75, biweekly: 211.5, semimonthly: 229.15, monthly: 458.3 },
+};
+const NY_EXEMPTION: Record<UsPayFrequency, number> = { weekly: 19.25, biweekly: 38.5, semimonthly: 41.65, monthly: 83.3 };
+
+const NY_TABLES: Record<"single" | "married", Record<UsPayFrequency, readonly PeriodRow[]>> = {
+  single: {
+    weekly: [[0, 0.039, 0], [163, 0.044, 6.38], [225, 0.0515, 9.08], [267, 0.054, 11.27], [1_551, 0.059, 80.58], [1_862, 0.0703, 98.9], [2_070, 0.0753, 113.58], [3_032, 0.064, 186.02], [4_142, 0.1144, 257.1], [5_104, 0.0735, 367.13]],
+    biweekly: [[0, 0.039, 0], [327, 0.044, 12.77], [450, 0.0515, 18.15], [535, 0.054, 22.54], [3_102, 0.059, 161.15], [3_723, 0.0703, 197.81], [4_140, 0.0753, 227.15], [6_063, 0.064, 372.04], [8_285, 0.1144, 514.19], [10_208, 0.0735, 734.27]],
+    semimonthly: [[0, 0.039, 0], [354, 0.044, 13.83], [488, 0.0515, 19.67], [579, 0.054, 24.42], [3_360, 0.059, 174.58], [4_033, 0.0703, 214.29], [4_485, 0.0753, 246.08], [6_569, 0.064, 403.04], [8_975, 0.1144, 557.04], [11_058, 0.0735, 795.46]],
+    monthly: [[0, 0.039, 0], [708, 0.044, 27.67], [975, 0.0515, 39.33], [1_158, 0.054, 48.83], [6_721, 0.059, 349.17], [8_067, 0.0703, 428.58], [8_971, 0.0753, 492.17], [13_138, 0.064, 806.08], [17_950, 0.1144, 1_114.08], [22_117, 0.0735, 1_590.92]],
+  },
+  married: {
+    weekly: [[0, 0.039, 0], [163, 0.044, 6.38], [225, 0.0515, 9.08], [267, 0.054, 11.27], [1_551, 0.059, 80.58], [1_862, 0.0657, 98.9], [2_070, 0.0707, 112.6], [3_032, 0.0801, 180.54], [4_068, 0.064, 263.62], [6_215, 0.1349, 401.04], [7_177, 0.0735, 530.77], [20_722, 0.0765, 1_526.33]],
+    biweekly: [[0, 0.039, 0], [327, 0.044, 12.77], [450, 0.0515, 18.15], [535, 0.054, 22.54], [3_102, 0.059, 161.15], [3_723, 0.0657, 197.81], [4_140, 0.0707, 225.19], [6_063, 0.0801, 361.08], [8_137, 0.064, 527.23], [12_431, 0.1349, 802.08], [14_354, 0.0735, 1_061.54], [41_444, 0.0765, 3_052.65]],
+    semimonthly: [[0, 0.039, 0], [354, 0.044, 13.83], [488, 0.0515, 19.67], [579, 0.054, 24.42], [3_360, 0.059, 174.58], [4_033, 0.0657, 214.29], [4_485, 0.0707, 243.96], [6_569, 0.0801, 391.17], [8_815, 0.064, 571.17], [13_467, 0.1349, 868.92], [15_550, 0.0735, 1_150], [44_898, 0.0765, 3_307.04]],
+    monthly: [[0, 0.039, 0], [708, 0.044, 27.67], [975, 0.0515, 39.33], [1_158, 0.054, 48.83], [6_721, 0.059, 349.17], [8_067, 0.0657, 428.58], [8_971, 0.0707, 487.92], [13_138, 0.0801, 782.33], [17_629, 0.064, 1_142.33], [26_933, 0.1349, 1_737.83], [31_100, 0.0735, 2_300], [89_796, 0.0765, 6_614.08]],
+  },
+};
+
+const NYC_TABLES: Record<UsPayFrequency, readonly PeriodRow[]> = {
+  weekly: [[0, 0.0205, 0], [154, 0.028, 3.15], [167, 0.0325, 3.54], [288, 0.0395, 7.46], [481, 0.0415, 15.06], [1_154, 0.0425, 43]],
+  biweekly: [[0, 0.0205, 0], [308, 0.028, 6.31], [334, 0.0325, 7.08], [577, 0.0395, 14.92], [962, 0.0415, 30.12], [2_308, 0.0425, 86]],
+  semimonthly: [[0, 0.0205, 0], [333, 0.028, 6.83], [362, 0.0325, 7.67], [625, 0.0395, 16.17], [1_042, 0.0415, 32.63], [2_500, 0.0425, 93.17]],
+  monthly: [[0, 0.0205, 0], [667, 0.028, 13.67], [725, 0.0325, 15.33], [1_250, 0.0395, 32.33], [2_083, 0.0415, 65.25], [5_000, 0.0425, 186.33]],
+};
+
+/** Tax on a paycheck's net wages from one of New York's period tables, in cents, rounded as its examples are. */
+function onPeriodTable(table: readonly PeriodRow[], net: number): Cents {
+  if (net <= 0) return 0;
+  let row: PeriodRow = table[0] ?? [0, 0, 0];
+  for (const r of table) if (net >= r[0]) row = r;
+  return Math.round((net - row[0]) * row[1] * 100) + Math.round(row[2] * 100);
+}
+
+/**
+ * New York State income tax to withhold from one paycheck: NYS-50-T-NYS
+ * (1/26), Method II. Above the tables' top line (a year's net wages of
+ * $1,077,550 and more) Method III applies, which is not worked here: the
+ * top line is used and the figure should be checked.
+ */
+export function newYorkWithholding(gross: Cents, frequency: UsPayFrequency, it2104: NyIt2104): Cents {
+  if (it2104.exempt === true) return 0;
+  const net = gross / 100 - NY_DEDUCTION[it2104.status][frequency] - it2104.allowances * NY_EXEMPTION[frequency];
+  return onPeriodTable(NY_TABLES[it2104.status][frequency], Math.round(net * 100) / 100) + (it2104.extra ?? 0);
+}
+
+/** New York City income tax to withhold from a city resident's paycheck: NYS-50-T-NYC (1/26), Method II. */
+export function newYorkCityWithholding(gross: Cents, frequency: UsPayFrequency, it2104: NyIt2104): Cents {
+  if (it2104.nyc !== true || it2104.exempt === true) return 0;
+  const allowances = it2104.nycAllowances ?? it2104.allowances;
+  const net = gross / 100 - NYC_DEDUCTION[it2104.status][frequency] - allowances * NY_EXEMPTION[frequency];
+  return onPeriodTable(NYC_TABLES[frequency], Math.round(net * 100) / 100) + (it2104.nycExtra ?? 0);
+}
+
+/** New York's 2026 Paid Family Leave: 0.432% of wages, at most $411.91 in the year (WCB). */
+const NY_PFL = { rate: 0.432, most: 41_191 };
+
+/**
+ * What New York's employee insurance takes from a paycheck: disability (DBL),
+ * 0.5% of wages up to $0.60 a week, and Paid Family Leave up to the year's most.
+ */
+export function nyEmployeeInsurance(gross: Cents, frequency: UsPayFrequency, before: Cents): Cents {
+  const weeks = 52 / US_PERIODS[frequency];
+  const dbl = Math.min(pct(gross, 0.5), Math.round(60 * weeks));
+  const pflBefore = Math.min(NY_PFL.most, pct(before, NY_PFL.rate));
+  const pfl = Math.max(0, Math.min(pct(gross, NY_PFL.rate), NY_PFL.most - pflBefore));
+  return dbl + pfl;
+}
+
 /** The state an employee's pay is worked for. */
 export function employeeState(employee: UsEmployee, employer: UsEmployer): string {
   return (employee.state ?? employer.state).toUpperCase();
@@ -378,6 +483,7 @@ export function grossBefore(runs: readonly UsPayRun[], employeeId: string, payDa
 export interface UsPayEntered {
   federal?: Cents;
   stateIncome?: Cents;
+  localIncome?: Cents;
 }
 
 /**
@@ -404,20 +510,27 @@ export function usPayLine(
   const worked = federalWithholding(gross, employee.payFrequency, employee.w4);
   const federal = entered.federal ?? worked;
   let stateWorked = 0;
+  let localWorked = 0;
+  if (rules?.income === "ny") {
+    const form: NyIt2104 = employee.it2104 ?? { status: employee.w4.status === "married" ? "married" : "single", allowances: 0 };
+    stateWorked = newYorkWithholding(gross, employee.payFrequency, form);
+    localWorked = newYorkCityWithholding(gross, employee.payFrequency, form);
+  }
   if (rules?.income === "ca") {
     stateWorked = californiaWithholding(gross, employee.payFrequency, employee.de4 ?? { status: employee.w4.status, allowances: 1 });
   }
   const stateIncome = entered.stateIncome ?? stateWorked;
   const sdiRate = rules?.sdi?.[year] ?? (rules?.sdi !== undefined ? rules.sdi[US_PAYROLL_TABLE_YEAR] ?? 0 : 0);
-  const stateOther = pct(gross, sdiRate);
+  const stateOther = pct(gross, sdiRate) + (rules?.income === "ny" ? nyEmployeeInsurance(gross, employee.payFrequency, before) : 0);
+  const localIncome = entered.localIncome ?? localWorked;
   const base = suiWageBase(state, employer);
   const suiWages = base === undefined ? 0 : underLimit(gross, before, base);
   const stateUnemployment = pct(suiWages, employer.state.toUpperCase() === state ? (employer.suiRate ?? rules?.newEmployerRate ?? 0) : (rules?.newEmployerRate ?? 0));
   const stateOtherEmployer = rules?.ett === true ? pct(suiWages, employer.ettRate ?? 0.1) : 0;
   const futa = pct(underLimit(gross, before, 700_000), employer.futaRate ?? 0.6);
   const employeeMedicare = medicare + extraMedicare;
-  const net = gross - federal - socialSecurity - employeeMedicare - stateIncome - stateOther;
-  const enteredList = (["federal", "stateIncome"] as const).filter((k) => entered[k] !== undefined);
+  const net = gross - federal - socialSecurity - employeeMedicare - stateIncome - stateOther - localIncome;
+  const enteredList = (["federal", "stateIncome", "localIncome"] as const).filter((k) => entered[k] !== undefined);
   return {
     employeeId: employee.id,
     gross,
@@ -426,6 +539,7 @@ export function usPayLine(
     medicare: employeeMedicare,
     stateIncome,
     stateOther,
+    ...(localIncome !== 0 ? { localIncome } : {}),
     net,
     employerSocialSecurity: socialSecurity,
     employerMedicare: medicare,
@@ -484,7 +598,7 @@ export function usPayRunAsPayday(run: UsPayRun, nameOf: (employeeId: string) => 
     amounts.socialEmployee = l.socialSecurity;
     amounts.medicareEmployee = l.medicare;
     amounts.stateIncome = l.stateIncome;
-    amounts.otherEmployee = l.stateOther;
+    amounts.otherEmployee = l.stateOther + (l.localIncome ?? 0);
     amounts.net = l.net;
     amounts.socialEmployer = l.employerSocialSecurity;
     amounts.medicareEmployer = l.employerMedicare;
@@ -505,9 +619,10 @@ export function usYearToDate(runs: readonly UsPayRun[], employeeId: string, year
   medicare: Cents;
   stateIncome: Cents;
   stateOther: Cents;
+  localIncome: Cents;
   net: Cents;
 } {
-  const out = { gross: 0, federal: 0, socialSecurity: 0, medicare: 0, stateIncome: 0, stateOther: 0, net: 0 };
+  const out = { gross: 0, federal: 0, socialSecurity: 0, medicare: 0, stateIncome: 0, stateOther: 0, localIncome: 0, net: 0 };
   for (const run of runs) {
     if (!run.payDate.startsWith(`${year}-`) || (upTo !== undefined && run.payDate > upTo)) continue;
     for (const l of run.lines) {
@@ -518,6 +633,7 @@ export function usYearToDate(runs: readonly UsPayRun[], employeeId: string, year
       out.medicare += l.medicare;
       out.stateIncome += l.stateIncome;
       out.stateOther += l.stateOther;
+      out.localIncome += l.localIncome ?? 0;
       out.net += l.net;
     }
   }

@@ -143,3 +143,49 @@ test("the next pay period follows the last", () => {
   });
   assert.equal(usNextPeriod({ periodStart: "2026-01-01", periodEnd: "2026-01-31", payDate: "2026-01-31" }, "monthly").periodEnd, "2026-02-28");
 });
+
+// NYS-50-T-NYS (1/26), Method II: its own examples, pages 16 and 18.
+test("New York State withholding matches its worked examples", async () => {
+  const { newYorkWithholding } = await import("../dist/index.js");
+  assert.equal(newYorkWithholding(40_000, "weekly", { status: "single", allowances: 3 }), 801);
+  // Example 2: 165.00 x 0.0753 is 12.4245, which the booklet writes as 12.43 (its other examples round to the nearest cent).
+  const single2 = newYorkWithholding(500_000, "semimonthly", { status: "single", allowances: 1 });
+  assert.ok(Math.abs(single2 - 25_851) <= 1, `got ${single2}`);
+  assert.equal(newYorkWithholding(5_000_000, "monthly", { status: "single", allowances: 3 }), 357_663);
+  assert.equal(newYorkWithholding(40_000, "weekly", { status: "married", allowances: 4 }), 669);
+  assert.equal(newYorkWithholding(5_000_000, "monthly", { status: "married", allowances: 3 }), 362_209);
+  // Example 2, married: the booklet multiplies by 0.070 where its table says 0.0707; a cent apart.
+  const two = newYorkWithholding(500_000, "semimonthly", { status: "married", allowances: 3 });
+  assert.ok(Math.abs(two - 24_811) <= 1, `got ${two}`);
+});
+
+// NYS-50-T-NYC (1/26), Method II: its examples, page 27.
+test("New York City withholding matches its worked examples", async () => {
+  const { newYorkCityWithholding } = await import("../dist/index.js");
+  assert.equal(newYorkCityWithholding(40_000, "weekly", { status: "married", allowances: 4, nyc: true }), 517);
+  assert.equal(newYorkCityWithholding(500_000, "semimonthly", { status: "married", allowances: 3, nyc: true }), 18_437);
+  assert.equal(newYorkCityWithholding(5_000_000, "monthly", { status: "married", allowances: 3, nyc: true }), 206_873);
+  assert.equal(newYorkCityWithholding(40_000, "weekly", { status: "single", allowances: 3, nyc: true }), 611);
+  assert.equal(newYorkCityWithholding(40_000, "weekly", { status: "single", allowances: 3 }), 0, "not a city resident");
+});
+
+test("a New York paycheck: DBL up to $0.60 a week, Paid Family Leave to its yearly most, city tax", () => {
+  const ny = { ...dana, state: "NY", de4: undefined, it2104: { status: "single", allowances: 1, nyc: true } };
+  const line = usPayLine(ny, 300_000, "2026-04-15", 0, { state: "NY", suiRate: 4.1 });
+  // DBL: 0.5% of 3,000 is 15.00, held to 0.60 x 52/24 weeks = 1.30. PFL: 0.432% = 12.96.
+  assert.equal(line.stateOther, 130 + 1_296);
+  assert.ok((line.localIncome ?? 0) > 0);
+  assert.equal(line.net, 300_000 - line.federal - line.socialSecurity - line.medicare - line.stateIncome - line.stateOther - line.localIncome);
+  assert.equal(line.stateUnemployment, 12_300, "4.1% under the $17,600 base");
+  // Near the year's PFL most of $411.91: only what is left of it.
+  const late = usPayLine(ny, 300_000, "2026-12-15", 9_500_000, { state: "NY", suiRate: 4.1 });
+  assert.equal(late.stateOther - 130, 41_191 - Math.round(9_500_000 * 0.00432));
+});
+
+test("Florida: no income tax, reemployment tax on the first $7,000", () => {
+  const fl = { ...dana, state: "FL", de4: undefined };
+  const line = usPayLine(fl, 500_000, "2026-02-27", 500_000, { state: "FL" });
+  assert.equal(line.stateIncome, 0);
+  assert.equal(line.stateOther, 0);
+  assert.equal(line.stateUnemployment, 5_400, "2.7% of the $2,000 left under $7,000");
+});

@@ -21,6 +21,7 @@ import {
 } from "@nzosa/core";
 import type {
   CaDe4,
+  NyIt2104,
   IsoDate,
   UsEmployee,
   UsEmployer,
@@ -199,7 +200,10 @@ function employerSection(body: HTMLElement, payroll: UsPayroll | undefined): voi
         worked
           ? US_STATE_PAYROLL[code]?.income === "none"
             ? `${stateName(code)} has no income tax on wages: each pay run works out the federal taxes and ${stateName(code)}'s unemployment tax.`
-            : `${stateName(code)}'s withholding is worked out from each employee's DE 4, with SDI, UI and ETT.`
+            : code === "NY"
+              ? "New York's withholding is worked out from each employee's IT-2104, with New York City's for a city resident, " +
+                "disability (DBL) and Paid Family Leave. Yonkers tax is not worked out: give it on the pay run."
+              : `${stateName(code)}'s withholding is worked out from each employee's DE 4, with SDI, UI and ETT.`
           : `${stateName(code)}'s income tax withholding is not worked out here yet: give it on each pay run, from the state's tables or calculator.`,
       ),
     );
@@ -267,11 +271,31 @@ function employeeForm(payroll: UsPayroll, editing?: UsEmployee): HTMLElement {
   );
   const caBox = document.createElement("div");
   caBox.append(heading("California DE 4"), caGrid);
-  const showCa = (): void => {
-    caBox.hidden = (where.value || payroll.employer.state) !== "CA";
+  const it = editing?.it2104;
+  const nyStatus = select<"single" | "married">([["single", "Single or head of household"], ["married", "Married"]], it?.status ?? (w4.status === "married" ? "married" : "single"));
+  const nyAllowances = input(it === undefined ? "1" : String(it.allowances));
+  const nyExtra = input(centsText(it?.extra), "0.00");
+  const [nycLabel, nyc] = checkbox("Lives in New York City", it?.nyc === true);
+  const nycAllowances = input(it?.nycAllowances === undefined ? "" : String(it.nycAllowances), "The state's");
+  const nycExtra = input(centsText(it?.nycExtra), "0.00");
+  const nyGrid = document.createElement("div");
+  nyGrid.className = "agent-fields";
+  nyGrid.append(
+    field("IT-2104 filing status", nyStatus),
+    field("New York State allowances", nyAllowances),
+    field("Extra New York State withholding each paycheck", nyExtra),
+    field("New York City allowances", nycAllowances, "Only where the IT-2104 gives the city a different number."),
+    field("Extra New York City withholding each paycheck", nycExtra),
+  );
+  const nyBox = document.createElement("div");
+  nyBox.append(heading("New York IT-2104"), nyGrid, nycLabel);
+  const showState = (): void => {
+    const code = where.value || payroll.employer.state;
+    caBox.hidden = code !== "CA";
+    nyBox.hidden = code !== "NY";
   };
-  where.addEventListener("change", showCa);
-  showCa();
+  where.addEventListener("change", showState);
+  showState();
   const bankGrid = document.createElement("div");
   bankGrid.className = "agent-fields";
   bankGrid.append(field("Routing number", routing), field("Account number", account), field("Account type", accountType));
@@ -287,12 +311,18 @@ function employeeForm(payroll: UsPayroll, editing?: UsEmployee): HTMLElement {
         said.textContent = "Give the employee's name.";
         return;
       }
-      const money4 = [usual, dependents, other, deductions, extra, caExtra].map((i) => amount(i.value));
+      const money4 = [usual, dependents, other, deductions, extra, caExtra, nyExtra, nycExtra].map((i) => amount(i.value));
       if (money4.some((v) => v === null)) {
         said.textContent = "An amount is not a number.";
         return;
       }
-      const [gross, dep, oth, ded, ext, caExt] = money4 as number[];
+      const [gross, dep, oth, ded, ext, caExt, nyExt, nycExt] = money4 as number[];
+      const nyAllowed = Number(nyAllowances.value || "0");
+      const nycAllowed = nycAllowances.value.trim() === "" ? undefined : Number(nycAllowances.value);
+      if (!Number.isInteger(nyAllowed) || (nycAllowed !== undefined && !Number.isInteger(nycAllowed))) {
+        said.textContent = "Allowances are whole numbers.";
+        return;
+      }
       const allowed = allowances.value.trim() === "" ? undefined : Number(allowances.value);
       const caAllowed = Number(caAllowances.value || "0");
       const caEst = Number(caEstimated.value || "0");
@@ -314,6 +344,17 @@ function employeeForm(payroll: UsPayroll, editing?: UsEmployee): HTMLElement {
               ...(caExt! > 0 ? { extra: caExt! } : {}),
             }
           : undefined;
+      const nyForm: NyIt2104 | undefined =
+        (state2 || payroll.employer.state) === "NY"
+          ? {
+              status: nyStatus.value as "single" | "married",
+              allowances: nyAllowed,
+              ...(nyExt! > 0 ? { extra: nyExt! } : {}),
+              ...(nyc.checked ? { nyc: true } : {}),
+              ...(nyc.checked && nycAllowed !== undefined ? { nycAllowances: nycAllowed } : {}),
+              ...(nyc.checked && nycExt! > 0 ? { nycExtra: nycExt! } : {}),
+            }
+          : undefined;
       const employee: UsEmployee = {
         id: editing?.id ?? `emp-${Date.now().toString(36)}`,
         name: who,
@@ -331,6 +372,7 @@ function employeeForm(payroll: UsPayroll, editing?: UsEmployee): HTMLElement {
         },
         ...(state2 !== "" ? { state: state2 } : {}),
         ...(caDe4 !== undefined ? { de4: caDe4 } : {}),
+        ...(nyForm !== undefined ? { it2104: nyForm } : {}),
         ...(routing.value.trim() !== "" ? { routing: routing.value.trim() } : {}),
         ...(account.value.trim() !== "" ? { account: account.value.trim(), accountType: accountType.value as "checking" | "savings" } : {}),
         ...(ended.value !== "" ? { ended: ended.value } : {}),
@@ -345,7 +387,7 @@ function employeeForm(payroll: UsPayroll, editing?: UsEmployee): HTMLElement {
   w4Box.append(heading("Form W-4"), w4Grid, step2Label, exemptLabel);
   const bankBox = document.createElement("div");
   bankBox.append(heading("Direct deposit"), bankGrid);
-  wrap.append(grid, w4Box, caBox, bankBox, done, said);
+  wrap.append(grid, w4Box, caBox, nyBox, bankBox, done, said);
   return wrap;
 }
 
@@ -440,14 +482,16 @@ function newPayRun(body: HTMLElement, payroll: UsPayroll): void {
     const gross = input(centsText(employee.usualGross), "0.00");
     const federal = input("", "");
     const stateIncome = input("", "");
-    const touched = { federal: false, stateIncome: false };
+    const local = input("", "0.00");
+    const touched = { federal: false, stateIncome: false, local: false };
     federal.addEventListener("input", () => (touched.federal = true));
     stateIncome.addEventListener("input", () => (touched.stateIncome = true));
+    local.addEventListener("input", () => (touched.local = true));
     const out = document.createElement("td");
     out.className = "report-amount";
     const net = document.createElement("td");
     net.className = "report-amount";
-    return { employee, gross, federal, stateIncome, touched, out, net, line: null as UsPayLine | null };
+    return { employee, gross, federal, stateIncome, local, touched, out, net, line: null as UsPayLine | null };
   });
   const said = document.createElement("p");
   said.className = "feed-said";
@@ -471,10 +515,15 @@ function newPayRun(body: HTMLElement, payroll: UsPayroll): void {
         const v = amount(r.stateIncome.value);
         if (v !== null) entered.stateIncome = v;
       }
+      if (r.touched.local) {
+        const v = amount(r.local.value);
+        if (v !== null) entered.localIncome = v;
+      }
       const line = usPayLine(r.employee, gross, pay.value || localToday(), before, payroll.employer, entered);
       r.line = line;
       if (!r.touched.federal) r.federal.value = (line.federal / 100).toFixed(2);
       if (!r.touched.stateIncome && stateWithholdingWorked(code)) r.stateIncome.value = (line.stateIncome / 100).toFixed(2);
+      if (!r.touched.local) r.local.value = line.localIncome === undefined ? "" : (line.localIncome / 100).toFixed(2);
       r.out.textContent = money(line.socialSecurity + line.medicare + line.stateOther);
       r.net.textContent = money(line.net);
     }
@@ -485,8 +534,8 @@ function newPayRun(body: HTMLElement, payroll: UsPayroll): void {
   const t = document.createElement("table");
   t.className = "report-table";
   t.innerHTML =
-    "<thead><tr><th>Employee</th><th>Gross pay</th><th>Federal income tax</th><th>State income tax</th>" +
-    "<th class=\"report-amount\">Social Security, Medicare and state</th><th class=\"report-amount\">Net pay</th></tr></thead>";
+    "<thead><tr><th>Employee</th><th>Gross pay</th><th>Federal income tax</th><th>State income tax</th><th>City or local tax</th>" +
+    "<th class=\"report-amount\">Social Security, Medicare and state insurance</th><th class=\"report-amount\">Net pay</th></tr></thead>";
   const tb = document.createElement("tbody");
   for (const r of rows) {
     const tr = document.createElement("tr");
@@ -495,9 +544,10 @@ function newPayRun(body: HTMLElement, payroll: UsPayroll): void {
     r.gross.setAttribute("aria-label", `Gross pay for ${r.employee.name}`);
     r.federal.setAttribute("aria-label", `Federal income tax for ${r.employee.name}`);
     r.stateIncome.setAttribute("aria-label", `State income tax for ${r.employee.name}`);
+    r.local.setAttribute("aria-label", `City or local tax for ${r.employee.name}`);
     const code = (r.employee.state ?? payroll.employer.state).toUpperCase();
     if (US_STATE_PAYROLL[code]?.income === "none") r.stateIncome.disabled = true;
-    const cells = [r.gross, r.federal, r.stateIncome].map((i) => {
+    const cells = [r.gross, r.federal, r.stateIncome, r.local].map((i) => {
       const td = document.createElement("td");
       i.inputMode = "decimal";
       i.className = "split-amount";
@@ -578,7 +628,7 @@ function payRunsSection(body: HTMLElement, payroll: UsPayroll): void {
       [`${run.periodStart} to ${run.periodEnd}`, false],
       [String(run.lines.length), false],
       [money(sum((l) => l.gross)), true],
-      [money(sum((l) => l.federal + l.socialSecurity + l.medicare + l.stateIncome + l.stateOther)), true],
+      [money(sum((l) => l.federal + l.socialSecurity + l.medicare + l.stateIncome + l.stateOther + (l.localIncome ?? 0))), true],
       [money(sum((l) => l.net)), true],
       [money(sum((l) => l.employerSocialSecurity + l.employerMedicare + l.futa + l.stateUnemployment + l.stateOtherEmployer)), true],
     ];
