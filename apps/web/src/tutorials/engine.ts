@@ -22,6 +22,8 @@ export interface LessonStep {
    * `done` says it has happened, or the person skips it.
    */
   task?: string | (() => string);
+  /** A page to read more on, opened in a new tab so the lesson stays where it is. */
+  link?: { text: string; href: string };
   done?: () => boolean;
   /** Run as the step starts: remember what to watch, for `done`. */
   before?: () => void;
@@ -168,6 +170,15 @@ export function runLesson(given: Lesson, from = 0): Promise<LessonEnd> {
       top.append(el("span", "tut-card-lesson", lesson.title), el("span", "tut-card-count", `${index + 1} of ${lesson.steps.length}`));
       const said = (text: string | (() => string)): string => (typeof text === "function" ? text() : text);
       card.append(top, el("h3", "tut-card-title", step.title), el("p", "tut-card-body", said(step.body)));
+      if (step.link !== undefined) {
+        const more = el("a", "tut-card-link", step.link.text);
+        more.href = step.link.href;
+        more.target = "_blank";
+        more.rel = "noopener";
+        const line = el("p", "tut-card-body");
+        line.append(more);
+        card.append(line);
+      }
       if (step.task !== undefined) card.append(el("p", "tut-card-task", said(step.task)));
 
       const buttons = el("div", "tut-card-buttons");

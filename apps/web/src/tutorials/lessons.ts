@@ -128,7 +128,13 @@ export const LESSONS: readonly Lesson[] = [
         title: "Where your books live",
         body:
           "Installed on your own computer, your books are plain files in a folder you choose, and nothing is " +
-          "uploaded. In this demo they are kept in this browser, so try anything: Start the demo again puts them back.",
+          "uploaded. Or keep them online, on a Supabase project and web hosting of your own, to reach them from " +
+          "any browser and share them with your bookkeeper or accountant; nobody else holds them either way. " +
+          "In this demo they are kept in this browser, so try anything: Start the demo again puts them back.",
+        link: {
+          text: "How to host OsaBooks online yourself",
+          href: "https://github.com/hidicker/osabooks/blob/main/docs/self-hosting.md",
+        },
       },
     ],
   },
