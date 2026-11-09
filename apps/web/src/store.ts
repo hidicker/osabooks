@@ -2,6 +2,7 @@ import { applyPartOps, copySize, entityId, partChanges, partCopy, writeQueue } f
 import type { Attachment, CreditAllocation, JobsHeld, LockedChange, PartCopy, PartOp, SuggestionDone, Wording, WordingKind } from "@nzosa/core";
 import type {
   AuPayroll,
+  UsPayroll,
   Item,
   BankLayout,
   StockCount,
@@ -510,6 +511,8 @@ export interface StoredLedger {
   payroll?: PayrollData;
   /** Australian payroll: employees, pay runs, PAYG withheld and super. Kept with the decisions. */
   auPayroll?: AuPayroll;
+  /** United States payroll: the employer's state, employees and pay runs. Kept with the decisions. */
+  usPayroll?: UsPayroll;
   /** Invoices set to repeat. Kept with the decisions: a person chose them. */
   recurring?: RecurringInvoice[];
 }
@@ -954,6 +957,7 @@ function decisionsOf(ledger: StoredLedger): Record<string, unknown> {
     ...(ledger.items && ledger.items.length > 0 ? { items: ledger.items } : {}),
     ...(ledger.timeEntries && ledger.timeEntries.length > 0 ? { timeEntries: ledger.timeEntries } : {}),
     ...(ledger.auPayroll && (ledger.auPayroll.employees.length > 0 || ledger.auPayroll.payRuns.length > 0) ? { auPayroll: ledger.auPayroll } : {}),
+    ...(ledger.usPayroll && (ledger.usPayroll.employees.length > 0 || ledger.usPayroll.payRuns.length > 0) ? { usPayroll: ledger.usPayroll } : {}),
     ...(ledger.stockCounts && ledger.stockCounts.length > 0 ? { stockCounts: ledger.stockCounts } : {}),
     ...(ledger.salesTaxRates && ledger.salesTaxRates.length > 0 ? { salesTaxRates: ledger.salesTaxRates } : {}),
     ...(ledger.bankLayouts && Object.keys(ledger.bankLayouts).length > 0 ? { bankLayouts: ledger.bankLayouts } : {}),

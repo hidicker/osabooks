@@ -423,6 +423,7 @@ export * from "./us-sales-tax.js";
 export * from "./au-tax.js";
 export * from "./au-payroll.js";
 export * from "./payroll-register.js";
+export * from "./us-payroll.js";
 export * from "./kr-tax.js";
 export * from "./ofx.js";
 export * from "./country-charts.js";

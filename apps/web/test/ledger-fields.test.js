@@ -61,6 +61,7 @@ function ledgerFields() {
 /** Fields read inside when saved, given a shape that has what is read. */
 const SHAPES = {
   auPayroll: { employees: [{ marked: "auPayroll" }], payRuns: [] },
+  usPayroll: { employer: { state: "CA" }, employees: [{ marked: "usPayroll" }], payRuns: [] },
   payroll: { employerIrd: "", employees: [{ marked: "payroll" }], payRuns: [] },
   classes: { names: ["marked"], assigned: { a: "marked" } },
   jobs: { jobs: [{ marked: "jobs" }], assigned: { a: "marked" } },

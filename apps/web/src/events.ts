@@ -73,6 +73,8 @@ export type EventKind =
   | "time"
   /** Australian payroll: employees and pay runs, whole. */
   | "aupayroll"
+  /** United States payroll: employer, employees and pay runs, whole. */
+  | "uspayroll"
   /** Stock counts, whole. */
   | "stock"
   /** One account in the chart. `id` is its code and name. */
@@ -364,6 +366,10 @@ export function reverse(ledger: StoredLedger, event: LedgerEvent): StoredLedger 
       return { ...ledger, timeEntries: (event.before ?? []) as NonNullable<StoredLedger["timeEntries"]> };
     case "aupayroll":
       return { ...ledger, auPayroll: (event.before ?? { employees: [], payRuns: [] }) as NonNullable<StoredLedger["auPayroll"]> };
+    case "uspayroll": {
+      const { usPayroll: _gone, ...rest } = ledger;
+      return event.before === null || event.before === undefined ? rest : { ...ledger, usPayroll: event.before as NonNullable<StoredLedger["usPayroll"]> };
+    }
     case "fxRates":
       return { ...ledger, fxRates: (event.before ?? {}) as NonNullable<StoredLedger["fxRates"]> };
     case "chartImport":
@@ -718,6 +724,7 @@ export const KIND_LABELS: Record<EventKind, string> = {
   classes: "Classes",
   time: "Time",
   aupayroll: "Payroll",
+  uspayroll: "Payroll",
   stock: "Stock count",
   entities: "Entities",
   codingBatch: "Coding (batch)",

@@ -1,8 +1,11 @@
 import { redraw } from "../app.js";
-import { asCsvText, saveManualJournals } from "../books.js";
+import { asCsvText, saveManualJournals, usPayRunJournals } from "../books.js";
 import { booksMoney } from "../country.js";
 import { $, state } from "../state.js";
+import { save } from "../store.js";
 import { note, noteBriefly, tellOnPage, wideTable } from "../ui.js";
+import { settleAccounts } from "./us-payroll-accounts.js";
+import { usPayRunSections } from "./us-payroll-runs.js";
 import {
   PAY_ACCOUNTS,
   PAY_AMOUNTS,
@@ -74,69 +77,23 @@ const label = (a: Account): string => `${a.name} - ${a.code}`;
 
 /** The payroll journals already in the books, by date. */
 function payrollJournals(): ManualJournal[] {
-  return (state.ledger.manualJournals ?? []).filter(
-    (j) => j.deleted === undefined && j.reverses === undefined && (/^payroll/i.test(j.id) || /payroll register/i.test(j.source ?? "")),
-  );
+  return [
+    ...(state.ledger.manualJournals ?? []).filter(
+      (j) => j.deleted === undefined && j.reverses === undefined && (/^payroll/i.test(j.id) || /payroll register/i.test(j.source ?? "")),
+    ),
+    ...usPayRunJournals(),
+  ];
 }
 
 function alreadyIn(date: string): boolean {
   return payrollJournals().some((j) => j.date === date || j.id === payrollRegisterId(date));
 }
 
-/** A free code near `start`, for an account the books lack. */
-function freeCode(start: number, taken: Set<string>): string {
-  let n = start;
-  while (taken.has(String(n))) n += 1;
-  taken.add(String(n));
-  return String(n);
-}
-
-/** The accounts the paydays post to, adding to the chart any the books lack. */
-function settleAccounts(used: readonly PayAccount[]): Partial<Record<PayAccount, string>> {
-  const taken = new Set(state.chart.map((a) => a.code.trim()));
-  const found = findPayAccounts(state.chart);
-  const added: Account[] = [];
-  const out: Partial<Record<PayAccount, string>> = {};
-  for (const id of used) {
-    const code = chosen.get(id) ?? found[id]?.code ?? "";
-    const account = state.chart.find((a) => a.code.trim() === code);
-    if (account !== undefined) {
-      out[id] = label(account);
-      continue;
-    }
-    const spec = PAY_ACCOUNTS.find((a) => a.id === id);
-    if (spec === undefined) continue;
-    const fresh = {
-      code: freeCode(spec.type === "Expense" ? 6300 : 2100, taken),
-      name: spec.name,
-      type: spec.type,
-      taxCode: "Tax Exempt",
-      description: "",
-    } as Account;
-    added.push(fresh);
-    chosen.set(id, fresh.code);
-    out[id] = label(fresh);
-  }
-  if (added.length > 0) {
-    state.chart = [...state.chart, ...added];
-    const model = state.ledger.entities;
-    const owner = model?.entities.find((e) => e.kind !== "personal" && e.kind !== "residential")?.id ?? model?.entities[0]?.id;
-    state.ledger = {
-      ...state.ledger,
-      chart: state.chart,
-      ...(model !== undefined && owner !== undefined
-        ? { entities: { ...model, accounts: { ...model.accounts, ...Object.fromEntries(added.map((a) => [a.code, owner])) } } }
-        : {}),
-    };
-  }
-  return out;
-}
-
 function fileSection(body: HTMLElement): void {
   body.append(
     heading("Bring in a payroll register"),
     note(
-      "Download the payroll register from the payroll service, one row for each employee on each payday: in Gusto, " +
+      "Where a payroll service (Gusto, ADP, Paychex) runs the payroll instead, download its payroll register, one row for each employee on each payday: in Gusto, " +
         "Reports, Payroll journal, by employee, as CSV or Excel. Each payday becomes a journal: gross wages and the " +
         "employer's taxes as costs, and the net pay, each tax and the deductions as owed until the bank pays them.",
     ),
@@ -284,7 +241,11 @@ function paydaysSection(body: HTMLElement, days: readonly RegisterPayday[]): voi
 
 async function postPaydays(days: readonly RegisterPayday[]): Promise<void> {
   if (loaded === null || days.length === 0) return;
-  const accounts = settleAccounts(payAccountsUsed(days));
+  const chartBefore = state.chart.length;
+  const accounts = settleAccounts(payAccountsUsed(days), chosen);
+  // Accounts added to the chart are saved with it: the journals alone would
+  // leave them out, and a reload would lose them.
+  if (state.chart.length !== chartBefore) state.persistent = await save(state.ledger);
   const journals: ManualJournal[] = [];
   for (const day of days) {
     const journal = payrollRegisterJournal(day, accounts, loaded.service);
@@ -314,7 +275,7 @@ function inBooksSection(body: HTMLElement): void {
   body.append(
     note(
       `${journals.length === 1 ? "1 payroll journal" : `${journals.length} payroll journals`}, ${journals[journals.length - 1]?.date} to ${journals[0]?.date}. ` +
-        "Each is on the Journal report, and History can undo a register brought in.",
+        "Each is on the Journal report, and History can undo a pay run or a register brought in.",
     ),
   );
   if (read.length === 0) {
@@ -364,8 +325,8 @@ function inBooksSection(body: HTMLElement): void {
   }
   body.append(
     note(
-      "For checking the W-2s the payroll service files. Gross wages are before any pre-tax deduction: boxes 1, 3 and 5 " +
-        "are the gross less 401(k) and other pre-tax deductions, which the service's own W-2 preview shows.",
+      "For the W-2s, or for checking those a payroll service files. Gross wages are before any pre-tax deduction: boxes 1, 3 " +
+        "and 5 are the gross less 401(k) and other pre-tax deductions, which a payroll service's own W-2 preview shows.",
     ),
   );
 }
@@ -373,6 +334,7 @@ function inBooksSection(body: HTMLElement): void {
 export function renderUsPayroll(): void {
   const body = $("uspayroll-body");
   body.textContent = "";
+  usPayRunSections(body);
   fileSection(body);
   if (loaded !== null) {
     columnsSection(body, loaded.read);

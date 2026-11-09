@@ -210,7 +210,7 @@ function groups(): { title: string; rows: Row[] }[] {
           what: nz
             ? "The employer's IRD number and size (how soon each payday is filed), the accounts pay runs post to, each employee's pay frequency, pay items, leave and public holidays."
             : country.id === "us"
-              ? "The payroll service's register, and the accounts each payday posts to."
+              ? "The employer's state and unemployment rate, each employee's W-4 and pay frequency, or a payroll service's register."
               : "The accounts pay runs post to, each employee's pay frequency, pay items and leave.",
           where: country.id === "au"
             ? [{ page: "aupayroll", label: "Payroll", module: "aupayroll" }]

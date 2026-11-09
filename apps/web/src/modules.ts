@@ -296,9 +296,11 @@ export const MODULES: readonly ModuleInfo[] = [
     opens: "uspayroll",
     countries: ["us"],
     name: "Payroll",
-    what: "The payroll service's register brought in, a journal for each payday, and a check of the W-2 figures.",
+    what: "Employees, pay runs with federal and state withholding, or a payroll service's register brought in; the W-2 figures.",
     basis: "data",
-    inferred: () => (state.ledger.manualJournals ?? []).some((j) => j.deleted === undefined && /payroll register/i.test(j.source ?? "")),
+    inferred: () =>
+      (state.ledger.usPayroll?.employees ?? []).length > 0 ||
+      (state.ledger.manualJournals ?? []).some((j) => j.deleted === undefined && /payroll register/i.test(j.source ?? "")),
     holds: () =>
       count((state.ledger.manualJournals ?? []).filter((j) => j.deleted === undefined && /payroll register/i.test(j.source ?? "")).length, "payday"),
   },

@@ -49,6 +49,8 @@ import {
   invoiceBalancesFor,
   payrollJournal,
   auPayRunJournal,
+  payrollRegisterJournal,
+  usPayRunAsPayday,
   postLedger,
   prepaymentAdjustments,
   readXlsx,
@@ -2601,7 +2603,7 @@ export function postedJournals(): PostedJournal[] {
     transfers: state.ledger.transfers ?? {},
     // A property manager's statement posts as a journal of its own, derived
     // each time so an edited statement cannot leave its old journal behind.
-    manualJournals: [...(state.ledger.manualJournals ?? []), ...agentStatementJournals()],
+    manualJournals: [...(state.ledger.manualJournals ?? []), ...agentStatementJournals(), ...usPayRunJournals()],
     // Pay runs post like depreciation: derived from what was stored, each time.
     assetJournals: [
       ...depreciationJournals(),
@@ -2739,6 +2741,7 @@ export function bookYears(): number[] {
     ...(state.ledger.manualJournals ?? []).filter((j) => j.reverses === undefined && j.deleted === undefined).map((j) => j.date),
     ...(state.ledger.payroll?.payRuns ?? []).map((r) => r.payDate),
     ...(state.ledger.auPayroll?.payRuns ?? []).map((r) => r.payDate),
+    ...(state.ledger.usPayroll?.payRuns ?? []).map((r) => r.payDate),
     ...(state.ledger.agentStatements ?? []).map((a) => a.to),
     ...(state.ledger.prepayments ?? []).map((p) => p.from),
     // Invoices and bills are in the books too: books with only those, and no
@@ -2783,6 +2786,31 @@ function payrollJournals(): PostedJournal[] {
   return (state.ledger.payroll?.payRuns ?? [])
     .map((run) => payrollJournal(run, accounts))
     .filter((j): j is PostedJournal => j !== null);
+}
+
+/**
+ * United States pay runs, as the journals they post: the same shape a payroll
+ * register brought in posts, a line for each employee's wages, withholding and
+ * net pay, so the Form 941 worksheet and the W-2 check read both alike.
+ * Derived each time from the stored runs, as the Australian ones are.
+ */
+export function usPayRunJournals(): ManualJournal[] {
+  const payroll = state.ledger.usPayroll;
+  if (payroll === undefined || payroll.payRuns.length === 0) return [];
+  const accounts = payroll.accounts ?? {};
+  const nameOf = (id: string): string => payroll.employees.find((e) => e.id === id)?.name ?? id;
+  const out: ManualJournal[] = [];
+  for (const run of payroll.payRuns) {
+    const journal = payrollRegisterJournal(usPayRunAsPayday(run, nameOf), accounts, "OsaBooks");
+    if (journal === null) continue;
+    out.push({
+      ...journal,
+      id: `us-payrun-${run.id}`,
+      narration: `Pay run, ${run.periodStart} to ${run.periodEnd}, paid ${run.payDate}`,
+      source: "Payroll",
+    });
+  }
+  return out;
 }
 
 /** Australian pay runs, posted to the payroll accounts the Payroll page adds to the chart. */
