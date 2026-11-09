@@ -18,15 +18,33 @@
  * and horizontal rules. Anything else passes through as text, which is the
  * right failure -- visible, and not silently dropped.
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 
+// `help`: also put on the website, under the home page's Help (public/home/help/).
 const PAGES = [
-  { from: "docs/user-guide.md", to: "docs/user-guide.html" },
-  { from: "docs/accountant-guide.md", to: "docs/accountant-guide.html" },
+  { from: "docs/user-guide.md", to: "docs/user-guide.html", help: true },
+  { from: "docs/accountant-guide.md", to: "docs/accountant-guide.html", help: true },
   { from: "docs/developer-guide.md", to: "docs/developer-guide.html" },
-  { from: "docs/self-hosting.md", to: "docs/self-hosting.html" },
+  { from: "docs/self-hosting.md", to: "docs/self-hosting.html", help: true },
+  { from: "docs/coming-next.md", to: "docs/coming-next.html", help: true },
 ];
+const HELP = "apps/web/public/home/help";
+const REPO = "https://github.com/hidicker/osabooks/blob/main/docs";
+
+/**
+ * A link to another guide, as `user-guide.md` or `docs/user-guide.md`, made a
+ * link to its page: beside it in docs/, and on the website the Help page where
+ * there is one, or the guide on GitHub where there is not.
+ */
+function linksBetweenGuides(html, onWebsite) {
+  return html.replace(/href="(?:docs\/)?([\w-]+)\.md(#[^"]*)?"/g, (whole, name, anchor = "") => {
+    const guide = PAGES.find((p) => basename(p.from, ".md") === name);
+    if (guide === undefined) return whole;
+    if (!onWebsite || guide.help === true) return `href="${name}.html${anchor}"`;
+    return `href="${REPO}/${name}.md${anchor}"`;
+  });
+}
 
 const escapeHtml = (value) =>
   value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -242,7 +260,7 @@ strong { font-weight: 650; }
 }
 `;
 
-function page(title, rendered, source) {
+function page(title, rendered, source, onWebsite) {
   const nav = rendered.contents
     .map((entry) => `<a href="#${entry.id}">${escapeHtml(entry.text)}</a>`)
     .join("\n      ");
@@ -258,11 +276,11 @@ function page(title, rendered, source) {
 <body>
   <div class="wrap">
     <nav>
-      <strong>Contents</strong>
+      ${onWebsite ? '<a href="../#help">&larr; OsaBooks help</a>\n      ' : ""}<strong>Contents</strong>
       ${nav}
     </nav>
     <main>
-${rendered.body}
+${linksBetweenGuides(rendered.body, onWebsite)}
       <p class="foot">
         OsaBooks &mdash; free accounting for New Zealand. Free software under the
         GNU AGPL v3 with the additional terms in NOTICE, provided as is and without warranty of any kind.
@@ -276,12 +294,18 @@ ${rendered.body}
 }
 
 let built = 0;
-for (const { from, to } of PAGES) {
+mkdirSync(HELP, { recursive: true });
+for (const { from, to, help } of PAGES) {
   const markdown = readFileSync(from, "utf8");
   const rendered = render(markdown);
   const title = (/^#\s+(.*)$/m.exec(markdown) ?? [, basename(from)])[1];
-  writeFileSync(to, page(title, rendered, basename(from)));
+  writeFileSync(to, page(title, rendered, basename(from), false));
   console.log(`${to}  ${rendered.contents.length} sections`);
+  if (help === true) {
+    const there = `${HELP}/${basename(to)}`;
+    writeFileSync(there, page(title, rendered, basename(from), true));
+    console.log(`${there}`);
+  }
   built += 1;
 }
 console.log(`${built} page(s) built.`);

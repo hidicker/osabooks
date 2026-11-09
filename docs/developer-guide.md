@@ -1063,8 +1063,7 @@ npm run dev --workspace @nzosa/web -- --port 3211
 ```
 
 Browser storage is per origin, so another port is a completely separate
-database. That is how to try something out, or run the
-[testing plan](docs/testing-plan.md), without touching real work.
+database. That is how to try something out without touching real work.
 
 ### Command line
 

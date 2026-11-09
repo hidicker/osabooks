@@ -133,7 +133,7 @@ export const LESSONS: readonly Lesson[] = [
           "In this demo they are kept in this browser, so try anything: Start the demo again puts them back.",
         link: {
           text: "How to host OsaBooks online yourself",
-          href: "https://github.com/hidicker/osabooks/blob/main/docs/self-hosting.md",
+          href: "https://nbparagliding.nz/osabooks/home/help/self-hosting.html",
         },
       },
     ],

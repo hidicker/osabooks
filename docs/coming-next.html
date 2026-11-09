@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coming next</title>
+<style>
+:root { --ink: #14171a; --quiet: #5b6570; --line: #e3e6ea; --page: #fff;
+  --soft: #f6f8fa; --link: #1a5fb4; }
+@media (prefers-color-scheme: dark) {
+  :root { --ink: #e6e9ec; --quiet: #9aa4af; --line: #2c3238; --page: #14171a;
+    --soft: #1c2126; --link: #7fb3ff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink);
+  font: 16px/1.65 -apple-system, "Segoe UI", system-ui, sans-serif; }
+.wrap { display: grid; grid-template-columns: 16rem minmax(0, 1fr);
+  gap: 3rem; max-width: 68rem; margin: 0 auto; padding: 2.5rem 1.5rem 6rem; }
+nav { position: sticky; top: 2.5rem; align-self: start; font-size: 0.87rem;
+  max-height: calc(100vh - 5rem); overflow-y: auto; }
+nav strong { display: block; margin-bottom: 0.6rem; font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.08em; color: var(--quiet); }
+nav a { display: block; padding: 0.2rem 0; color: var(--quiet);
+  text-decoration: none; border-left: 2px solid transparent; padding-left: 0.7rem; }
+nav a:hover { color: var(--link); border-left-color: var(--link); }
+main { min-width: 0; }
+h1 { font-size: 2rem; line-height: 1.2; margin: 0 0 0.5rem; }
+h2 { font-size: 1.35rem; margin: 2.75rem 0 0.75rem; padding-top: 1.25rem;
+  border-top: 1px solid var(--line); }
+h3 { font-size: 1.05rem; margin: 1.75rem 0 0.5rem; }
+h4 { font-size: 0.95rem; margin: 1.25rem 0 0.4rem; color: var(--quiet); }
+p, li { margin: 0 0 0.85rem; }
+li { margin-bottom: 0.4rem; }
+ul, ol { padding-left: 1.35rem; margin: 0 0 1rem; }
+a { color: var(--link); }
+code { background: var(--soft); border: 1px solid var(--line); border-radius: 3px;
+  padding: 0.05em 0.35em; font-size: 0.88em;
+  font-family: ui-monospace, "Cascadia Code", Menlo, Consolas, monospace; }
+pre { background: var(--soft); border: 1px solid var(--line); border-radius: 6px;
+  padding: 0.9rem 1.1rem; overflow-x: auto; }
+pre code { background: none; border: 0; padding: 0; font-size: 0.85em; }
+.scroll { overflow-x: auto; margin: 0 0 1.25rem; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+th { text-align: left; font-size: 0.75rem; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--quiet); border-bottom: 1px solid var(--quiet);
+  padding: 0 0.8rem 0.4rem 0; }
+td { padding: 0.5rem 0.8rem 0.5rem 0; border-bottom: 1px solid var(--line);
+  vertical-align: top; }
+hr { border: 0; border-top: 1px solid var(--line); margin: 2rem 0; }
+strong { font-weight: 650; }
+.foot { margin-top: 4rem; padding-top: 1.25rem; border-top: 1px solid var(--line);
+  font-size: 0.85rem; color: var(--quiet); }
+@media (max-width: 60rem) {
+  .wrap { grid-template-columns: 1fr; gap: 1.5rem; }
+  nav { position: static; max-height: none; border-bottom: 1px solid var(--line);
+    padding-bottom: 1rem; }
+}
+@media print {
+  .wrap { display: block; max-width: none; padding: 0; }
+  nav { display: none; }
+  h2 { break-before: auto; }
+  pre, table { break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <nav>
+      <strong>Contents</strong>
+      <a href="#new-zealand">New Zealand</a>
+      <a href="#other-countries">Other countries</a>
+      <a href="#moving-from-other-software">Moving from other software</a>
+      <a href="#money-in-other-currencies">Money in other currencies</a>
+      <a href="#books-kept-online">Books kept online</a>
+      <a href="#ai-and-connectors">AI and connectors</a>
+      <a href="#everyday-use">Everyday use</a>
+    </nav>
+    <main>
+<h1 id="coming-next">Coming next</h1>
+<p>Features still to be built. Nothing here has a date; what comes first depends on who is using OsaBooks and what they need. To ask for one, or for something not listed, open an issue on GitHub.</p>
+<h2 id="new-zealand">New Zealand</h2>
+<ul><li><strong>ACC work levy by classification unit</strong>, for sole traders, from ACC's yearly rate schedule.</li><li><strong>Provisional tax by the ratio option</strong>, taking out a fixed asset sale before the ratio is applied.</li><li><strong>A Kiwibank payment file.</strong> BNZ, ANZ, Westpac and ASB files are written already.</li></ul>
+<h2 id="other-countries">Other countries</h2>
+<ul><li><strong>United States:</strong> income tax beyond a single filer with the standard deduction (other filing statuses, the QBI deduction, credits and state income tax); Form 940 and W-2; payroll for more states (Illinois, Ohio, Georgia, North Carolina and on, by size).</li><li><strong>Filed returns to compare with</strong>, as New Zealand books do with myIR's GST returns: Australia's BAS, South Korea's VAT return and US sales tax returns.</li></ul>
+<h2 id="moving-from-other-software">Moving from other software</h2>
+<ul><li><strong>QuickBooks:</strong> invoices, bills and customers brought in as documents, with due dates and aged receivables and payables, rather than as journals.</li><li><strong>MYOB:</strong> open invoices and bills, customers and suppliers, and items.</li><li><strong>Sage 50, Wave and Zoho Books.</strong></li></ul>
+<h2 id="money-in-other-currencies">Money in other currencies</h2>
+<ul><li><strong>Wise balances in other currencies</strong>, converted at each day's rate.</li><li><strong>Foreign currency:</strong> open receivables and payables revalued at the balance date, credit notes across currencies, and quick entry in another currency.</li><li><strong>Currencies with three decimal places</strong>, such as dinars and rials, held to the third decimal.</li></ul>
+<h2 id="books-kept-online">Books kept online</h2>
+<ul><li><strong>The same choices for every set of books:</strong> open, rename, make a copy, clear and delete, for books online and books in a folder alike, with when each was last opened.</li><li><strong>SimpleFIN bank feeds</strong> for books kept online (today on the desktop app only).</li><li><strong>Bank feeds, AI and the morning run on your own Supabase project.</strong></li><li><strong>Payment reminders from your own email address.</strong></li><li><strong>Card payments with Stripe</strong> that show as soon as they are paid, and for books kept in a folder.</li><li><strong>Lock dates enforced by the server</strong>, so a change in a locked period is refused, not only noted.</li></ul>
+<h2 id="ai-and-connectors">AI and connectors</h2>
+<ul><li><strong>More for your AI app:</strong> the trial balance, GST returns and journals.</li><li><strong>One connector for all your books</strong>, rather than one for each set.</li></ul>
+<h2 id="everyday-use">Everyday use</h2>
+<ul><li><strong>Undoing a merge of two accounts</strong> in full, with everything it moved.</li><li><strong>US business meals</strong>, half deductible.</li></ul>
+      <p class="foot">
+        OsaBooks &mdash; free accounting for New Zealand. Free software under the
+        GNU AGPL v3 with the additional terms in NOTICE, provided as is and without warranty of any kind.
+        Built from <code>coming-next.md</code>.
+      </p>
+    </main>
+  </div>
+</body>
+</html>

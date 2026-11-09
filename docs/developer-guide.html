@@ -342,7 +342,7 @@ for r,d,f in os.walk('.'):
 <p>Upload <code>apps/web/dist/</code> to any static host — GitHub Pages, Netlify, Cloudflare Pages, or plain shared hosting. There is no backend to run.</p>
 <h3 id="running-a-second-copy-side-by-side">Running a second copy side by side</h3>
 <pre><code>npm run dev --workspace @nzosa/web -- --port 3211</code></pre>
-<p>Browser storage is per origin, so another port is a completely separate database. That is how to try something out, or run the <a href="docs/testing-plan.md">testing plan</a>, without touching real work.</p>
+<p>Browser storage is per origin, so another port is a completely separate database. That is how to try something out without touching real work.</p>
 <h3 id="command-line">Command line</h3>
 <pre><code>node packages/cli/dist/cli.js import samples/*.csv</code></pre>
 <pre><code>node packages/cli/dist/cli.js detect statements/july.csv</code></pre>
@@ -350,7 +350,7 @@ for r,d,f in os.walk('.'):
 <h3 id="what-a-static-deployment-does-not-have">What a static deployment does not have</h3>
 <p>A static host serves the files and nothing else, so <code>/api/status</code> answers 404, <code>loadFromFolder</code> returns null, and <code>backend</code> stays <code>"browser"</code>. Every consequence follows from that one fact:</p>
 <ul><li><strong>Each visitor's books live in their own browser</strong>, in IndexedDB under that origin. There is no shared ledger, and nothing is uploaded — the host never sees a figure.</li><li><strong>They are not durable.</strong> Clearing site data deletes them; a private window keeps nothing; the browser may evict them under storage pressure unless <code>requestPersistence()</code> has been granted.</li><li><strong>The folder-only features are absent</strong>: switching ledgers, archives, restoring an archive, and the per-part file writes. <code>writesToFolder()</code> is false and the app adjusts what it offers accordingly.</li></ul>
-<p>That makes a static deployment right for a demo or for somebody to try, and wrong for books anybody depends on. Real books want the launcher, which runs the small server that owns the folder -- or books kept online on a Supabase project of your own, which <a href="self-hosting.md">Hosting it online yourself</a> walks through.</p>
+<p>That makes a static deployment right for a demo or for somebody to try, and wrong for books anybody depends on. Real books want the launcher, which runs the small server that owns the folder -- or books kept online on a Supabase project of your own, which <a href="self-hosting.html">Hosting it online yourself</a> walks through.</p>
       <p class="foot">
         OsaBooks &mdash; free accounting for New Zealand. Free software under the
         GNU AGPL v3 with the additional terms in NOTICE, provided as is and without warranty of any kind.

@@ -128,6 +128,10 @@ npx supabase functions deploy stripe --use-api --project-ref &lt;your-ref&gt;</c
 <pre><code>npx supabase functions deploy gemini --use-api --project-ref &lt;your-ref&gt;</code></pre>
 <pre><code>npx supabase functions deploy gemini-demo --use-api --project-ref &lt;your-ref&gt;</code></pre>
 <p><code>SUPABASE_URL</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> are given to every function by Supabase itself — you set nothing for them.</p>
+<p><strong>Optional: payment reminders sent by themselves.</strong> Books with reminders turned on in Settings are sent them each morning at 21:00 UTC (the <code>*_reminders.sql</code> migration schedules it, with the morning run's key). Build the run, then deploy:</p>
+<pre><code>node tools/build-nightly-function.mjs
+npx supabase functions deploy reminders --no-verify-jwt --use-api --project-ref &lt;your-ref&gt;</code></pre>
+<p>It sends through the same SMTP secrets as the invitations (<code>SMTP_HOST</code>, <code>SMTP_USER</code>, <code>SMTP_PASSWORD</code>), from <code>SMTP_USER</code>'s address. To send through Resend instead, set <code>RESEND_API_KEY</code> and <code>REMINDERS_FROM</code> (an address on a domain verified with Resend). Each email comes in the business's name, with replies to the business's own email; at most 50 go from one set of books in a morning.</p>
 <p><strong>Optional: a shared AI allowance.</strong> If you want people using your copy to try AI suggestions before they add a key of their own, set a Gemini API key as a function secret (<strong>Edge Functions → Secrets</strong>, or the CLI):</p>
 <pre><code>npx supabase secrets set GEMINI_API_KEY=&lt;your key&gt; --project-ref &lt;your-ref&gt;</code></pre>
 <p><code>GEMINI_MODEL</code> is optional (a current Flash model is the default). The allowance is one pool shared by everybody without a key, capped at 1,000 lines by default; change the cap in the <code>ai_demo_pool</code> table. Leave the key unset and there is simply no shared allowance — everybody uses their own key or copies prompts to an AI they already have.</p>
