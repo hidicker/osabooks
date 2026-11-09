@@ -48,7 +48,7 @@ import { $, state } from "../state.js";
 import { backendKind, booksReadOnly, emptyCloudBooks, ledgerName, save, switchLedger, writesToFolder } from "../store.js";
 import type { StoredLedger } from "../store.js";
 import { askOnPage, note, setLoadingStatus, tellOnPage } from "../ui.js";
-import { DEMO_PERSONAS, currentDemoPersona, demoFolder, rememberDemoPersona } from "../demo-personas.js";
+import { DEMO_PERSONAS, booksFromLink, currentDemoPersona, demoFolder, rememberDemoPersona } from "../demo-personas.js";
 import {
   DEFAULT_ENTITY_NAME,
   accountEntityKey,
@@ -2091,6 +2091,16 @@ export async function seedBrowser(): Promise<void> {
   // demo build has no `data/`, and asking for its seven files first was most
   // of the wait before the demo appeared.
   if (!isDemoBuild()) await loadStartupFiles();
+  // A shared link to one set of demo books opens those, even for a visitor
+  // who has other demo books open already.
+  if (isDemoBuild()) {
+    const linked = booksFromLink();
+    if (linked !== undefined && (linked !== currentDemoPersona() || demoEmpty() || state.ledger.transactions.length === 0)) {
+      rememberDemoPersona(linked);
+      setDemoEmpty(false);
+      if (state.ledger.transactions.length > 0) await wipe();
+    }
+  }
   if (state.ledger.transactions.length > 0) return;
 
   let already = true;

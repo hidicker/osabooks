@@ -600,6 +600,59 @@ export const LESSONS: readonly Lesson[] = [
     ],
   },
   {
+    id: "school",
+    title: "A paragliding school's year",
+    summary: "Tandems and courses through the seasons, gift vouchers, a wing sold for a student, and school gear under and over $1,000.",
+    minutes: 3,
+    books: ["school"],
+    steps: [
+      {
+        title: "Where the money comes from",
+        body:
+          "Tandem flights, courses, flight videos, gift vouchers and gear, each its own line. The terminal settles " +
+          "once a week, and each settlement is split between tandems and videos, so both are counted right.",
+        page: "reports",
+        before: report("pl"),
+        target: q("#reports-body"),
+      },
+      {
+        title: "Gift vouchers",
+        body:
+          "A voucher for a tandem flight has no fixed value, so its GST is due when it is sold, and it is coded to " +
+          "Gift vouchers sold. At 31 March the ones not yet flown are moved out of income by a journal, to be " +
+          "flown next year; last year's, flown this year, come in as tandem income.",
+        before: report("manual"),
+        target: q("#reports-body"),
+      },
+      {
+        title: "Owed at year end",
+        body:
+          "The vouchers still to fly are owed to their holders: a liability, not income. So is money held for " +
+          "gear sold on a student's behalf. When Mia's wing sold for $3,200, $2,880 was hers and passed on; only " +
+          "the $320 commission is the school's income, with GST on it.",
+        before: report("balancesheet"),
+        target: q("#reports-body"),
+      },
+      {
+        title: "School gear and the $1,000 rule",
+        body:
+          "Wings and the retrieve van are in the register and depreciated. Gear costing up to $1,000 before GST, " +
+          "like the radios and helmets, is written off in the year it is bought. But items bought together from " +
+          "one supplier at the same rate count together: three $850 harnesses on one order are a $2,550 asset.",
+        page: "assets",
+        target: q("#assets-body table"),
+      },
+      {
+        title: "Left to code",
+        body:
+          "Three lines are waiting. The reserve parachute is $1,100 before GST, just over the line, so it is an " +
+          "asset; the $520 vario is written off. The suggestion on each line says why.",
+        page: "reconcile",
+        target: firstLine,
+      },
+    ],
+  },
+  {
     id: "us-schedules",
     title: "Schedule C, Schedule E and 1099-NEC",
     summary: "The business's profit, the duplex's rental income, and which contractors need a 1099-NEC.",

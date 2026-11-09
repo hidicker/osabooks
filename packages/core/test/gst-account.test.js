@@ -48,3 +48,28 @@ test("a posting to the GST account that is neither GST nor a payment shows as a 
   assert.equal(july.shouldOwe, 180000);
   assert.equal(july.booksDifference, -100000);
 });
+
+test("a refund period takes away from what is owing, once Box 15 is signed", async () => {
+  const { signedBox15 } = await import("../dist/index.js");
+  assert.equal(signedBox15({ box15: 2369, outcome: "refund" }), -2369);
+  assert.equal(signedBox15({ box15: 167765, outcome: "pay" }), 167765);
+  assert.equal(signedBox15({ box15: 0, outcome: "nil" }), 0);
+  // The first period is paid; the second is a refund, received after it ends.
+  const [may, july] = gstAccountReconciliation({
+    returns: [
+      { periodEnd: "2025-05-31", box15: signedBox15({ box15: 167765, outcome: "pay" }) },
+      { periodEnd: "2025-07-31", box15: signedBox15({ box15: 2369, outcome: "refund" }) },
+    ],
+    postings: [
+      { date: "2025-05-31", amount: -167765 },
+      { date: "2025-06-30", amount: 167765 },
+      { date: "2025-07-31", amount: 2369 },
+    ],
+    payments: [{ date: "2025-06-30", amount: 167765 }],
+  });
+  assert.equal(may.booksDifference, 0);
+  assert.equal(july.returnsToDate, 165396);
+  assert.equal(july.shouldOwe, -2369);
+  assert.equal(july.booksOwe, -2369);
+  assert.equal(july.booksDifference, 0);
+});

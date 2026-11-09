@@ -18,6 +18,7 @@ import {
   ownersOf,
   readIr3Confirmation,
   readIrdExport,
+  signedBox15,
 } from "@nzosa/core";
 import type {
   BankLineRef,
@@ -135,7 +136,7 @@ function ourGstReturns(entityId: string | undefined, from: IsoDate, to: IsoDate)
         boxes: {
           box5: b.box5, box6: b.box6, box9: b.box9, box10: b.box10,
           box11: b.box11, box13: b.box13, box14: b.box14,
-          box15: b.outcome === "refund" ? -b.box15 : b.box15,
+          box15: signedBox15(b),
         },
       });
     }

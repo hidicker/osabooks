@@ -95,6 +95,16 @@ export const DEMO_PERSONAS: readonly DemoPersona[] = [
     ready: true,
   },
   {
+    id: "school",
+    label: "A paragliding school (New Zealand)",
+    shows: "Tandems and courses through the seasons, gift vouchers not yet flown, a wing sold for a student, school gear and the $1,000 rule",
+    about:
+      "These demo books are invented: Ridgeline Paragliding Limited, a tandem and paragliding school in Wānaka run by " +
+      "its owner and head instructor, registered for GST, busy in summer and quiet in winter.",
+    page: "reconcile",
+    ready: true,
+  },
+  {
     id: "society",
     label: "A sailing club (incorporated society, New Zealand)",
     shows: "Grants and what became of them, the society's statements and its IR9",
@@ -163,6 +173,24 @@ export function rememberDemoPersona(id: string): void {
     else localStorage.setItem(KEY, id);
   } catch {
     // Without storage the demo simply opens on the main books next time.
+  }
+}
+
+/**
+ * The books a shared link asks for, as in `?books=school`, taken off the
+ * address once read so a later choice under Demo books is not overruled by it.
+ * Only books offered to visitors; anything else is ignored.
+ */
+export function booksFromLink(): string | undefined {
+  try {
+    const url = new URL(location.href);
+    const id = url.searchParams.get("books");
+    if (id === null) return undefined;
+    url.searchParams.delete("books");
+    history.replaceState(history.state, "", url.toString());
+    return DEMO_PERSONAS.some((p) => p.id === id && p.id !== "" && p.ready === true) ? id : undefined;
+  } catch {
+    return undefined;
   }
 }
 

@@ -9,6 +9,7 @@ import {
   formatAmount,
   gstAccountReconciliation,
   isGstControlCode,
+  signedBox15,
   splitAccountLabel,
   localToday,
 } from "@nzosa/core";
@@ -48,7 +49,8 @@ export function gstAccountSection(): HTMLElement | null {
 
   const returns = computeOurReturns(varianceInput(), from, to).map((r) => ({
     periodEnd: r.period.to,
-    box15: r.boxes.box15 as Cents,
+    // Signed: a refund takes away from what is owing.
+    box15: signedBox15(r.boxes),
   }));
 
   const postings: { date: string; amount: Cents }[] = [];

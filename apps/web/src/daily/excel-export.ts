@@ -25,6 +25,7 @@ import {
   gstWithin,
   plClassForType,
   splitAccountLabel,
+  signedBox15,
 } from "@nzosa/core";
 import type {
   Entity,
@@ -1360,7 +1361,8 @@ function buildGstReturnsSheet(ctx: SheetContext): string {
       const b12 = b.box12 / 100;
       const b13 = b.box13 / 100;
       const b14 = (b.box12 + b.box13) / 100;
-      const b15 = b.box15 / 100;
+      // Signed, as its formula is: a refund is negative and labelled one.
+      const b15 = signedBox15(b) / 100;
 
       rowsXml.push(`<row r="${rIdx}">
         ${textCell(`A${rIdx}`, res.period.label, 5)}

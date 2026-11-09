@@ -104,6 +104,7 @@ class Book {
 
     const transactions = [];
     const overrides = {};
+    const splits = {};
     const running = new Map([...this.banks.keys()].map((b) => [b, this.opening[b] ?? 0]));
     const low = new Map();
     sorted.forEach((line, i) => {
@@ -144,6 +145,32 @@ class Book {
           at: line.date,
         };
       }
+      // A line split across accounts: `split` is [{ amount, code, note }], adding up to the line.
+      if (line.split !== undefined) {
+        const total = line.split.reduce((s, p) => s + p.amount, 0);
+        if (total !== line.amount) throw new Error(`${this.slug}: split on ${line.date} adds to ${dollars(total)}, not ${dollars(line.amount)}`);
+        splits[id] = line.split.map((part) => {
+          const account = this.accounts.get(part.code);
+          if (account === undefined) throw new Error(`${this.slug}: no account ${part.code}`);
+          const registered = account.entity.gstRegistered === true;
+          const treatment = !registered ? "exempt" : account.gst === "s" ? "standard" : account.gst === "e" ? "exempt" : "out-of-scope";
+          return {
+            amount: part.amount,
+            code: `${account.name} - ${account.code}`,
+            treatment,
+            side: treatment === "standard" ? (part.amount < 0 ? "purchases" : "sales") : "none",
+            note: part.note ?? account.name,
+          };
+        });
+        // Confirmed, as the tick on Reconcile would leave it: the parts carry the coding.
+        overrides[id] = {
+          confirmed: true,
+          treatment: splits[id][0].treatment,
+          side: splits[id][0].side,
+          note: line.note ?? "",
+          at: line.date,
+        };
+      }
     });
     // Example AI answers, on the lines they were written for.
     const exampleAiSuggestions = sorted.flatMap((line, i) =>
@@ -154,7 +181,9 @@ class Book {
     // Where the money went, by account, for checking a set reads like a real year.
     if (process.env.DEMO_TOTALS === this.slug) {
       const totals = new Map();
-      for (const line of sorted) totals.set(line.code ?? "(uncoded)", (totals.get(line.code ?? "(uncoded)") ?? 0) + line.amount);
+      for (const line of sorted) {
+        for (const part of line.split ?? [line]) totals.set(part.code ?? "(uncoded)", (totals.get(part.code ?? "(uncoded)") ?? 0) + part.amount);
+      }
       for (const [code, cents] of [...totals].sort()) console.log(`  ${code.padEnd(10)} ${this.accounts.get(code)?.name ?? ""}`.padEnd(60) + dollars(cents).padStart(14));
     }
 
@@ -171,7 +200,7 @@ class Book {
         legitimateDuplicates: [],
         transactions,
         overrides,
-        splits: {},
+        splits,
         invoiceMatches: {},
         transfers: {},
         entities: {
@@ -458,7 +487,7 @@ function write(name, built) {
   const built = b.build({
     manualJournals: [
       {
-        id: "trust-allocation-2026",
+        id: "trust-allocation-whitcombe-family-trust-2026",
         date: FY_END,
         narration: "Beneficiary income allocated by trustees' resolution of 31 March 2026",
         lines: [
@@ -888,4 +917,315 @@ function write(name, built) {
     `  payroll: ${payRuns.length} pay runs; PAYE owing at year end ${dollars(payeOwingAtYearEnd)}; ` +
       `GST owing at year end ${dollars(gstOwingAtYearEnd)}.`,
   );
+}
+
+// ===========================================================================
+// A paragliding school: tandems and courses, gift vouchers, gear, the seasons.
+// ===========================================================================
+{
+  const school = {
+    id: "ridgeline-paragliding-limited",
+    name: "Ridgeline Paragliding Limited",
+    note: "A company run by its owner-instructor",
+    about:
+      "A tandem and paragliding school in Wānaka, run by its owner and head instructor, Kate Brennan. " +
+      "Tandem flights and flight videos are paid on the EFTPOS terminal, courses by bank transfer, and gift " +
+      "vouchers on the website. Busy in summer, quiet in winter.",
+    kind: "business",
+    structure: "company",
+    gstRegistered: true,
+    gstFrequency: 2,
+    owners: [],
+    shareholders: [{ name: "Kate Brennan", percent: 100 }],
+    holderIrd: { "Kate Brennan": ird(101_442_600) },
+  };
+  const b = new Book({
+    slug: "school",
+    entities: [school],
+    accounts: [
+      ["200", "Tandem flights", "Revenue", "s"],
+      ["205", "Courses and lessons", "Revenue", "s"],
+      ["210", "Gift vouchers sold", "Revenue", "s"],
+      ["215", "Flight photos and videos", "Revenue", "s"],
+      ["220", "Gear sales", "Revenue", "s"],
+      ["225", "Commission on gear sold for others", "Revenue", "s"],
+      ["310", "Gear bought for resale", "Direct Costs", "s"],
+      ["400", "Advertising", "Overhead", "s"],
+      ["404", "Bank fees", "Overhead", "e"],
+      ["405", "EFTPOS terminal fees", "Overhead", "s"],
+      ["406", "Stripe fees", "Overhead", "o"],
+      ["412", "Consulting & Accounting", "Overhead", "s"],
+      ["414", "Subcontract tandem pilots", "Overhead", "s"],
+      ["416", "Depreciation", "Overhead", "o"],
+      ["433", "Insurance", "Overhead", "s"],
+      ["446", "Low Value Assets <1K", "Expense", "s"],
+      ["449", "Motor Vehicle Expenses", "Overhead", "s"],
+      ["454", "Instruction and school expenses", "Overhead", "s"],
+      ["455", "Wing checks and reserve repacks", "Overhead", "s"],
+      ["456", "Association membership and ratings", "Overhead", "s"],
+      ["457", "Site and landing field fees", "Overhead", "s"],
+      ["469", "Rent", "Overhead", "s"],
+      ["485", "Booking system", "Overhead", "s"],
+      ["489", "Telephone & Internet", "Overhead", "s"],
+      ["730", "Paragliding Equipment", "Fixed Asset", "s"],
+      ["731", "Less Accumulated Depreciation on Paragliding Equipment", "Fixed Asset", "o"],
+      ["740", "Motor Vehicles", "Fixed Asset", "s"],
+      ["741", "Less Accumulated Depreciation on Motor Vehicles", "Fixed Asset", "o"],
+      ["815", "Gift vouchers not yet flown", "Current Liability", "o"],
+      ["816", "Held for gear sold for others", "Current Liability", "o"],
+      ["820", "GST", "GST", "o"],
+      ["830", "Income Tax", "Current Liability", "o"],
+      ["881", "Shareholder current account, Kate Brennan", "Current Liability", "o"],
+      ["950", "Share capital", "Equity", "o"],
+      ["960", "Retained Earnings", "Retained Earnings", "o"],
+    ],
+  });
+  const bank = b.bank("02-0948-0071234-000", "Ridgeline Trading");
+
+  // School gear and the retrieve van. Paragliding gear is written off over
+  // eighteen months at 67% straight line; the van at 21%.
+  const assets = [
+    { number: "FA-0001", name: "Tandem wing, 41 m²", type: "Paragliding Equipment", status: "Registered", purchased: "2024-12-10", depreciationFrom: "2024-12-10", cost: 780_000, rate: 67, method: "Straight Line", averaging: "Full Month", disposed: null },
+    { number: "FA-0002", name: "Tandem pilot and passenger harnesses", type: "Paragliding Equipment", status: "Registered", purchased: "2024-12-10", depreciationFrom: "2024-12-10", cost: 260_000, rate: 67, method: "Straight Line", averaging: "Full Month", disposed: null },
+    { number: "FA-0003", name: "Retrieve van, 2016 Toyota Hiace", type: "Motor Vehicles", status: "Registered", purchased: "2023-08-15", depreciationFrom: "2023-08-15", cost: 2_800_000, rate: 21, method: "Straight Line", averaging: "Full Month", disposed: null },
+    { number: "FA-0004", name: "School wing, EN A, size S", type: "Paragliding Equipment", status: "Registered", purchased: "2025-09-18", depreciationFrom: "2025-09-18", cost: 435_000, rate: 67, method: "Straight Line", averaging: "Full Month", disposed: null },
+    { number: "FA-0005", name: "School wing, EN A, size M", type: "Paragliding Equipment", status: "Registered", purchased: "2025-09-18", depreciationFrom: "2025-09-18", cost: 435_000, rate: 67, method: "Straight Line", averaging: "Full Month", disposed: null },
+    // $850 each, but three on one order at the same rate: together over $1,000, so not a low-value write-off.
+    { number: "FA-0006", name: "Training harnesses, three on one order", type: "Paragliding Equipment", status: "Registered", purchased: "2025-10-02", depreciationFrom: "2025-10-02", cost: 255_000, rate: 67, method: "Straight Line", averaging: "Full Month", disposed: null },
+  ];
+  const monthsTo = (purchased, end) => {
+    const [py, pm] = purchased.split("-").map(Number);
+    const [ey, em] = end.split("-").map(Number);
+    return Math.max(0, (ey - py) * 12 + (em - pm) + 1);
+  };
+  const priorOf = (a) => Math.round((a.cost * a.rate) / 100 / 12 * monthsTo(a.purchased, "2025-03-31"));
+  const held = assets.filter((a) => a.purchased < FY_START);
+  const gear = held.filter((a) => a.type === "Paragliding Equipment");
+  const vans = held.filter((a) => a.type === "Motor Vehicles");
+
+  // GST: worked out here exactly as the return works it out, period by period.
+  const gstSales = new Map();
+  const gstPurchases = new Map();
+  const periodOf = (iso) => {
+    const [y, m] = iso.split("-").map(Number);
+    if (m === 1) return `${y - 1}-12`;
+    const start = m % 2 === 0 ? m : m - 1;
+    return `${y}-${String(start).padStart(2, "0")}`;
+  };
+  const count = (date, code, amount) => {
+    if (b.accounts.get(code).gst !== "s") return;
+    const map = amount > 0 ? gstSales : gstPurchases;
+    map.set(periodOf(date), (map.get(periodOf(date)) ?? 0) + Math.abs(amount));
+  };
+  const sale = (date, amount, payee, code, note) => {
+    b.line(bank, date, amount, payee, code, note);
+    count(date, code, amount);
+  };
+  const splitLine = (date, payee, parts, note) => {
+    const amount = parts.reduce((s, p) => s + p.amount, 0);
+    b.line(bank, date, amount, payee, undefined, note, { split: parts });
+    for (const p of parts) count(date, p.code, p.amount);
+  };
+
+  // Tandems flown in each month, and what one costs.
+  const TANDEM = 29_500;
+  const VIDEO = 4_500;
+  const tandems = { 4: 30, 5: 12, 6: 8, 7: 14, 8: 12, 9: 14, 10: 22, 11: 30, 12: 48, 1: 70, 2: 55, 3: 40 };
+  const flownBySubcontractor = new Map();
+  // The EFTPOS terminal settles every Monday: the week's tandems and the videos sold with them.
+  for (let monday = "2025-04-07"; monday <= FY_END; monday = addDays(monday, 7)) {
+    const week = addDays(monday, -3);
+    const m = Number(week.slice(5, 7));
+    const wobble = [0.8, 1.1, 0.95, 1.2, 0.9, 1.05, 1.0][Number(monday.slice(8, 10)) % 7];
+    const flights = Math.round((tandems[m] / 4.33) * wobble);
+    if (flights === 0) continue;
+    const videos = Math.round(flights * 0.4);
+    const parts = [{ amount: flights * TANDEM, code: "200", note: `${flights} tandem flights` }];
+    if (videos > 0) parts.push({ amount: videos * VIDEO, code: "215", note: `${videos} flight videos` });
+    splitLine(monday, "Windcave settlement", parts, "Week's EFTPOS takings");
+    // From November to March a subcontract pilot flies about four in ten.
+    if (m >= 11 || m <= 3) {
+      const month = week.slice(0, 7);
+      flownBySubcontractor.set(month, (flownBySubcontractor.get(month) ?? 0) + Math.round(flights * 0.4));
+    }
+  }
+  // The subcontract pilot invoices at month end, $110 a flight plus GST, paid on the 5th.
+  for (const [month, flights] of flownBySubcontractor) {
+    const [y, m] = month.split("-").map(Number);
+    const paid = m === 12 ? day(y + 1, 1, 5) : day(y, m + 1, 5);
+    if (paid > FY_END) continue;
+    sale(paid, -Math.round(flights * 11_000 * 1.15), "Tom Harker Paragliding", "414", `Tandem flights, ${month}`);
+  }
+
+  // Courses, paid by bank transfer before each one starts.
+  const students = [
+    "Aria Patel", "Ben Walsh", "Chloe Martin", "Daniel Kim", "Ella Rangi", "Finn O'Connor", "Grace Liu", "Hugo Ferreira",
+    "Isla Morgan", "Jack Tane", "Kiri Hohaia", "Liam Novak", "Maddie Clarke", "Noah Singh", "Olivia Reid", "Paul Andersen",
+    "Quinn Davies", "Ruby Te Awa", "Sam Whitley", "Tessa Brooks", "Umar Haddad", "Violet King", "Will Pearce", "Zoe Fletcher",
+  ];
+  const courses = [
+    // [date paid, course, price, how many]
+    ["2025-04-08", "PG2", 145_000, 3],
+    ["2025-10-06", "PG1", 165_000, 4],
+    ["2025-11-03", "PG1", 165_000, 5],
+    ["2025-12-01", "PG2", 145_000, 4],
+    ["2026-01-05", "PG1", 165_000, 5],
+    ["2026-02-02", "PG1", 165_000, 4],
+    ["2026-02-09", "PG2", 145_000, 5],
+    ["2026-03-02", "PG1", 165_000, 4],
+  ];
+  let next = 0;
+  for (const [paid, course, price, many] of courses) {
+    for (let i = 0; i < many; i += 1) {
+      const who = students[next % students.length];
+      next += 1;
+      sale(addDays(paid, i % 3), price, who, "205", `${course} course`);
+    }
+  }
+
+  // Gift vouchers for a tandem flight, sold on the website and paid out by
+  // Stripe at month end, its fee taken off. A voucher for one tandem flight has
+  // no fixed value, so its GST is due when it is sold.
+  const vouchers = { 4: 2, 5: 5, 6: 2, 7: 2, 8: 3, 9: 4, 10: 3, 11: 8, 12: 22, 1: 4, 2: 3, 3: 2 };
+  MONTHS.forEach(([y, m]) => {
+    const sold = vouchers[m] * TANDEM;
+    const fee = Math.round(sold * 0.029) + vouchers[m] * 30;
+    splitLine(day(y, m, 26), "Stripe", [
+      { amount: sold, code: "210", note: `${vouchers[m]} tandem gift vouchers` },
+      { amount: -fee, code: "406", note: "Stripe's fee" },
+    ], "Stripe payout");
+  });
+
+  // Gear: wings and harnesses bought in to sell to students.
+  sale("2025-10-13", -1_587_000, "Alpine Wings Distribution", "310", "Three EN A wings for resale");
+  sale("2025-10-13", -264_500, "Skyline Harness Co", "310", "Two harnesses for resale");
+  sale("2025-10-20", 545_000, "Chloe Martin", "220", "EN A wing");
+  sale("2025-12-15", 545_000, "Daniel Kim", "220", "EN A wing");
+  sale("2026-02-23", 545_000, "Grace Liu", "220", "EN A wing");
+  sale("2025-11-10", 145_000, "Ben Walsh", "220", "Harness");
+  sale("2026-01-19", 145_000, "Ella Rangi", "220", "Harness");
+
+  // A student's own wing sold for her: the buyer's $3,200 is hers, less 10% commission.
+  splitLine("2025-11-14", "J Thornton", [
+    { amount: 288_000, code: "816", note: "Mia Kowalski's wing, held for her" },
+    { amount: 32_000, code: "225", note: "10% commission on Mia Kowalski's wing" },
+  ], "Wing bought from student");
+  b.line(bank, "2025-11-20", -288_000, "Mia Kowalski", "816", "Her wing sold, less 10% commission");
+
+  // New school gear: two wings and three harnesses go in the asset register.
+  sale("2025-09-18", -1_000_500, "Alpine Wings Distribution", "730", "Two school wings, EN A");
+  sale("2025-10-02", -293_250, "Skyline Harness Co", "730", "Three training harnesses");
+  // Under $1,000 before GST, and not part of a larger order at the same rate: written off at once.
+  sale("2025-08-12", -82_800, "Southern Radio Supplies", "446", "Four two-way radios");
+  sale("2025-11-05", -59_800, "Mountain Sports Wānaka", "446", "Two student helmets");
+
+  // The overheads.
+  MONTHS.forEach(([y, m]) => {
+    sale(day(y, m, 1), -115_000, "Lakeside Storage & Office", "469", "Office and gear store, incl GST");
+    sale(day(y, m, 9), -9_500, "Spark", "489", "Phone and fibre");
+    sale(day(y, m, 10), -57_100, "Southern Aviation Insurance", "433", "Tandem and school liability, monthly");
+    sale(day(y, m, 15), -12_900, "FlyBook NZ", "485", "Online booking system");
+    sale(day(y, m, 3), -Math.round(tandems[m === 1 ? 12 : m - 1] * TANDEM * 0.015), "Windcave", "405", "Terminal and transaction fees");
+    sale(day(y, m, 20), -Math.round(tandems[m] * 650 + 12_000), "Z Energy Wānaka", "449", "Fuel, retrieve van");
+    b.line(bank, day(y, m, 28), -1_000, "ANZ", "404", "Account fee");
+  });
+  for (const date of ["2025-06-30", "2025-09-30", "2025-12-31", "2026-03-31"]) {
+    sale(date, -57_500, "Hillend Station", "457", "Take-off and landing field, quarter");
+  }
+  sale("2025-07-01", -78_000, "NZHGPA", "456", "Membership and tandem instructor rating");
+  sale("2025-07-14", -38_500, "NZ Transport Agency", "449", "Van registration");
+  sale("2025-08-05", -148_000, "Glider Check Wānaka", "455", "Wing checks and reserve repacks before the season");
+  sale("2026-02-10", -62_000, "Glider Check Wānaka", "455", "Tandem wing check and reserve repack");
+  sale("2025-10-08", -120_000, "Lake Wānaka Tourism", "400", "Listing and brochure, summer season");
+  sale("2025-11-12", -46_000, "Wānaka Sun", "400", "Gift voucher advertisement");
+  sale("2025-06-24", -245_000, "Lakes Accounting", "412", "Annual accounts and IR4");
+  sale("2025-10-14", -24_000, "Paper Plus Wānaka", "454", "Course workbooks");
+  sale("2026-01-13", -18_000, "Paper Plus Wānaka", "454", "Course workbooks");
+
+  // Kate draws on her current account: less in winter.
+  MONTHS.forEach(([y, m]) => {
+    b.line(bank, day(y, m, 25), m >= 4 && m <= 9 ? -350_000 : -700_000, "Kate Brennan", "881", "Drawings");
+  });
+  // Provisional tax on the standard method: last year's $24,000 plus 5%, in three instalments, two by balance date.
+  for (const date of ["2025-08-28", "2026-01-15"]) b.line(bank, date, -840_000, "Inland Revenue", "830", "Provisional tax instalment");
+
+  // GST for Feb-Mar 2025, owing at the start, paid on 7 May.
+  const openingGst = 386_240;
+  b.line(bank, "2025-05-07", -openingGst, "Inland Revenue", "820", "GST, February and March 2025");
+  const periods = ["2025-04", "2025-06", "2025-08", "2025-10", "2025-12", "2026-02"];
+  const dueOf = { "2025-04": "2025-06-30", "2025-06": "2025-08-28", "2025-08": "2025-10-28", "2025-10": "2026-01-15", "2025-12": "2026-02-28", "2026-02": "2026-05-07" };
+  let gstOwingAtYearEnd = 0;
+  const gstLines = [];
+  for (const p of periods) {
+    const owing = Math.round(((gstSales.get(p) ?? 0) * 3) / 23) - Math.round(((gstPurchases.get(p) ?? 0) * 3) / 23);
+    if (dueOf[p] > FY_END) gstOwingAtYearEnd += owing;
+    else gstLines.push([dueOf[p], owing, p]);
+  }
+  for (const [due, owing, p] of gstLines) {
+    const date = due === "2026-02-28" ? "2026-03-02" : due;
+    // A refund comes in; GST owing goes out.
+    b.line(bank, date, -owing, "Inland Revenue", "820", `GST, period from ${p}`);
+  }
+
+  // Vouchers: 22 sold last year were still to fly at 1 April; 24 of this year's are at 31 March.
+  const openingVouchers = 22 * TANDEM;
+  const closingVouchers = 24 * TANDEM;
+
+  // Opening balances, from last year's signed accounts.
+  b.open(bank, 4_850_000);
+  b.open("730", gear.reduce((s, a) => s + a.cost, 0));
+  b.open("731", -gear.reduce((s, a) => s + priorOf(a), 0));
+  b.open("740", vans.reduce((s, a) => s + a.cost, 0));
+  b.open("741", -vans.reduce((s, a) => s + priorOf(a), 0));
+  b.open("815", -openingVouchers);
+  b.open("820", -openingGst);
+  b.open("881", -500_000);
+  b.open("950", -10_000);
+  b.open("960", -Object.values(b.opening).reduce((s, v) => s + v, 0));
+
+  // Left to code.
+  b.line(bank, "2026-03-12", -126_500, "Sky Gear NZ", undefined, undefined, {
+    particulars: "Reserve parachute",
+    example: {
+      code: "730", confidence: 0.71, because: "A reserve parachute for school use, $1,100 before GST.",
+      caution: "Over $1,000 before GST, so it goes in the asset register rather than Low Value Assets.",
+    },
+  });
+  b.line(bank, "2026-03-19", -59_800, "Flight Instruments NZ", undefined, undefined, {
+    particulars: "Vario",
+    example: { code: "446", confidence: 0.84, because: "A vario for $520 before GST: under $1,000, so it can be written off this year." },
+  });
+  b.line(bank, "2026-03-26", 88_500, "Chen W", undefined, undefined, {
+    particulars: "Tandems x3",
+    example: { code: "200", confidence: 0.9, because: "Three tandem flights at $295, paid by bank transfer." },
+  });
+
+  const built = b.build({
+    assets,
+    manualJournals: [
+      {
+        id: "vouchers-flown-2026",
+        date: FY_END,
+        narration: "Gift vouchers sold last year, flown or expired this year",
+        lines: [
+          { code: "Gift vouchers not yet flown - 815", amount: openingVouchers, description: "22 vouchers from last year" },
+          { code: "Tandem flights - 200", amount: -openingVouchers, description: "Flown this year" },
+        ],
+      },
+      {
+        id: "vouchers-not-flown-2026",
+        date: FY_END,
+        narration: "Gift vouchers sold this year and not yet flown at 31 March 2026",
+        lines: [
+          { code: "Gift vouchers sold - 210", amount: closingVouchers, description: "24 vouchers still to fly" },
+          { code: "Gift vouchers not yet flown - 815", amount: -closingVouchers, description: "Income in advance" },
+        ],
+      },
+    ],
+    ir4Returns: {
+      [`${school.id}:2026`]: { classes: {}, placements: {}, provisionalPaid: 1_680_000, lastYearRit: 2_400_000, icaOpening: 1_150_000, icaIncomeTaxPaid: 1_680_000 },
+    },
+  });
+  write("school", built);
+  console.log(`  school: GST owing at year end ${dollars(gstOwingAtYearEnd)}.`);
 }

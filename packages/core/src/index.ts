@@ -266,6 +266,7 @@ export {
   gstDueDate,
   gstPayBy,
   gstContent,
+  signedBox15,
 } from "./gst.js";
 export type {
   GstBasis,

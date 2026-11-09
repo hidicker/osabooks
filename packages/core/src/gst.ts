@@ -215,6 +215,15 @@ export interface GstReturnLine {
   amount: Cents;
 }
 
+/**
+ * Box 15 with its direction in its sign: positive to pay, negative a refund.
+ * The return holds it as a positive number beside `outcome`; anything that
+ * adds returns together, or sets one against a payment, needs it signed.
+ */
+export function signedBox15(boxes: Pick<GstReturnBoxes, "box15" | "outcome">): Cents {
+  return (boxes.outcome === "refund" ? -boxes.box15 : boxes.box15) as Cents;
+}
+
 export interface GstReturnResult {
   period: GstPeriod;
   basis: GstBasis;
