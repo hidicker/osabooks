@@ -98,6 +98,12 @@ export interface UsEmployee {
   de4?: CaDe4;
   /** New York's IT-2104, where the employee works in New York. */
   it2104?: NyIt2104;
+  /**
+   * A local income tax on wages, in percent: Pennsylvania's earned income tax
+   * (the higher of the home and work rates), an Ohio or Michigan city's. Not
+   * used for New York City, which is worked from the IT-2104.
+   */
+  localRate?: number;
   /** Bank routing and account numbers, for the direct deposit file. */
   routing?: string;
   account?: string;
@@ -288,7 +294,11 @@ function underLimit(gross: Cents, before: Cents, limit: Cents): Cents {
 export interface UsStateRules {
   name: string;
   /** "none": no income tax on wages. "ca": California's Method B. Undefined: entered on each pay run. */
-  income?: "none" | "ca" | "ny";
+  income?: "none" | "ca" | "ny" | "flat";
+  /** A flat income tax rate, percent, with no allowances: Pennsylvania's. */
+  flatRate?: number;
+  /** An unemployment tax withheld from the employee, percent of all wages (no limit). */
+  employeeSui?: number;
   /** The unemployment wage base, per employee per year. */
   suiWageBase?: Cents;
   /** Employee state disability insurance, percent, by year; no wage limit. */
@@ -309,6 +319,9 @@ export const US_STATE_PAYROLL: Readonly<Record<string, UsStateRules>> = {
   // NYS-50 (12/25): the 2026 UI wage base is $17,600; a new employer's rate is 4.1% with the
   // Re-employment Service Fund. Disability (DBL) and Paid Family Leave are withheld: nyEmployeeInsurance.
   NY: { name: "New York", income: "ny", suiWageBase: 1_760_000, newEmployerRate: 4.1 },
+  // PA Revenue (REV-580): 3.07% of compensation, no allowances. L&I 2026: UC on the first
+  // $10,000; 3.822% for a new employer (not in construction); 0.07% withheld from the employee on all wages.
+  PA: { name: "Pennsylvania", income: "flat", flatRate: 3.07, suiWageBase: 1_000_000, newEmployerRate: 3.822, employeeSui: 0.07 },
 };
 
 // California, EDD 2026 Method B, annual payroll period (Tables 1-7).
@@ -525,12 +538,17 @@ export function usPayLine(
     stateWorked = newYorkWithholding(gross, employee.payFrequency, form);
     localWorked = newYorkCityWithholding(gross, employee.payFrequency, form);
   }
+  if (rules?.income === "flat") stateWorked = pct(gross, rules.flatRate ?? 0);
   if (rules?.income === "ca") {
     stateWorked = californiaWithholding(gross, employee.payFrequency, employee.de4 ?? { status: employee.w4.status, allowances: 1 });
   }
   const stateIncome = entered.stateIncome ?? stateWorked;
   const sdiRate = rules?.sdi?.[year] ?? (rules?.sdi !== undefined ? rules.sdi[US_PAYROLL_TABLE_YEAR] ?? 0 : 0);
-  const stateOther = pct(gross, sdiRate) + (rules?.income === "ny" ? nyEmployeeInsurance(gross, employee.payFrequency, before) : 0);
+  const stateOther =
+    pct(gross, sdiRate) +
+    pct(gross, rules?.employeeSui ?? 0) +
+    (rules?.income === "ny" ? nyEmployeeInsurance(gross, employee.payFrequency, before) : 0);
+  if (localWorked === 0 && employee.localRate !== undefined) localWorked = pct(gross, employee.localRate);
   const localIncome = entered.localIncome ?? localWorked;
   const base = suiWageBase(state, employer);
   const suiWages = base === undefined ? 0 : underLimit(gross, before, base);

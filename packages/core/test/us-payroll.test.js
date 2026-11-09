@@ -198,3 +198,13 @@ test("New York's Method III for top incomes (page 22)", async () => {
   // Married, the same pay, stays on Method II: under $2,155,350.
   assert.ok(newYorkWithholding(2_500_000, "weekly", { status: "married", allowances: 0 }) < 259_763);
 });
+
+test("Pennsylvania: 3.07% flat, 0.07% employee UC on all wages, UC on the first $10,000, local EIT", () => {
+  const pa = { ...dana, state: "PA", de4: undefined, localRate: 1.5 };
+  const line = usPayLine(pa, 400_000, "2026-05-15", 800_000, { state: "PA" });
+  assert.equal(line.stateIncome, 12_280, "3.07% of 4,000");
+  assert.equal(line.stateOther, 280, "0.07% of 4,000");
+  assert.equal(line.localIncome, 6_000, "the 1.5% earned income tax");
+  assert.equal(line.stateUnemployment, 7_644, "3.822% of the $2,000 left under $10,000");
+  assert.equal(line.net, 400_000 - line.federal - line.socialSecurity - line.medicare - 12_280 - 280 - 6_000);
+});

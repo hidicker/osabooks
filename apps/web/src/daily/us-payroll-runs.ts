@@ -209,7 +209,11 @@ function employerSection(body: HTMLElement, payroll: UsPayroll | undefined): voi
         worked
           ? US_STATE_PAYROLL[code]?.income === "none"
             ? `${stateName(code)} has no income tax on wages: each pay run works out the federal taxes and ${stateName(code)}'s unemployment tax.`
-            : code === "NY"
+            : code === "PA"
+              ? "Pennsylvania's 3.07% is withheld from all pay, with the employee's 0.07% unemployment tax. Give each " +
+                "employee's local earned income tax rate (the higher of where they live and work) on their details; the " +
+                "Local Services Tax is given on the pay run."
+              : code === "NY"
               ? "New York's withholding is worked out from each employee's IT-2104, with New York City's for a city resident, " +
                 "disability (DBL) and Paid Family Leave. Yonkers tax is not worked out: give it on the pay run."
               : `${stateName(code)}'s withholding is worked out from each employee's DE 4, with SDI, UI and ETT.`
@@ -247,6 +251,7 @@ function employeeForm(payroll: UsPayroll, editing?: UsEmployee): HTMLElement {
   const caAllowances = input(de4 === undefined ? "1" : String(de4.allowances));
   const caEstimated = input(de4?.estimated === undefined ? "" : String(de4.estimated), "0");
   const caExtra = input(centsText(de4?.extra), "0.00");
+  const localRate = input(editing?.localRate === undefined ? "" : String(editing.localRate), "e.g. 1.5");
   const routing = input(editing?.routing ?? "", "9 digits");
   const account = input(editing?.account ?? "", "Account number");
   const accountType = select<"checking" | "savings">([["checking", "Checking"], ["savings", "Savings"]], editing?.accountType ?? "checking");
@@ -259,6 +264,11 @@ function employeeForm(payroll: UsPayroll, editing?: UsEmployee): HTMLElement {
     field("Paid", frequency),
     field("Usual gross pay", usual, "Each pay run starts with it; change it there for the pay."),
     field("Works in", where),
+    field(
+      "Local income tax rate (%)",
+      localRate,
+      "Pennsylvania's earned income tax, or a city's (Ohio, Michigan): withheld at this rate. New York City's is worked from the IT-2104.",
+    ),
   );
   const w4Grid = document.createElement("div");
   w4Grid.className = "agent-fields";
@@ -326,6 +336,11 @@ function employeeForm(payroll: UsPayroll, editing?: UsEmployee): HTMLElement {
         return;
       }
       const [gross, dep, oth, ded, ext, caExt, nyExt, nycExt] = money4 as number[];
+      const local = localRate.value.trim() === "" ? undefined : Number(localRate.value);
+      if (local !== undefined && (!Number.isFinite(local) || local < 0 || local > 10)) {
+        said.textContent = "The local tax rate is a percentage, such as 1.5.";
+        return;
+      }
       const nyAllowed = Number(nyAllowances.value || "0");
       const nycAllowed = nycAllowances.value.trim() === "" ? undefined : Number(nycAllowances.value);
       if (!Number.isInteger(nyAllowed) || (nycAllowed !== undefined && !Number.isInteger(nycAllowed))) {
@@ -382,6 +397,7 @@ function employeeForm(payroll: UsPayroll, editing?: UsEmployee): HTMLElement {
         ...(state2 !== "" ? { state: state2 } : {}),
         ...(caDe4 !== undefined ? { de4: caDe4 } : {}),
         ...(nyForm !== undefined ? { it2104: nyForm } : {}),
+        ...(local !== undefined && local > 0 ? { localRate: local } : {}),
         ...(routing.value.trim() !== "" ? { routing: routing.value.trim() } : {}),
         ...(account.value.trim() !== "" ? { account: account.value.trim(), accountType: accountType.value as "checking" | "savings" } : {}),
         ...(ended.value !== "" ? { ended: ended.value } : {}),
