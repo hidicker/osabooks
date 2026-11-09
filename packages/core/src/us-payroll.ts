@@ -420,15 +420,24 @@ function onPeriodTable(table: readonly PeriodRow[], net: number): Cents {
 
 /**
  * New York State income tax to withhold from one paycheck: NYS-50-T-NYS
- * (1/26), Method II. Above the tables' top line (a year's net wages of
- * $1,077,550 and more) Method III applies, which is not worked here: the
- * top line is used and the figure should be checked.
+ * (1/26), Method II, and Method III above its tables' top line.
  */
 export function newYorkWithholding(gross: Cents, frequency: UsPayFrequency, it2104: NyIt2104): Cents {
   if (it2104.exempt === true) return 0;
-  const net = gross / 100 - NY_DEDUCTION[it2104.status][frequency] - it2104.allowances * NY_EXEMPTION[frequency];
-  return onPeriodTable(NY_TABLES[it2104.status][frequency], Math.round(net * 100) / 100) + (it2104.extra ?? 0);
+  const net = Math.round((gross / 100 - NY_DEDUCTION[it2104.status][frequency] - it2104.allowances * NY_EXEMPTION[frequency]) * 100) / 100;
+  // Method III, top income: a year's net wages from $1,077,550 ($2,155,350 married)
+  // take one rate on the whole, divided back to the paycheck.
+  const annual = net * US_PERIODS[frequency];
+  const top = NY_TOP[it2104.status];
+  if (annual >= top.from) {
+    const rate = annual >= 25_000_000 ? 0.117 : annual >= 5_000_000 ? 0.111 : 0.1045;
+    return Math.round((annual * rate * 100) / US_PERIODS[frequency]) + (it2104.extra ?? 0);
+  }
+  return onPeriodTable(NY_TABLES[it2104.status][frequency], net) + (it2104.extra ?? 0);
 }
+
+/** Where Method III begins: NYS-50-T-NYS (1/26), page 22. */
+const NY_TOP: Record<"single" | "married", { from: number }> = { single: { from: 1_077_550 }, married: { from: 2_155_350 } };
 
 /** New York City income tax to withhold from a city resident's paycheck: NYS-50-T-NYC (1/26), Method II. */
 export function newYorkCityWithholding(gross: Cents, frequency: UsPayFrequency, it2104: NyIt2104): Cents {

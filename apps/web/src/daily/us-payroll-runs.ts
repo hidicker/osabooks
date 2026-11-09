@@ -152,6 +152,7 @@ function employerSection(body: HTMLElement, payroll: UsPayroll | undefined): voi
   const rate = input(employer.suiRate === undefined ? "" : String(employer.suiRate), rules?.newEmployerRate === undefined ? "e.g. 2.7" : String(rules.newEmployerRate));
   const base = input(centsText(employer.suiWageBase), rules?.suiWageBase === undefined ? "e.g. 9,000.00" : (rules.suiWageBase / 100).toFixed(2));
   const futa = input(employer.futaRate === undefined ? "" : String(employer.futaRate), "0.6");
+  const ett = input(employer.ettRate === undefined ? "" : String(employer.ettRate), "0.1");
   const grid = document.createElement("div");
   grid.className = "agent-fields";
   grid.append(
@@ -164,6 +165,13 @@ function employerSection(body: HTMLElement, payroll: UsPayroll | undefined): voi
     ),
     field("FUTA rate (%)", futa, "0.6 unless the state is a credit reduction state."),
   );
+  const ettField = field("California ETT rate (%)", ett, "0.1, or 0 for an employer EDD has in deficit; it is on EDD's rate notice.");
+  grid.append(ettField);
+  const showEtt = (): void => {
+    ettField.hidden = where.value !== "CA";
+  };
+  where.addEventListener("change", showEtt);
+  showEtt();
   const said = document.createElement("p");
   said.className = "feed-said";
   const saveIt = button(
@@ -175,8 +183,9 @@ function employerSection(body: HTMLElement, payroll: UsPayroll | undefined): voi
       }
       const suiRate = rate.value.trim() === "" ? undefined : Number(rate.value);
       const futaRate = futa.value.trim() === "" ? undefined : Number(futa.value);
+      const ettRate = ett.value.trim() === "" ? undefined : Number(ett.value);
       const wageBase = base.value.trim() === "" ? undefined : parseAmount(base.value, "USD");
-      if ((suiRate !== undefined && !Number.isFinite(suiRate)) || (futaRate !== undefined && !Number.isFinite(futaRate)) || wageBase === null) {
+      if ((suiRate !== undefined && !Number.isFinite(suiRate)) || (futaRate !== undefined && !Number.isFinite(futaRate)) || (ettRate !== undefined && !Number.isFinite(ettRate)) || wageBase === null) {
         said.textContent = "A rate or the wage base is not a number.";
         return;
       }
@@ -185,7 +194,7 @@ function employerSection(body: HTMLElement, payroll: UsPayroll | undefined): voi
         ...(suiRate !== undefined ? { suiRate } : {}),
         ...(wageBase !== undefined ? { suiWageBase: wageBase } : {}),
         ...(futaRate !== undefined ? { futaRate } : {}),
-        ...(employer.ettRate !== undefined ? { ettRate: employer.ettRate } : {}),
+        ...(ettRate !== undefined ? { ettRate } : {}),
       };
       void keep({ employees: [], payRuns: [], ...payroll, employer: next }, "Payroll employer settings");
     },

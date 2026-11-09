@@ -189,3 +189,12 @@ test("Florida: no income tax, reemployment tax on the first $7,000", () => {
   assert.equal(line.stateOther, 0);
   assert.equal(line.stateUnemployment, 5_400, "2.7% of the $2,000 left under $7,000");
 });
+
+test("New York's Method III for top incomes (page 22)", async () => {
+  const { newYorkWithholding } = await import("../dist/index.js");
+  // $25,000 a week, single, no allowances: (25,000 - 142.30) x 52 = 1,292,600.40 a year,
+  // over $1,077,550: 10.45% of it, / 52 = $2,597.63.
+  assert.equal(newYorkWithholding(2_500_000, "weekly", { status: "single", allowances: 0 }), 259_763);
+  // Married, the same pay, stays on Method II: under $2,155,350.
+  assert.ok(newYorkWithholding(2_500_000, "weekly", { status: "married", allowances: 0 }) < 259_763);
+});
