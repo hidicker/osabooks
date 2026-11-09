@@ -153,6 +153,10 @@
                 <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM3 18v-1a7 7 0 0 1 14 0v1H3z"/></svg>
                 <span>Payroll</span>
               </button>
+              <button type="button" data-page="uspayroll" hidden data-module="uspayroll">
+                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M10 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM3 18v-1a7 7 0 0 1 14 0v1H3z"/></svg>
+                <span>Payroll</span>
+              </button>
             </div>
           </div>
           <div class="sidebar-group" data-group="organisation">
@@ -780,6 +784,16 @@
           Who is paid, each pay run's gross, the PAYG withheld and the super guarantee on it, and when each pay's super is due. A pay run posts the wages and super, and what is owed to the employees, the ATO and the funds.
         </p>
         <div id="aupayroll-body"></div>
+      </section>
+
+      <section id="page-uspayroll" class="page" hidden>
+        <div class="page-head">
+          <h2>Payroll</h2>
+        </div>
+        <p class="page-hint">
+          The payroll service works out each payday and files the 941s and W-2s. Bring in its payroll register here: each payday becomes a journal, posted to the accounts the Form 941 worksheet reads, and each employee's year is shown for checking the W-2s.
+        </p>
+        <div id="uspayroll-body"></div>
       </section>
 
       <section id="page-time" class="page" hidden>

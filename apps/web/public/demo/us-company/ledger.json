@@ -6363,43 +6363,110 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 51975,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     },
     {
      "code": "Federal unemployment (FUTA) payable - 2140",
      "amount": -3780,
-     "description": "FUTA"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "description": "FUTA",
+     "pay": "futa"
     }
    ]
   },
@@ -6411,43 +6478,110 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 51975,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     },
     {
      "code": "Federal unemployment (FUTA) payable - 2140",
      "amount": -3780,
-     "description": "FUTA"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "description": "FUTA",
+     "pay": "futa"
     }
    ]
   },
@@ -6459,43 +6593,110 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 49035,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     },
     {
      "code": "Federal unemployment (FUTA) payable - 2140",
      "amount": -840,
-     "description": "FUTA"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "description": "FUTA",
+     "pay": "futa"
     }
    ]
   },
@@ -6507,38 +6708,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6550,38 +6817,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6593,38 +6926,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6636,38 +7035,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6679,38 +7144,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6722,38 +7253,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6765,38 +7362,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6808,38 +7471,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6851,38 +7580,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6894,38 +7689,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6937,38 +7798,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -6980,38 +7907,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -7023,38 +8016,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -7066,38 +8125,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   },
@@ -7109,38 +8234,104 @@
    "lines": [
     {
      "code": "Wages and salaries - 6300",
-     "amount": 630000,
-     "description": "Gross wages"
+     "amount": 350000,
+     "description": "Dana Brooks: gross wages",
+     "employee": "Dana Brooks",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -41200,
+     "description": "Dana Brooks: federal income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -21700,
+     "description": "Dana Brooks: Social Security withheld",
+     "employee": "Dana Brooks",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -5075,
+     "description": "Dana Brooks: Medicare withheld",
+     "employee": "Dana Brooks",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -26800,
+     "description": "Dana Brooks: state income tax withheld",
+     "employee": "Dana Brooks",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -255225,
+     "description": "Dana Brooks: net pay",
+     "employee": "Dana Brooks",
+     "pay": "net"
+    },
+    {
+     "code": "Wages and salaries - 6300",
+     "amount": 280000,
+     "description": "Luis Ortega: gross wages",
+     "employee": "Luis Ortega",
+     "pay": "gross"
+    },
+    {
+     "code": "Federal income tax withheld - 2110",
+     "amount": -29600,
+     "description": "Luis Ortega: federal income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "federal"
+    },
+    {
+     "code": "Social Security payable - 2120",
+     "amount": -17360,
+     "description": "Luis Ortega: Social Security withheld",
+     "employee": "Luis Ortega",
+     "pay": "socialEmployee"
+    },
+    {
+     "code": "Medicare payable - 2130",
+     "amount": -4060,
+     "description": "Luis Ortega: Medicare withheld",
+     "employee": "Luis Ortega",
+     "pay": "medicareEmployee"
+    },
+    {
+     "code": "Oregon withholding payable - 2150",
+     "amount": -20500,
+     "description": "Luis Ortega: state income tax withheld",
+     "employee": "Luis Ortega",
+     "pay": "stateIncome"
+    },
+    {
+     "code": "Wages payable - 2100",
+     "amount": -208480,
+     "description": "Luis Ortega: net pay",
+     "employee": "Luis Ortega",
+     "pay": "net"
     },
     {
      "code": "Payroll taxes - 6310",
      "amount": 48195,
-     "description": "Employer Social Security, Medicare and FUTA"
-    },
-    {
-     "code": "Federal income tax withheld - 2110",
-     "amount": -70800,
-     "description": "Federal income tax withheld"
+     "description": "Employer payroll taxes"
     },
     {
      "code": "Social Security payable - 2120",
-     "amount": -78120,
-     "description": "Social Security, employee and employer"
+     "amount": -39060,
+     "description": "Social Security, employer",
+     "pay": "socialEmployer"
     },
     {
      "code": "Medicare payable - 2130",
-     "amount": -18270,
-     "description": "Medicare, employee and employer"
-    },
-    {
-     "code": "Oregon withholding payable - 2150",
-     "amount": -47300,
-     "description": "Oregon income tax withheld"
-    },
-    {
-     "code": "Wages payable - 2100",
-     "amount": -463705,
-     "description": "Net pay"
+     "amount": -9135,
+     "description": "Medicare, employer",
+     "pay": "medicareEmployer"
     }
    ]
   }

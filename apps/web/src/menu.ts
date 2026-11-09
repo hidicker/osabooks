@@ -149,6 +149,7 @@ const KEYWORDS: Readonly<Record<string, string>> = {
   invoices: "sales customers receivables owed allocations",
   statements: "bank statement reconcile tick cleared difference ending balance",
   time: "time tracking hours timesheet billable rate unbilled invoice time",
+  uspayroll: "payroll register gusto adp paychex wages employees w-2 w2 941 withholding social security medicare futa suta",
   aupayroll: "payroll pay run wages employees payg withholding super superannuation stp single touch payroll w1 w2",
   apps: "modules apps features turn on off menu",
   classes: "class classes department location job project segment tag profit and loss by class",

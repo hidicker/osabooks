@@ -153,6 +153,12 @@ for (let m = 1; m <= 9; m += 1) {
     let futa = 0;
     let oregon = 0;
     let employerTax = 0;
+    let ssEmployer = 0;
+    let medEmployer = 0;
+    // Each employee's wages, withholding and net pay as their own lines, marked
+    // with the name, as a register brought in on the Payroll page posts them:
+    // the W-2 check reads them back.
+    const own = [];
     for (const e of employees) {
       const g = cents(e.gross);
       const ssEach = Math.round(g * 0.062);
@@ -170,22 +176,29 @@ for (let m = 1; m <= 9; m += 1) {
       oregon += cents(e.oregon);
       employerTax += ssEach + medEach + futaEach;
       line(payday, -net, e.name, "2100", "Net pay");
+      const who = { employee: e.name };
+      own.push(
+        { code: label("6300"), amount: g, description: `${e.name}: gross wages`, ...who, pay: "gross" },
+        { code: label("2110"), amount: -cents(e.fit), description: `${e.name}: federal income tax withheld`, ...who, pay: "federal" },
+        { code: label("2120"), amount: -ssEach, description: `${e.name}: Social Security withheld`, ...who, pay: "socialEmployee" },
+        { code: label("2130"), amount: -medEach, description: `${e.name}: Medicare withheld`, ...who, pay: "medicareEmployee" },
+        { code: label("2150"), amount: -cents(e.oregon), description: `${e.name}: state income tax withheld`, ...who, pay: "stateIncome" },
+        { code: label("2100"), amount: -net, description: `${e.name}: net pay`, ...who, pay: "net" },
+      );
+      ssEmployer += ssEach;
+      medEmployer += medEach;
     }
-    const wagesNet = gross - fit - ss / 2 - medicare / 2 - oregon;
     const journal = {
       id: `payroll-${payday}`,
       date: payday,
       narration: `Payroll for the period ending ${payday}, from the Gusto payroll register`,
       source: "Gusto payroll register",
       lines: [
-        { code: label("6300"), amount: gross, description: "Gross wages" },
-        { code: label("6310"), amount: employerTax, description: "Employer Social Security, Medicare and FUTA" },
-        { code: label("2110"), amount: -fit, description: "Federal income tax withheld" },
-        { code: label("2120"), amount: -ss, description: "Social Security, employee and employer" },
-        { code: label("2130"), amount: -medicare, description: "Medicare, employee and employer" },
-        ...(futa > 0 ? [{ code: label("2140"), amount: -futa, description: "FUTA" }] : []),
-        { code: label("2150"), amount: -oregon, description: "Oregon income tax withheld" },
-        { code: label("2100"), amount: -wagesNet, description: "Net pay" },
+        ...own,
+        { code: label("6310"), amount: employerTax, description: "Employer payroll taxes" },
+        { code: label("2120"), amount: -ssEmployer, description: "Social Security, employer", pay: "socialEmployer" },
+        { code: label("2130"), amount: -medEmployer, description: "Medicare, employer", pay: "medicareEmployer" },
+        ...(futa > 0 ? [{ code: label("2140"), amount: -futa, description: "FUTA", pay: "futa" }] : []),
       ],
     };
     if (journal.lines.reduce((s, l) => s + l.amount, 0) !== 0) throw new Error(`payroll ${payday} does not balance`);

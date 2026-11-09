@@ -74,6 +74,7 @@ export type PageName =
   | "settings"
   | "time"
   | "aupayroll"
+  | "uspayroll"
   | "variance";
 
 export type Pages = Record<PageName, () => void>;
@@ -238,6 +239,7 @@ export function showPage(page: string, scrollTo?: "top" | "bottom" | number): vo
   if (page === "settings") redraw("settings");
   if (page === "time") redraw("time");
   if (page === "aupayroll") redraw("aupayroll");
+  if (page === "uspayroll") redraw("uspayroll");
   if (page === "ir9") redraw("ir9");
   if (page === "trustpeople") redraw("trustPeople");
   if (page === "ir6") redraw("ir6");

@@ -209,10 +209,14 @@ function groups(): { title: string; rows: Row[] }[] {
           name: "Payroll settings",
           what: nz
             ? "The employer's IRD number and size (how soon each payday is filed), the accounts pay runs post to, each employee's pay frequency, pay items, leave and public holidays."
-            : "The accounts pay runs post to, each employee's pay frequency, pay items and leave.",
+            : country.id === "us"
+              ? "The payroll service's register, and the accounts each payday posts to."
+              : "The accounts pay runs post to, each employee's pay frequency, pay items and leave.",
           where: country.id === "au"
             ? [{ page: "aupayroll", label: "Payroll", module: "aupayroll" }]
-            : [{ page: "payroll", label: "Payroll", module: "payroll" }],
+            : country.id === "us"
+              ? [{ page: "uspayroll", label: "Payroll", module: "uspayroll" }]
+              : [{ page: "payroll", label: "Payroll", module: "payroll" }],
         },
       ],
     },

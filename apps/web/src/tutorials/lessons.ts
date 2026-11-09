@@ -818,10 +818,19 @@ export const LESSONS: readonly Lesson[] = [
         target: q("#reports-body"),
       },
       {
+        title: "Bringing in the register",
+        body:
+          "On the Payroll page, the payroll service's register (Gusto's payroll journal report) becomes these " +
+          "journals, one for each payday, and each employee's year is shown for checking the W-2s.",
+        page: "uspayroll",
+        target: q("#uspayroll-body"),
+      },
+      {
         title: "Form 941, quarter by quarter",
         body:
           "Wages, federal income tax withheld, Social Security and Medicare for each quarter, with the EFTPS " +
           "deposits made and what is still to deposit: September's taxes are paid in October.",
+        page: "reports",
         before: report("payrolltax"),
         target: q("#reports-body"),
       },

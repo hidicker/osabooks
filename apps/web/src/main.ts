@@ -92,6 +92,7 @@ import { renderApps } from "./daily/apps-page.js";
 import { applyReportDefaults, renderSettings } from "./daily/settings-page.js";
 import { renderTime } from "./daily/time-page.js";
 import { renderAuPayroll } from "./daily/au-payroll-page.js";
+import { renderUsPayroll } from "./daily/us-payroll-page.js";
 import { renderIr9Page } from "./daily/ir9-page.js";
 import { renderTrustPeoplePage } from "./daily/trust-people-page.js";
 import { renderIr6Page } from "./daily/ir6-page.js";
@@ -207,6 +208,7 @@ async function init(): Promise<void> {
     settings: renderSettings,
     time: renderTime,
     aupayroll: renderAuPayroll,
+    uspayroll: renderUsPayroll,
     entities: renderEntities,
     entityFilter: renderEntityFilter,
     feed: renderFeed,

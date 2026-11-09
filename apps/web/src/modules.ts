@@ -40,6 +40,7 @@ export type ModuleId =
   | "items"
   | "time"
   | "aupayroll"
+  | "uspayroll"
   | "classes"
   | "jobs"
   | "currencies"
@@ -291,6 +292,17 @@ export const MODULES: readonly ModuleInfo[] = [
     holds: () => count((state.ledger.auPayroll?.employees ?? []).length, "employee"),
   },
   {
+    id: "uspayroll",
+    opens: "uspayroll",
+    countries: ["us"],
+    name: "Payroll",
+    what: "The payroll service's register brought in, a journal for each payday, and a check of the W-2 figures.",
+    basis: "data",
+    inferred: () => (state.ledger.manualJournals ?? []).some((j) => j.deleted === undefined && /payroll register/i.test(j.source ?? "")),
+    holds: () =>
+      count((state.ledger.manualJournals ?? []).filter((j) => j.deleted === undefined && /payroll register/i.test(j.source ?? "")).length, "payday"),
+  },
+  {
     id: "vehicle",
     countries: ["nz"],
     name: "Company vehicle",
@@ -317,6 +329,7 @@ export const MODULES: readonly ModuleInfo[] = [
 export const ASKED: readonly ModuleId[] = [
   "payroll",
   "aupayroll",
+  "uspayroll",
   "vehicle",
   "assets",
   "business",

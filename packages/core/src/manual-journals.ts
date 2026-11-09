@@ -5,6 +5,7 @@ import type { Journal } from "./journals.js";
 import type { PostedJournal, PostedLine, PostingOptions } from "./posting.js";
 import { gstAccountsFrom } from "./posting.js";
 import { taxWithinExact } from "./sales-tax.js";
+import type { PayAmount } from "./payroll-register.js";
 
 /**
  * Journals a person writes, which no amount of bank data implies.
@@ -48,6 +49,10 @@ export interface ManualJournalLine {
    * (3/23 in New Zealand), the GST account takes the tax.
    */
   gst?: "INPUT2" | "OUTPUT2";
+  /** The employee a payroll register line is for, so the W-2 figures can be read back. */
+  employee?: string;
+  /** What a payroll register line is: gross wages, a tax withheld, net pay. */
+  pay?: PayAmount;
 }
 
 export interface ManualJournal {
