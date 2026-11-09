@@ -1714,10 +1714,10 @@ function companyTaxSection(year: number, taxableProfit: Cents): HTMLElement {
  * is only the movement since the first bank line. That is not a smaller balance
  * sheet, it is a wrong one, and it is said rather than left to be discovered.
  */
-function renderBalanceSheet(body: HTMLElement, year: number): void {
+/** The balance sheet for the year chosen, and a year earlier when comparing: what the page and its CSV both show. */
+function balanceSheetFor(year: number) {
   const asAt = reportRange(year).to;
   const position = positionJournals();
-  const { basis, fromImport } = position;
   // The chosen entity's own accounts and banks, as the IR10 keeps to them.
   const { journals, opening } = entityPart(position.journals, state.ledger.openingBalances);
   // Set out as signed statements are: a company's shareholder current accounts
@@ -1734,11 +1734,215 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
       shareholderCurrentAccounts: currentAccounts,
       profitInRetainedEarnings: company,
     });
-  const sheet = sheetAt(asAt);
   // The same day a year earlier, as a column of its own; the opening and
   // movement columns make way for it.
   const earlierAt = comparing() ? earlierRange(year).to : null;
-  const earlier = earlierAt === null ? null : sheetAt(earlierAt);
+  return {
+    asAt,
+    position,
+    journals,
+    opening,
+    currentAccounts,
+    sheet: sheetAt(asAt),
+    earlierAt,
+    earlier: earlierAt === null ? null : sheetAt(earlierAt),
+  };
+}
+
+/** One account's entries over a period, from its balance at the start to its closing balance. */
+interface AccountLedger {
+  start: number;
+  startSaid: string;
+  entries: { date: string; entry: string; description: string; amount: number }[];
+  closing: number;
+  /** 1, or -1 where the report shows the balance the other way up (a liability or equity as a positive). */
+  sign: 1 | -1;
+  /** The balance as Dr or Cr rather than signed. */
+  sides: boolean;
+}
+
+/**
+ * The entries behind one account's figure on the balance sheet or the trial
+ * balance: its balance when the period starts, each entry in the period, and
+ * the closing balance. Null when those would not come to `figure` -- a line
+ * that gathers several accounts, or retained earnings holding the year's
+ * profit -- so a figure opens only to a list that adds up to it.
+ * `periodOnly`: an income or expense account on the trial balance, which
+ * starts the period at nothing. An entry dated the opening balances' own day
+ * counts after them, as the balance sheet and trial balance both take it.
+ * `sides`: the balance as Dr or Cr, as the trial balance sets it out.
+ */
+function accountLedger(
+  code: string,
+  view: { journals: readonly PostedJournal[]; opening: OpeningBalances | undefined },
+  from: string,
+  to: string,
+  figure: number,
+  periodOnly = false,
+  sides = false,
+): AccountLedger | null {
+  const key = code.trim();
+  if (key === "") return null;
+  const openAt = view.opening?.asAt;
+  const fromOpening = !periodOnly && view.opening !== undefined && openAt !== undefined && openAt <= to;
+  let start = fromOpening ? (view.opening?.accounts[key] ?? 0) : 0;
+  const entries: AccountLedger["entries"] = [];
+  let closing = start;
+  for (const journal of view.journals) {
+    if (journal.date > to) continue;
+    if (fromOpening && openAt !== undefined && journal.date < openAt) continue;
+    if (periodOnly && journal.date < from) continue;
+    for (const line of journal.lines) {
+      // As the balance sheet keys it: a bank line by the account's name when it has no code.
+      if ((line.accountCode || line.accountName).trim() !== key) continue;
+      closing += line.amount;
+      if (journal.date < from) start += line.amount;
+      else entries.push({ date: journal.date, entry: [journal.source.charAt(0).toUpperCase() + journal.source.slice(1), journal.narration].filter((s) => s !== "").join(": "), description: line.description ?? "", amount: line.amount });
+    }
+  }
+  const sign = closing === figure ? 1 : closing === -figure ? -1 : null;
+  if (sign === null || (entries.length === 0 && start === 0)) return null;
+  entries.sort((a, b) => a.date.localeCompare(b.date));
+  const startSaid =
+    fromOpening && openAt !== undefined && openAt >= from ? `Opening balance at ${daySaid(openAt)}` : `Balance at the start, ${daySaid(from)}`;
+  return { start, startSaid, entries, closing, sign, sides };
+}
+
+/** The row under an account that lists its ledger, the width of the report's table. */
+function accountLedgerRow(ledger: AccountLedger, columns: number, money: (cents: number) => string): HTMLTableRowElement {
+  const row = document.createElement("tr");
+  row.className = "report-behind";
+  const cell = document.createElement("td");
+  cell.colSpan = columns;
+  const table = document.createElement("table");
+  table.className = "report-table match-table";
+  table.innerHTML = "<thead><tr><th>Date</th><th>Entry</th><th>Description</th><th>Debit</th><th>Credit</th><th>Balance</th></tr></thead>";
+  const tbody = document.createElement("tbody");
+  const shown = (cents: number): string =>
+    ledger.sides ? (cents === 0 ? money(0) : `${money(Math.abs(cents))} ${cents > 0 ? "Dr" : "Cr"}`) : money(ledger.sign * cents);
+  const plain = (label: string, balance: number, cls: string): void => {
+    const tr = document.createElement("tr");
+    tr.className = cls;
+    const name = nameCell(label);
+    name.colSpan = 5;
+    tr.append(name, amountCell(shown(balance)));
+    tbody.append(tr);
+  };
+  plain(ledger.startSaid, ledger.start, "");
+  let running = ledger.start;
+  const most = 300;
+  for (const e of ledger.entries.slice(0, most)) {
+    running += e.amount;
+    const tr = document.createElement("tr");
+    tr.append(nameCell(e.date), nameCell(e.entry), nameCell(e.description));
+    tr.append(amountCell(e.amount > 0 ? money(e.amount) : ""), amountCell(e.amount < 0 ? money(-e.amount) : ""));
+    tr.append(amountCell(shown(running)));
+    tbody.append(tr);
+  }
+  if (ledger.entries.length > most) {
+    const tr = document.createElement("tr");
+    const said = nameCell(`… and ${ledger.entries.length - most} more. Account transactions and the general ledger list them all.`);
+    said.colSpan = 6;
+    tr.append(said);
+    tbody.append(tr);
+  }
+  plain("Closing balance", ledger.closing, "report-total");
+  table.append(tbody);
+  cell.append(table);
+  row.append(cell);
+  return row;
+}
+
+/**
+ * An account's name that opens to its entries under the row, and closes
+ * again; plain text when there is nothing that adds up to show.
+ */
+function ledgerNameCell(label: string, tr: HTMLTableRowElement, columns: number, ledger: () => AccountLedger | null, money: (cents: number) => string): HTMLTableCellElement {
+  const cell = document.createElement("td");
+  cell.className = "report-name";
+  const found = ledger();
+  if (found === null) {
+    cell.textContent = label;
+    return cell;
+  }
+  const open = document.createElement("button");
+  open.type = "button";
+  open.className = "link-button";
+  open.textContent = label;
+  open.title = `Show the ${found.entries.length} entr${found.entries.length === 1 ? "y" : "ies"} behind this figure`;
+  let shown: HTMLTableRowElement | null = null;
+  open.addEventListener("click", () => {
+    if (shown !== null) {
+      shown.remove();
+      shown = null;
+      tr.classList.remove("report-open");
+      return;
+    }
+    shown = accountLedgerRow(found, columns, money);
+    tr.classList.add("report-open");
+    tr.after(shown);
+  });
+  cell.append(open);
+  return cell;
+}
+
+/** An amount for a CSV: plain digits a spreadsheet reads, whole units when Settings says so. */
+function csvAmount(): (cents: number) => string {
+  const whole = bookSettings().wholeUnits === true;
+  return (cents) => (whole ? String(Math.round(cents / 100) || 0) : formatAmount(cents));
+}
+
+/** A balance sheet's parts, in the order it is read. */
+function balanceSheetParts(sheet: ReturnType<typeof computeBalanceSheet>) {
+  return [sheet.currentAssets, sheet.nonCurrentAssets, sheet.currentLiabilities, sheet.nonCurrentLiabilities, sheet.equity];
+}
+
+/** The balance sheet as a CSV, set out as the page shows it. */
+function balanceSheetCsv(year: number): { text: string; name: string } {
+  const { sheet, earlier, asAt, earlierAt } = balanceSheetFor(year);
+  const display = statementDisplay();
+  const amount = csvAmount();
+  const rows: string[][] = [[`${reportingEntity()?.name ?? "Balance sheet"} — Balance sheet as at ${daySaid(asAt)}`], []];
+  const earlierClosing = new Map<string, Cents>();
+  if (earlier !== null) for (const part of balanceSheetParts(earlier)) for (const line of part.lines) earlierClosing.set(balanceSheetLabel(line), line.closing);
+  rows.push(earlier === null || earlierAt === null ? ["Account", "Opening", "Movement", `As at ${asAt}`] : ["Account", `As at ${asAt}`, `As at ${earlierAt}`, "Change"]);
+  const totals: Record<string, [Cents, Cents | undefined]> = {
+    [sheet.nonCurrentAssets.title]: [sheet.totalAssets, earlier?.totalAssets],
+    [sheet.nonCurrentLiabilities.title]: [sheet.totalLiabilities, earlier?.totalLiabilities],
+  };
+  for (const part of balanceSheetParts(sheet)) {
+    rows.push([part.title]);
+    for (const line of part.lines) {
+      const label = display.label(balanceSheetLabel(line));
+      if (earlier === null) rows.push([label, amount(line.opening), amount(line.movement), amount(line.closing)]);
+      else {
+        const then = earlierClosing.get(balanceSheetLabel(line)) ?? 0;
+        rows.push([label, amount(line.closing), amount(then), amount(line.closing - then)]);
+      }
+    }
+    if (part === sheet.equity) continue;
+    const before = earlier === null ? undefined : balanceSheetParts(earlier).find((p) => p.title === part.title)?.total;
+    rows.push(earlier === null ? [`Total ${part.title.toLowerCase()}`, "", "", amount(part.total)] : [`Total ${part.title.toLowerCase()}`, amount(part.total), amount(before ?? 0), amount(part.total - (before ?? 0))]);
+    const grand = totals[part.title];
+    if (grand !== undefined) {
+      const [now, then] = grand;
+      const label = part.title === sheet.nonCurrentAssets.title ? "Total assets" : "Total liabilities";
+      rows.push(earlier === null ? [label, "", "", amount(now)] : [label, amount(now), amount(then ?? 0), amount(now - (then ?? 0))]);
+      if (label === "Total liabilities") {
+        rows.push(earlier === null ? ["Net assets", "", "", amount(sheet.netAssets)] : ["Net assets", amount(sheet.netAssets), amount(earlier.netAssets), amount(sheet.netAssets - earlier.netAssets)]);
+      }
+    }
+  }
+  rows.push(earlier === null ? ["Total equity", "", "", amount(sheet.totalEquity)] : ["Total equity", amount(sheet.totalEquity), amount(earlier.totalEquity), amount(sheet.totalEquity - earlier.totalEquity)]);
+  return {
+    text: rows.map((r) => r.map(spreadsheetCell).join(",")).join("\r\n") + "\r\n",
+    name: `balance-sheet-${asAt}.csv`,
+  };
+}
+
+function renderBalanceSheet(body: HTMLElement, year: number): void {
+  const { asAt, position, journals, opening, currentAccounts, sheet, earlierAt, earlier } = balanceSheetFor(year);
+  const { basis, fromImport } = position;
   const earlierClosing = new Map<string, Cents>();
   if (earlier !== null) {
     for (const part of [earlier.currentAssets, earlier.nonCurrentAssets, earlier.currentLiabilities, earlier.nonCurrentLiabilities, earlier.equity]) {
@@ -1830,9 +2034,9 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
     // account only last year had still shows, at nothing now.
     if (earlier !== null) {
       const shown = new Set<string>();
-      const rowOf = (label: string, now: Cents, then: Cents): void => {
+      const rowOf = (label: string, now: Cents, then: Cents, code = ""): void => {
         const row = document.createElement("tr");
-        row.append(nameCell(display.label(label)));
+        row.append(ledgerNameCell(display.label(label), row, 4, () => accountLedger(code, { journals, opening }, reportRange(year).from, asAt, now), money));
         row.append(amountCell(money(now)));
         row.append(amountCell(money(then)));
         row.append(amountCell(now === then ? "" : money((now - then) as Cents)));
@@ -1841,7 +2045,7 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
       for (const line of lines) {
         const label = balanceSheetLabel(line);
         shown.add(label);
-        rowOf(label, line.closing, earlierClosing.get(label) ?? (0 as Cents));
+        rowOf(label, line.closing, earlierClosing.get(label) ?? (0 as Cents), line.code);
       }
       const before = [earlier.currentAssets, earlier.nonCurrentAssets, earlier.currentLiabilities, earlier.nonCurrentLiabilities, earlier.equity].find(
         (part) => part.title === title,
@@ -1864,7 +2068,7 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
 
     for (const line of lines) {
       const row = document.createElement("tr");
-      row.append(nameCell(display.label(balanceSheetLabel(line))));
+      row.append(ledgerNameCell(display.label(balanceSheetLabel(line)), row, 4, () => accountLedger(line.code, { journals, opening }, reportRange(year).from, asAt, line.closing), money));
       row.append(amountCell(line.opening === 0 ? "" : money(line.opening)));
       row.append(amountCell(line.movement === 0 ? "" : money(line.movement)));
       row.append(amountCell(money(line.closing)));
@@ -1943,16 +2147,100 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
  * periods on a line of its own, where retained earnings would hold it. So it
  * agrees with the balance sheet, and its debits still equal its credits.
  */
+/** An income or expense account: on the trial balance, its balance is the period's alone. */
+function periodAccount(code: string): boolean {
+  const type = state.chart.find((a) => a.code.trim() === code.trim())?.type ?? "";
+  return /revenue|sales|income|expense|overhead|direct cost|depreciation/i.test(type) && !/current|fixed|asset|liabilit|equity/i.test(type);
+}
+
+/**
+ * The journal report's figures for the year chosen: the period's journals,
+ * proved, and each account's postings in the period and closing balance.
+ * What the page shows and its CSV holds.
+ */
+function trialBalanceFor(year: number) {
+  const { from, to } = reportRange(year);
+  // The chosen entity's own lines, as its balance sheet has them.
+  const view = entityView(reportPostings(), state.ledger.openingBalances);
+  const journals = view.journals.filter((j) => j.date >= from && j.date <= to);
+  const balance = trialBalance(journals);
+  // Each account's postings in the period, and its closing balance beside
+  // them: the first prove the period, the second agree with the balance sheet.
+  type Row = { accountCode: string; accountName: string; lines: number; moved: number; closing: number };
+  const rows = new Map<string, Row>();
+  const keyOf = (code: string, name: string): string => code.trim() || name;
+  for (const r of balance.rows) {
+    const key = keyOf(r.accountCode, r.accountName);
+    const held = rows.get(key) ?? { accountCode: r.accountCode, accountName: r.accountName, lines: 0, moved: 0, closing: 0 };
+    held.lines += r.lines;
+    held.moved += r.balance;
+    rows.set(key, held);
+  }
+  for (const r of closingTrialBalance(view, from, to)) {
+    const key = keyOf(r.accountCode, r.accountName);
+    const held = rows.get(key) ?? { accountCode: r.accountCode, accountName: r.accountName, lines: 0, moved: 0, closing: 0 };
+    held.closing += r.balance;
+    rows.set(key, held);
+  }
+  if (statementDisplay().showEmpty) {
+    for (const account of state.chart) {
+      const code = account.code.trim();
+      if (code === "" || rows.has(code) || account.inactive === true) continue;
+      rows.set(code, { accountCode: code, accountName: account.name, lines: 0, moved: 0, closing: 0 });
+    }
+  }
+  const listed = [...rows.values()].sort((a, b) => Math.abs(b.moved) - Math.abs(a.moved) || Math.abs(b.closing) - Math.abs(a.closing));
+  return { from, to, view, journals, balance, listed };
+}
+
+/** A code the books made up for themselves (a bank's id), not one to show in a Code column. */
+const madeUpCode = (code: string): boolean => /^[a-z][a-z-]*$/.test(code);
+
+/** The trial balance as a CSV: each account's debits and credits in the period, and its closing balance. */
+function trialBalanceCsv(year: number): { text: string; name: string } | null {
+  const { to, journals, listed } = trialBalanceFor(year);
+  if (journals.length === 0) return null;
+  const amount = csvAmount();
+  const codes = bookSettings().hideCodes !== true;
+  const display = statementDisplay();
+  const rows: string[][] = [
+    [`${reportingEntity()?.name ?? "Trial balance"} — Trial balance at ${daySaid(to)}, ${periodHeading(year)}`],
+    [],
+    [...(codes ? ["Code"] : []), "Account", "Lines", "Debit", "Credit", "Closing debit", "Closing credit"],
+  ];
+  let debit = 0;
+  let credit = 0;
+  let closingDebit = 0;
+  let closingCredit = 0;
+  for (const row of listed) {
+    if (row.moved > 0) debit += row.moved;
+    else credit -= row.moved;
+    if (row.closing > 0) closingDebit += row.closing;
+    else closingCredit -= row.closing;
+    rows.push([
+      ...(codes ? [madeUpCode(row.accountCode) ? "" : row.accountCode] : []),
+      display.label(row.accountName),
+      row.lines === 0 ? "" : String(row.lines),
+      row.moved > 0 ? amount(row.moved) : "",
+      row.moved < 0 ? amount(-row.moved) : "",
+      row.closing > 0 ? amount(row.closing) : "",
+      row.closing < 0 ? amount(-row.closing) : "",
+    ]);
+  }
+  rows.push([...(codes ? [""] : []), "Total", "", amount(debit), amount(credit), amount(closingDebit), amount(closingCredit)]);
+  return {
+    text: rows.map((r) => r.map(spreadsheetCell).join(",")).join("\r\n") + "\r\n",
+    name: `trial-balance-${periodFileName(year)}.csv`,
+  };
+}
+
 function closingTrialBalance(
   view: { journals: readonly PostedJournal[]; opening: OpeningBalances | undefined },
   from: string,
   to: string,
 ): { accountCode: string; accountName: string; lines: number; balance: number }[] {
   const byCode = new Map(state.chart.map((a) => [a.code.trim(), a]));
-  const income = (code: string): boolean => {
-    const type = byCode.get(code.trim())?.type ?? "";
-    return /revenue|sales|income|expense|overhead|direct cost|depreciation/i.test(type) && !/current|fixed|asset|liabilit|equity/i.test(type);
-  };
+  const income = periodAccount;
   const rows = new Map<string, { accountCode: string; accountName: string; lines: number; balance: number }>();
   const row = (code: string, name: string) => {
     const key = code.trim() || name;
@@ -1970,7 +2258,9 @@ function closingTrialBalance(
   }
   let earlier = 0;
   for (const journal of view.journals) {
-    if (journal.date > to || (openAt !== undefined && journal.date <= openAt)) continue;
+    // As the balance sheet takes them: an entry on the opening balances' own
+    // day comes after them, so the two agree on the same day.
+    if (journal.date > to || (openAt !== undefined && journal.date < openAt)) continue;
     for (const line of journal.lines) {
       if (income(line.accountCode) && journal.date < from) {
         earlier += line.amount;
@@ -1986,10 +2276,7 @@ function closingTrialBalance(
 }
 
 function renderJournal(body: HTMLElement, year: number): void {
-  const { from, to } = reportRange(year);
-  // The chosen entity's own lines, as its balance sheet has them.
-  const view = entityView(reportPostings(), state.ledger.openingBalances);
-  const journals = view.journals.filter((j) => j.date >= from && j.date <= to);
+  const { from, to, view, journals, balance, listed } = trialBalanceFor(year);
 
   const heading = document.createElement("h3");
   heading.textContent = `Journal and trial balance, ${periodHeading(year)}`;
@@ -2000,7 +2287,6 @@ function renderJournal(body: HTMLElement, year: number): void {
     return;
   }
 
-  const balance = trialBalance(journals);
   // On the basis the books' returns are on: invoices and bills when issued on
   // the invoice basis (always in Korea), as they are paid otherwise.
   const tax = taxSummary(journals, { basis: gstBasis() === "accruals" ? "invoice" : "payments" });
@@ -2093,37 +2379,19 @@ function renderJournal(body: HTMLElement, year: number): void {
     `<tr>${codes ? "<th>Code</th>" : ""}<th>Account</th><th>Lines</th><th>Debit</th><th>Credit</th><th>Closing debit</th><th>Closing credit</th></tr>`;
   const tbody = document.createElement("tbody");
 
-  // Each account's postings in the period, and its closing balance beside
-  // them: the first prove the period, the second agree with the balance sheet.
-  type Row = { accountCode: string; accountName: string; lines: number; moved: number; closing: number };
-  const rows = new Map<string, Row>();
-  const keyOf = (code: string, name: string): string => code.trim() || name;
-  for (const r of balance.rows) {
-    const key = keyOf(r.accountCode, r.accountName);
-    const held = rows.get(key) ?? { accountCode: r.accountCode, accountName: r.accountName, lines: 0, moved: 0, closing: 0 };
-    held.lines += r.lines;
-    held.moved += r.balance;
-    rows.set(key, held);
-  }
-  for (const r of closingTrialBalance(view, from, to)) {
-    const key = keyOf(r.accountCode, r.accountName);
-    const held = rows.get(key) ?? { accountCode: r.accountCode, accountName: r.accountName, lines: 0, moved: 0, closing: 0 };
-    held.closing += r.balance;
-    rows.set(key, held);
-  }
-  if (display.showEmpty) {
-    for (const account of state.chart) {
-      const code = account.code.trim();
-      if (code === "" || rows.has(code) || account.inactive === true) continue;
-      rows.set(code, { accountCode: code, accountName: account.name, lines: 0, moved: 0, closing: 0 });
-    }
-  }
-  const listed = [...rows.values()].sort((a, b) => Math.abs(b.moved) - Math.abs(a.moved) || Math.abs(b.closing) - Math.abs(a.closing));
+  const columns = codes ? 7 : 6;
   for (const row of listed) {
     const tr = document.createElement("tr");
+    if (codes) {
+      const code = document.createElement("td");
+      code.className = "report-name";
+      code.textContent = madeUpCode(row.accountCode) ? "" : row.accountCode;
+      tr.append(code);
+    }
+    tr.append(
+      ledgerNameCell(row.accountName, tr, columns, () => accountLedger(row.accountCode || row.accountName, view, from, to, row.closing, periodAccount(row.accountCode), true), display.money),
+    );
     for (const [text, cls] of [
-      ...(codes ? [[/^[a-z][a-z-]*$/.test(row.accountCode) ? "" : row.accountCode, "report-name"] as const] : []),
-      [row.accountName, "report-name"],
       [row.lines === 0 ? "" : String(row.lines), "report-amount"],
       [row.moved > 0 ? display.money(row.moved) : "", "report-amount"],
       [row.moved < 0 ? display.money(-row.moved) : "", "report-amount"],
@@ -5895,7 +6163,16 @@ export function downloadReport(): void {
   // without one here does not compile.
   const downloads: Record<DownloadKind, () => void> = {
     pl: () => downloadProfitAndLoss(),
-    journal: () => downloadGeneralLedger(year),
+    balancesheet: () => {
+      if (year === undefined) return nothingToDownload();
+      const csv = balanceSheetCsv(year);
+      download(csv.text, csv.name, "text/csv");
+    },
+    journal: () => {
+      const csv = year === undefined ? null : trialBalanceCsv(year);
+      if (csv === null) return nothingToDownload();
+      download(csv.text, csv.name, "text/csv");
+    },
     general: () => downloadGeneralLedger(year),
     extract: () => {
       const csv = year === undefined ? null : accountTransactionsCsv(year);
