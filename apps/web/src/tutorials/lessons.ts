@@ -609,8 +609,8 @@ export const LESSONS: readonly Lesson[] = [
       {
         title: "Where the money comes from",
         body:
-          "Tandem flights, courses, flight videos, gift vouchers and gear, each its own line. The terminal settles " +
-          "once a week, and each settlement is split between tandems and videos, so both are counted right.",
+          "Trial tandem flights, courses, gift vouchers and gear, each its own line. Tandems are paid on the " +
+          "EFTPOS terminal, which settles once a week; courses come in by bank transfer.",
         page: "reports",
         before: report("pl"),
         target: q("#reports-body"),
@@ -628,7 +628,7 @@ export const LESSONS: readonly Lesson[] = [
         title: "Owed at year end",
         body:
           "The vouchers still to fly are owed to their holders: a liability, not income. So is money held for " +
-          "gear sold on a student's behalf. When Mia's wing sold for $3,200, $2,880 was hers and passed on; only " +
+          "gear sold on a student's behalf. When Sophie's wing sold for $3,200, $2,880 was hers and passed on; only " +
           "the $320 commission is the school's income, with GST on it.",
         before: report("balancesheet"),
         target: q("#reports-body"),

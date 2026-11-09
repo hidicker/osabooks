@@ -929,7 +929,7 @@ function write(name, built) {
     note: "A company run by its owner-instructor",
     about:
       "A tandem and paragliding school in Wānaka, run by its owner and head instructor, Kate Brennan. " +
-      "Tandem flights and flight videos are paid on the EFTPOS terminal, courses by bank transfer, and gift " +
+      "Trial tandem flights are paid on the EFTPOS terminal, courses by bank transfer, and gift " +
       "vouchers on the website. Busy in summer, quiet in winter.",
     kind: "business",
     structure: "company",
@@ -943,10 +943,9 @@ function write(name, built) {
     slug: "school",
     entities: [school],
     accounts: [
-      ["200", "Tandem flights", "Revenue", "s"],
+      ["200", "Trial Tandem Flights", "Revenue", "s"],
       ["205", "Courses and lessons", "Revenue", "s"],
       ["210", "Gift vouchers sold", "Revenue", "s"],
-      ["215", "Flight photos and videos", "Revenue", "s"],
       ["220", "Gear sales", "Revenue", "s"],
       ["225", "Commission on gear sold for others", "Revenue", "s"],
       ["310", "Gear bought for resale", "Direct Costs", "s"],
@@ -1029,20 +1028,16 @@ function write(name, built) {
 
   // Tandems flown in each month, and what one costs.
   const TANDEM = 29_500;
-  const VIDEO = 4_500;
   const tandems = { 4: 30, 5: 12, 6: 8, 7: 14, 8: 12, 9: 14, 10: 22, 11: 30, 12: 48, 1: 70, 2: 55, 3: 40 };
   const flownBySubcontractor = new Map();
-  // The EFTPOS terminal settles every Monday: the week's tandems and the videos sold with them.
+  // The EFTPOS terminal settles every Monday with the week's tandems.
   for (let monday = "2025-04-07"; monday <= FY_END; monday = addDays(monday, 7)) {
     const week = addDays(monday, -3);
     const m = Number(week.slice(5, 7));
     const wobble = [0.8, 1.1, 0.95, 1.2, 0.9, 1.05, 1.0][Number(monday.slice(8, 10)) % 7];
     const flights = Math.round((tandems[m] / 4.33) * wobble);
     if (flights === 0) continue;
-    const videos = Math.round(flights * 0.4);
-    const parts = [{ amount: flights * TANDEM, code: "200", note: `${flights} tandem flights` }];
-    if (videos > 0) parts.push({ amount: videos * VIDEO, code: "215", note: `${videos} flight videos` });
-    splitLine(monday, "Windcave settlement", parts, "Week's EFTPOS takings");
+    sale(monday, flights * TANDEM, "Windcave settlement", "200", `Week's EFTPOS takings, ${flights} trial tandems`);
     // From November to March a subcontract pilot flies about four in ten.
     if (m >= 11 || m <= 3) {
       const month = week.slice(0, 7);
@@ -1054,7 +1049,7 @@ function write(name, built) {
     const [y, m] = month.split("-").map(Number);
     const paid = m === 12 ? day(y + 1, 1, 5) : day(y, m + 1, 5);
     if (paid > FY_END) continue;
-    sale(paid, -Math.round(flights * 11_000 * 1.15), "Tom Harker Paragliding", "414", `Tandem flights, ${month}`);
+    sale(paid, -Math.round(flights * 11_000 * 1.15), "Tom Harker Paragliding", "414", `Trial tandem flights, ${month}`);
   }
 
   // Courses, paid by bank transfer before each one starts.
@@ -1107,10 +1102,10 @@ function write(name, built) {
 
   // A student's own wing sold for her: the buyer's $3,200 is hers, less 10% commission.
   splitLine("2025-11-14", "J Thornton", [
-    { amount: 288_000, code: "816", note: "Mia Kowalski's wing, held for her" },
-    { amount: 32_000, code: "225", note: "10% commission on Mia Kowalski's wing" },
+    { amount: 288_000, code: "816", note: "Sophie Lambert's wing, held for her" },
+    { amount: 32_000, code: "225", note: "10% commission on Sophie Lambert's wing" },
   ], "Wing bought from student");
-  b.line(bank, "2025-11-20", -288_000, "Mia Kowalski", "816", "Her wing sold, less 10% commission");
+  b.line(bank, "2025-11-20", -288_000, "Sophie Lambert", "816", "Her wing sold, less 10% commission");
 
   // New school gear: two wings and three harnesses go in the asset register.
   sale("2025-09-18", -1_000_500, "Alpine Wings Distribution", "730", "Two school wings, EN A");
@@ -1197,7 +1192,7 @@ function write(name, built) {
   });
   b.line(bank, "2026-03-26", 88_500, "Chen W", undefined, undefined, {
     particulars: "Tandems x3",
-    example: { code: "200", confidence: 0.9, because: "Three tandem flights at $295, paid by bank transfer." },
+    example: { code: "200", confidence: 0.9, because: "Three trial tandem flights at $295, paid by bank transfer." },
   });
 
   const built = b.build({
@@ -1209,7 +1204,7 @@ function write(name, built) {
         narration: "Gift vouchers sold last year, flown or expired this year",
         lines: [
           { code: "Gift vouchers not yet flown - 815", amount: openingVouchers, description: "22 vouchers from last year" },
-          { code: "Tandem flights - 200", amount: -openingVouchers, description: "Flown this year" },
+          { code: "Trial Tandem Flights - 200", amount: -openingVouchers, description: "Flown this year" },
         ],
       },
       {
