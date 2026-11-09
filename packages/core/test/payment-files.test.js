@@ -162,3 +162,44 @@ test("ABA refuses what the bank would refuse", () => {
   assert.throws(() => abaFile({ ...base, bank: "Commonwealth" }), /three-letter/);
   assert.throws(() => abaFile({ ...base, userId: "ABC" }), /user ID/);
 });
+
+test("ASB MT9: 160-character lines, header 12, a detail 13 each, trailer 13 99", () => {
+  const file = nzPaymentFile({ format: "asb", from: "12-3141-0123456-00", payer: "Kea Coffee", due: "2026-10-27", created: "2026-10-25", payments: pays });
+  const all = lines(file.text);
+  assert.equal(all.length, 4);
+  for (const line of all) assert.equal(line.length, 160);
+  const [header, first, second, trailer] = all;
+  assert.equal(header.slice(0, 18), "12" + "12" + "3141" + "0123456" + "00 ", "the payer's suffix as two digits and a space");
+  assert.equal(header.slice(18, 31), "20261027     ", "CCYYMMDD and five spaces");
+  assert.equal(header.slice(31, 51), "Kea Coffee          ");
+  assert.equal(first.slice(0, 18), "13" + "12" + "3456" + "0123456" + "000", "the payee's suffix in three digits");
+  assert.equal(first.slice(18, 21), "051");
+  assert.equal(first.slice(21, 31), "0000078554");
+  assert.equal(first.slice(31, 51), "Mere Tane           ");
+  assert.equal(first.slice(51, 63), " ".repeat(12), "internal reference left blank");
+  assert.equal(first.slice(75, 87).trimEnd(), "2026-09-20", "payee reference");
+  assert.equal(first.slice(87, 99).trimEnd(), "Wages", "payee particulars");
+  assert.equal(first.slice(99, 100), " ");
+  assert.equal(first.slice(100, 120).trimEnd(), "Kea Coffee");
+  assert.equal(first.slice(144, 156).trimEnd(), "Mere Tane", "payer particulars");
+  assert.equal(second.slice(31, 51).trimEnd(), "Kea Supplies Ltd");
+  assert.equal(second.slice(132, 144).trimEnd(), "BILL-7", "payer reference");
+  assert.equal(trailer.slice(0, 4), "1399");
+  assert.equal(trailer.slice(4, 15), nzHashTotal(pays.map((p) => p.account)));
+  assert.equal(trailer.slice(15, 21), "      ");
+  assert.equal(trailer.slice(21, 31), "0000080242");
+  assert.equal(file.total, 80_242);
+});
+
+test("ASB MT9: the check total as ASB's guide works it, wages as 052, and only from ASB", () => {
+  assert.equal(nzHashTotal(["121234123456700", "124321765432100"]), "55558888888", "ASB's Appendix A example");
+  const wages = nzPaymentFile({ format: "asb", from: "12-3141-0123456-50", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays, payroll: true });
+  assert.equal(lines(wages.text)[1].slice(18, 21), "052");
+  assert.equal(lines(wages.text)[0].slice(15, 18), "50 ");
+  assert.throws(() => nzPaymentFile({ format: "asb", from: "02-0100-0123456-000", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays }), /ASB account/);
+  const odd = nzPaymentFile({ format: "asb", from: "12-3141-0123456-00", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: [{ name: "Ref #1: test", account: "12-3456-0123456-00", amount: 100, reference: "#12:34" }] });
+  assert.equal(lines(odd.text)[1].slice(31, 51).trimEnd(), "Ref 1 test", "no # or : in ASB's fields");
+  const big = nzPaymentFile({ format: "asb", from: "12-3141-0123456-00", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: [{ name: "Too much", account: "12-3456-0123456-00", amount: 10_000_000_000 }, pays[0]] });
+  assert.equal(big.count, 1);
+  assert.match(big.skipped[0].why, /more than ASB's file/);
+});

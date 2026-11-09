@@ -12,6 +12,9 @@ import type { IsoDate } from "./dates.js";
  *   - ANZ domestic extended format: the same three records, dates YYYYMMDD.
  *   - Westpac Corporate Online, New Zealand Direct Entry: fixed 180-character
  *     lines, a header A and a detail D for each payment, no trailer.
+ *   - ASB FastNet Business, MT9 direct credit (File Formats Technical Guide,
+ *     November 2012, pages 42-46): fixed 160-character lines, header 12,
+ *     a detail 13 for each payment, trailer 13 99 with the check total.
  * Australia: the ABA (Cemtex) direct entry file every Australian bank takes,
  * fixed 120-character lines: descriptive 0, details 1, file total 7.
  *
@@ -51,12 +54,13 @@ export interface PaymentFile {
   skipped: SkippedPayment[];
 }
 
-export type NzBankFormat = "bnz" | "anz" | "westpac";
+export type NzBankFormat = "bnz" | "anz" | "westpac" | "asb";
 
 export const NZ_BANK_FORMATS: readonly { id: NzBankFormat; label: string }[] = [
   { id: "bnz", label: "BNZ (Internet Banking for Business)" },
   { id: "anz", label: "ANZ (domestic payments file)" },
   { id: "westpac", label: "Westpac (Corporate Online direct entry)" },
+  { id: "asb", label: "ASB (FastNet Business, MT9 direct credit)" },
 ];
 
 /** An NZ account number in its four parts, the account base as 7 digits; null when it is not one. */
@@ -188,7 +192,17 @@ export function nzPaymentFile(options: NzPaymentFileOptions): PaymentFile {
   if (options.format === "westpac" && from.bank !== "03") {
     throw new Error("Westpac's file pays from a Westpac account, one starting 03.");
   }
-  const { kept, skipped } = sortOut(options.payments, nzAccountParts, "NZ bank account");
+  if (options.format === "asb" && (from.bank !== "12" || Number(from.suffix) > 99)) {
+    throw new Error("ASB's file pays from an ASB account, one starting 12 with a two-digit suffix.");
+  }
+  const sorted = sortOut(options.payments, nzAccountParts, "NZ bank account");
+  const skipped = sorted.skipped;
+  // MT9 holds an amount in ten digits: up to $99,999,999.99 a payment.
+  const kept = options.format === "asb" ? sorted.kept.filter((k) => {
+    if (k.payment.amount <= MT9_MOST) return true;
+    skipped.push({ name: k.payment.name.trim(), why: "more than ASB's file can hold in one payment" });
+    return false;
+  }) : sorted.kept;
   const total = kept.reduce((sum, k) => sum + k.payment.amount, 0);
   const payer = bankText(options.payer, 20);
   const code = options.payroll === true ? "52" : "50";
@@ -226,6 +240,8 @@ export function nzPaymentFile(options: NzPaymentFileOptions): PaymentFile {
     lines.push(["3", String(total), String(kept.length), nzHashTotal(kept.map((k) => k.payment.account))].join(","));
     return { text: `${lines.join("\r\n")}\r\n`, fileName: `${base}.txt`, count: kept.length, total, skipped };
   }
+
+  if (options.format === "asb") return asbMt9(options, from, kept, skipped, total, `${base}.txt`);
 
   // Westpac: fixed width, a header A then a detail D a payment.
   let sequence = 1;
@@ -265,6 +281,58 @@ export function nzPaymentFile(options: NzPaymentFileOptions): PaymentFile {
     );
   }
   return { text: `${lines.join("\r\n")}\r\n`, fileName: `${base}.txt`, count: kept.length, total, skipped };
+}
+
+const MT9_MOST = 9_999_999_999;
+
+/** ASB's MT9 text: bankText, less the # and : ASB does not list. */
+const asbText = (value: string | undefined, length: number): string => bankText(value, length).replace(/[#:]/g, " ").replace(/\s+/g, " ").trim();
+
+/**
+ * ASB's MT9 direct credit file: 160-character lines. The header names the
+ * paying account (its suffix as two digits and a space, as ASB prefers) and
+ * the due date as CCYYMMDD; each detail the payee's account (suffix in three
+ * digits), code 051 or 052 for wages, cents in ten digits, and the payee's
+ * and the payer's particulars, code and reference; the trailer the check
+ * total (branch and account numbers added, eleven digits kept) and the total.
+ */
+function asbMt9(
+  options: NzPaymentFileOptions,
+  from: { bank: string; branch: string; base: string; suffix: string },
+  kept: readonly { payment: BankPayment; account: { bank: string; branch: string; base: string; suffix: string } }[],
+  skipped: SkippedPayment[],
+  total: Cents,
+  fileName: string,
+): PaymentFile {
+  if (total > MT9_MOST) throw new Error("ASB's file holds up to $99,999,999.99 in all. Split the payments into two files.");
+  const payer = left(asbText(options.payer, 20), 20);
+  const lines: string[] = [
+    "12" + from.bank + from.branch + from.base + zeros(Number(from.suffix), 2) + " " + yyyymmdd(options.due) + " ".repeat(5) + payer + " ".repeat(109),
+  ];
+  for (const { payment, account } of kept) {
+    lines.push(
+      "13" +
+        account.bank +
+        account.branch +
+        account.base +
+        account.suffix +
+        (options.payroll === true ? "052" : "051") +
+        zeros(payment.amount, 10) +
+        left(asbText(payment.name, 20), 20) +
+        " ".repeat(12) +
+        left(asbText(payment.code, 12), 12) +
+        left(asbText(payment.reference, 12), 12) +
+        left(asbText(payment.particulars, 12), 12) +
+        " " +
+        payer +
+        left(asbText(payment.ourCode, 12), 12) +
+        left(asbText(payment.ourReference, 12), 12) +
+        left(asbText(payment.ourParticulars, 12), 12) +
+        " ".repeat(4),
+    );
+  }
+  lines.push("1399" + nzHashTotal(kept.map((k) => k.payment.account)) + " ".repeat(6) + zeros(total, 10) + " ".repeat(129));
+  return { text: `${lines.join("\r\n")}\r\n`, fileName, count: kept.length, total, skipped };
 }
 
 /** An Australian account as a BSB (NNN-NNN) and account number; null when it is not one. */
