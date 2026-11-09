@@ -19,6 +19,7 @@
     "docs": "node tools/build-docs.mjs",
     "build:demo": "node tools/build-demo.mjs",
     "build:mcpb": "npm run build && node tools/build-mcpb.mjs",
+    "check:live": "node tools/after-deploy.mjs",
     "clean": "rimraf packages/*/dist apps/*/dist"
   },
   "devDependencies": {

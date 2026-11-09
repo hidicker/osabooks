@@ -223,6 +223,7 @@ export async function renderBooks(): Promise<void> {
       note("This browser holds one set of books. Clearing it cannot be undone."),
       clearHereControl(),
     );
+    backupTools(body, "the books in this browser", false);
     return;
   }
 

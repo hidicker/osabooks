@@ -55,3 +55,8 @@ jobs:
           WEBDISK_DEMO_USER: ${{ secrets.NZOSA_WEBDISK_DEMO_USER }}
           TARGET: ${{ inputs.target }}
         run: bash tools/deploy-webdisk.sh
+
+      - name: Check the live site
+        # Pages, demo books, the old addresses, the extension, and the AI
+        # connector refusing a request with no sign-in. Reads only.
+        run: node tools/after-deploy.mjs ${{ inputs.target }}
