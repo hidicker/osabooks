@@ -481,3 +481,192 @@ export function ringChart(slices: readonly RingSlice[], centre: string): HTMLEle
   wrap.append(chart, key);
   return wrap;
 }
+
+/** Ticks spanning a range that may go below zero, in whole units, zero always among them. */
+function ticksBetween(low: number, high: number, wanted = 5): { low: number; high: number; values: number[] } {
+  const lo = Math.min(0, low);
+  const hi = Math.max(0, high);
+  if (hi - lo <= 0) return { low: 0, high: 1, values: [0] };
+  const step = niceStep((hi - lo) / wanted);
+  const bottom = Math.floor(lo / step) * step;
+  const top = Math.ceil(hi / step) * step;
+  const values: number[] = [];
+  for (let at = bottom; at <= top + step / 2; at += step) values.push(Math.round(at * 1e6) / 1e6);
+  return { low: bottom, high: top, values };
+}
+
+/** Two amounts and a rate for one month. */
+export interface RatePoint {
+  label: string;
+  first: Cents;
+  second: Cents;
+  /** A share, 0.25 for 25%; null where there is none (no income that month). */
+  rate: number | null;
+}
+
+/**
+ * Two amounts a month as columns, and a rate as a line on its own scale.
+ *
+ * The rate's scale is on the right, labelled in percent, and starts and ends
+ * where the rates do rather than at 0 and 100: a margin moving between -30%
+ * and 35% drawn on a 0-100 scale would be a flat line along the floor. Where a
+ * month has no rate the line breaks rather than inventing one.
+ */
+export function columnsWithRate(points: readonly RatePoint[], names: { first: string; second: string; rate: string }): HTMLElement {
+  const wrap = document.createElement("figure");
+  wrap.className = "chart-figure";
+  const width = 760;
+  const height = 300;
+  const right = 56;
+  const chart = svgRoot(width, height);
+  const plotWidth = width - AXIS_LEFT - right;
+  const plotHeight = height - AXIS_BOTTOM - TOP_ROOM;
+  const baseline = TOP_ROOM + plotHeight;
+
+  const biggest = Math.max(0, ...points.map((p) => Math.max(Math.abs(p.first), Math.abs(p.second))));
+  const { top, values } = ticksTo(biggest / 100);
+  const heightOf = (cents: Cents): number => (top === 0 ? 0 : (Math.abs(cents) / 100 / top) * plotHeight);
+  for (const value of values) {
+    const at = baseline - (value / top) * plotHeight;
+    chart.append(node("line", { x1: AXIS_LEFT, y1: at, x2: AXIS_LEFT + plotWidth, y2: at, class: "chart-grid" }));
+    const label = node("text", { x: AXIS_LEFT - 10, y: at + 4, class: "chart-tick", "text-anchor": "end" });
+    label.textContent = short(value);
+    chart.append(label);
+  }
+
+  // The rate's own scale, on the right, in whole percent.
+  const rates = points.map((p) => p.rate).filter((r): r is number => r !== null).map((r) => r * 100);
+  const scale = ticksBetween(Math.min(0, ...rates), Math.max(0, ...rates), 4);
+  const rateY = (percent: number): number => TOP_ROOM + ((scale.high - percent) / (scale.high - scale.low)) * plotHeight;
+  for (const value of scale.values) {
+    const label = node("text", { x: AXIS_LEFT + plotWidth + 8, y: rateY(value) + 4, class: "chart-tick", "text-anchor": "start" });
+    label.textContent = `${Math.round(value)}%`;
+    chart.append(label);
+  }
+  if (scale.low < 0) {
+    chart.append(
+      node("line", { x1: AXIS_LEFT, y1: rateY(0), x2: AXIS_LEFT + plotWidth, y2: rateY(0), class: "chart-zero", "stroke-dasharray": "4 4" }),
+    );
+  }
+
+  const band = plotWidth / Math.max(points.length, 1);
+  const barWidth = Math.max(3, Math.min(22, (band - 14) / 2));
+  const showTip = hoverLayer(wrap);
+  let path = "";
+  let pen = false;
+  points.forEach((point, index) => {
+    const middle = AXIS_LEFT + band * index + band / 2;
+    const tip =
+      `<strong>${safe(point.label)}</strong><br>${safe(names.first)} ${formatAmount(point.first)}<br>` +
+      `${safe(names.second)} ${formatAmount(Math.abs(point.second))}<br>` +
+      `${safe(names.rate)} ${point.rate === null ? "none" : `${Math.round(point.rate * 1000) / 10}%`}`;
+    const pairs: readonly (readonly [Cents, string])[] = [
+      [point.first, "chart-series-1"],
+      [point.second, "chart-cat-4"],
+    ];
+    pairs.forEach(([amount, className], side) => {
+      const tall = heightOf(amount);
+      if (tall <= 0) return;
+      const bar = node("path", {
+        d: roundedTop(middle - barWidth - 1 + side * (barWidth + 2), baseline - tall, barWidth, tall, 4),
+        class: className,
+      });
+      chart.append(bar);
+      showTip(bar, tip);
+    });
+    if (point.rate === null) {
+      pen = false;
+    } else {
+      path += `${pen ? "L" : "M"} ${middle.toFixed(1)} ${rateY(point.rate * 100).toFixed(1)} `;
+      pen = true;
+    }
+    const label = node("text", { x: middle, y: baseline + 20, class: "chart-tick", "text-anchor": "middle" });
+    label.textContent = point.label;
+    chart.append(label);
+  });
+  if (path !== "") chart.append(node("path", { d: path, class: "chart-line-rate" }));
+  points.forEach((point, index) => {
+    if (point.rate === null) return;
+    const dot = node("circle", { cx: AXIS_LEFT + band * index + band / 2, cy: rateY(point.rate * 100), r: 3.5, class: "chart-dot-rate" });
+    chart.append(dot);
+    showTip(dot, `<strong>${safe(point.label)}</strong><br>${safe(names.rate)} ${Math.round(point.rate * 1000) / 10}%`);
+  });
+  chart.append(node("line", { x1: AXIS_LEFT, y1: baseline, x2: AXIS_LEFT + plotWidth, y2: baseline, class: "chart-axis" }));
+
+  wrap.append(
+    legend([
+      ["chart-series-1", names.first],
+      ["chart-cat-4", names.second],
+      ["chart-line-swatch", names.rate],
+    ]),
+    chart,
+  );
+  return wrap;
+}
+
+/** One month's amount in each series, by series name; a missing series is nothing. */
+export interface StackPoint {
+  label: string;
+  parts: ReadonlyMap<string, Cents>;
+}
+
+/**
+ * Each month as one column made of its parts, such as income by account.
+ *
+ * `series` is the order to stack and colour them in, the largest first; one
+ * named "Others" is grey. A part below zero (a gain posted to an expense
+ * account) stacks downward from the baseline rather than being dropped, so the
+ * column still adds up to the month's total.
+ */
+export function stackedColumns(months: readonly StackPoint[], series: readonly string[]): HTMLElement {
+  const wrap = document.createElement("figure");
+  wrap.className = "chart-figure";
+  const width = 760;
+  const height = 300;
+  const chart = svgRoot(width, height);
+  const plotWidth = width - AXIS_LEFT - 16;
+  const plotHeight = height - AXIS_BOTTOM - TOP_ROOM;
+
+  const ups = months.map((m) => [...m.parts.values()].filter((v) => v > 0).reduce((s, v) => s + v, 0));
+  const downs = months.map((m) => [...m.parts.values()].filter((v) => v < 0).reduce((s, v) => s + v, 0));
+  const scale = ticksBetween(Math.min(0, ...downs) / 100, Math.max(0, ...ups) / 100, 4);
+  const yOf = (dollars: number): number => TOP_ROOM + ((scale.high - dollars) / (scale.high - scale.low)) * plotHeight;
+  for (const value of scale.values) {
+    const at = yOf(value);
+    chart.append(node("line", { x1: AXIS_LEFT, y1: at, x2: AXIS_LEFT + plotWidth, y2: at, class: value === 0 ? "chart-axis" : "chart-grid" }));
+    const label = node("text", { x: AXIS_LEFT - 10, y: at + 4, class: "chart-tick", "text-anchor": "end" });
+    label.textContent = short(value);
+    chart.append(label);
+  }
+
+  const classOf = (name: string, index: number): string => (name === "Others" ? "chart-cat-others" : `chart-cat-${(index % 9) + 1}`);
+  const band = plotWidth / Math.max(months.length, 1);
+  const barWidth = Math.max(4, Math.min(34, band - 16));
+  const showTip = hoverLayer(wrap);
+  months.forEach((month, index) => {
+    const x = AXIS_LEFT + band * index + (band - barWidth) / 2;
+    let up = 0;
+    let down = 0;
+    const total = [...month.parts.values()].reduce((s, v) => s + v, 0);
+    series.forEach((name, which) => {
+      const cents = month.parts.get(name) ?? 0;
+      if (cents === 0) return;
+      const from = cents > 0 ? up : down;
+      const to = from + cents / 100;
+      if (cents > 0) up = to;
+      else down = to;
+      const y = Math.min(yOf(from), yOf(to));
+      const tall = Math.abs(yOf(from) - yOf(to));
+      if (tall < 0.2) return;
+      const rect = node("rect", { x, y, width: barWidth, height: tall, class: classOf(name, which) });
+      chart.append(rect);
+      showTip(rect, `<strong>${safe(month.label)}</strong><br>${safe(name)} ${formatAmount(cents)}<br>Month in all ${formatAmount(total)}`);
+    });
+    const label = node("text", { x: x + barWidth / 2, y: TOP_ROOM + plotHeight + 20, class: "chart-tick", "text-anchor": "middle" });
+    label.textContent = month.label;
+    chart.append(label);
+  });
+
+  wrap.append(legend(series.map((name, index) => [classOf(name, index), name] as const)), chart);
+  return wrap;
+}

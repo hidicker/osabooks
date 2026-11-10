@@ -2356,9 +2356,10 @@ tr.job-open td { background: var(--accent-soft, #eef4fa); }
 .chart-series-4 { fill: var(--muted); opacity: 0.55; }
 .chart-series-5 { fill: var(--muted); opacity: 0.25; }
 
-.chart-legend { display: flex; gap: 1.1rem; margin: 0 0 0.5rem 76px; font-size: 0.8rem;
+.chart-legend { display: flex; flex-wrap: wrap; gap: 0.3rem 1.1rem; margin: 0 0 0.5rem 76px; font-size: 0.8rem;
   color: var(--muted); }
-.chart-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; }
+.chart-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; white-space: nowrap; }
+.dashboard-panel .chart-legend { margin-left: 0.5rem; }
 .chart-swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 .chart-swatch.chart-series-1 { background: var(--chart-1); }
 .chart-swatch.chart-series-2 { background: var(--chart-2); }
@@ -2367,6 +2368,30 @@ tr.job-open td { background: var(--accent-soft, #eef4fa); }
 .chart-swatch.chart-series-5 { background: var(--muted); opacity: 0.25; }
 .chart-line-1 { stroke: var(--chart-1); fill: none; stroke-width: 2.5; }
 .chart-line-2 { stroke: var(--chart-2); fill: none; stroke-width: 2.5; }
+.chart-cat-1 { fill: #2a78d6; }
+.chart-swatch.chart-cat-1 { background: #2a78d6; }
+.chart-cat-2 { fill: #eb6834; }
+.chart-swatch.chart-cat-2 { background: #eb6834; }
+.chart-cat-3 { fill: #1f9e8a; }
+.chart-swatch.chart-cat-3 { background: #1f9e8a; }
+.chart-cat-4 { fill: #e0b100; }
+.chart-swatch.chart-cat-4 { background: #e0b100; }
+.chart-cat-5 { fill: #8e5ac7; }
+.chart-swatch.chart-cat-5 { background: #8e5ac7; }
+.chart-cat-6 { fill: #d64b7f; }
+.chart-swatch.chart-cat-6 { background: #d64b7f; }
+.chart-cat-7 { fill: #5a8f29; }
+.chart-swatch.chart-cat-7 { background: #5a8f29; }
+.chart-cat-8 { fill: #4f6d8f; }
+.chart-swatch.chart-cat-8 { background: #4f6d8f; }
+.chart-cat-9 { fill: #b07a4a; }
+.chart-swatch.chart-cat-9 { background: #b07a4a; }
+.chart-cat-others { fill: var(--muted); opacity: 0.45; }
+.chart-swatch.chart-cat-others { background: var(--muted); opacity: 0.45; }
+.chart-line-rate { stroke: #b03a2e; fill: none; stroke-width: 2.5; }
+.chart-dot-rate { fill: #b03a2e; }
+.chart-swatch.chart-line-swatch { height: 3px; border-radius: 2px; background: #b03a2e; }
+.chart-zero { stroke: var(--muted); stroke-width: 1; opacity: 0.8; }
 
 .chart-tip { position: absolute; pointer-events: none; z-index: 5; background: var(--surface);
   border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem;
@@ -2396,7 +2421,9 @@ tr.job-open td { background: var(--accent-soft, #eef4fa); }
 .change-good { color: var(--in); }
 .change-bad { color: var(--out); }
 .chart-ring { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2rem; overflow: visible; }
-.chart-ring > svg { flex: 0 0 auto; width: 200px; height: 200px; }
+.chart-ring > svg { flex: 0 0 auto; width: 200px; height: 200px; min-width: 0; }
+/* Half-width panels: charts fit them, and scroll only when narrower than this. */
+.dashboard-panel .chart { min-width: 400px; }
 .chart-ring-centre { fill: var(--text); font-size: 15px; font-weight: 600; }
 .chart-ring-key { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; display: grid; gap: 0.35rem; }
 .chart-ring-key li { display: flex; align-items: center; gap: 0.4rem; }

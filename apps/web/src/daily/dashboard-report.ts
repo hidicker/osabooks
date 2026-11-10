@@ -1,7 +1,7 @@
 import { emptyEntityModel, groupProfitAndLoss, isCreditNote, isEstimate, isPosted, localToday } from "@nzosa/core";
 import type { Cents, Invoice } from "@nzosa/core";
 import { banks, entityBankAccounts, invoiceBalanceMap, invoicesInPlay } from "../books.js";
-import { lineChart, monthlyColumns, rankedBars, ringChart } from "../charts.js";
+import { columnsWithRate, lineChart, monthlyColumns, rankedBars, ringChart, stackedColumns } from "../charts.js";
 import type { RingSlice } from "../charts.js";
 import { booksMoney } from "../country.js";
 import { state } from "../state.js";
@@ -245,6 +245,8 @@ function build(year: number): HTMLElement {
     ]),
   );
 
+  page.append(...pastYear(asAt));
+
   // Two charts side by side where there is room.
   const pairOne = document.createElement("div");
   pairOne.className = "dashboard-pair";
@@ -487,4 +489,65 @@ function overdueTable(items: readonly { invoice: Invoice; owing: Cents; daysOver
   wrap.append(table);
   if (sorted.length > 15) wrap.append(note(`And ${sorted.length - 15} more: the aged receivables report lists them all.`));
   return wrap;
+}
+
+/** The twelve months ending with the one `asAt` falls in, oldest first. */
+function twelveMonths(asAt: string): { label: string; from: string; to: string }[] {
+  const out: { label: string; from: string; to: string }[] = [];
+  let month = asAt.slice(0, 7);
+  for (let i = 0; i < 12; i += 1) {
+    const [y, m] = month.split("-").map(Number) as [number, number];
+    const label = new Date(Date.UTC(y, m - 1, 1)).toLocaleDateString(undefined, { month: "short", year: "2-digit", timeZone: "UTC" });
+    const end = lastDay(month);
+    out.unshift({ label, from: `${month}-01`, to: end < asAt ? end : asAt });
+    month = monthBefore(month);
+  }
+  return out;
+}
+
+/**
+ * The past twelve months: income and expenses with the operating margin, and
+ * each split by account. From one profit and loss a month, the builder the
+ * reports use, so a column adds up to that month's report.
+ */
+function pastYear(asAt: string): HTMLElement[] {
+  const months = twelveMonths(asAt).map((m) => ({ ...m, report: currentReport({ from: m.from, to: m.to })?.report }));
+  if (months.every((m) => m.report === undefined || (m.report.totalIncome === 0 && m.report.totalExpenses === 0))) return [];
+
+  const rates = months.map((m) => {
+    const income = m.report?.totalIncome ?? 0;
+    const expenses = Math.abs(m.report?.totalExpenses ?? 0);
+    return { label: m.label, first: income, second: expenses, rate: income === 0 ? null : (income - expenses) / income };
+  });
+  const operating = panel(
+    "Operating income and expenses, the past 12 months",
+    columnsWithRate(rates, { first: "Income", second: "Expenses", rate: "Operating margin" }),
+  );
+  operating.classList.add("dashboard-wide");
+
+  /** Each account's month by month, the biggest `most` named and the rest as Others. */
+  const byAccount = (side: "income" | "expenses", most: number): HTMLElement => {
+    const totals = new Map<string, Cents>();
+    for (const m of months) for (const line of m.report?.[side] ?? []) totals.set(line.code, (totals.get(line.code) ?? 0) + Math.abs(line.net));
+    const ranked = [...totals].sort((a, b) => b[1] - a[1]).map(([code]) => code);
+    const named = ranked.slice(0, ranked.length > most + 1 ? most : most + 1);
+    const series = ranked.length > named.length ? [...named, "Others"] : named;
+    if (series.length === 0) return note(side === "income" ? "No income in these months." : "No expenses in these months.");
+    const points = months.map((m) => {
+      const parts = new Map<string, Cents>();
+      for (const line of m.report?.[side] ?? []) {
+        const name = named.includes(line.code) ? line.code : "Others";
+        // Income as earned and expenses as spent, both shown upward; a line
+        // the other way (a refund, a gain) goes below the line.
+        const signed = side === "income" ? line.net : -line.net;
+        parts.set(name, (parts.get(name) ?? 0) + signed);
+      }
+      return { label: m.label, parts };
+    });
+    return stackedColumns(points, series);
+  };
+  const pair = document.createElement("div");
+  pair.className = "dashboard-pair";
+  pair.append(panel("Income by account", byAccount("income", 5)), panel("Expenses by account", byAccount("expenses", 8)));
+  return [operating, pair];
 }
