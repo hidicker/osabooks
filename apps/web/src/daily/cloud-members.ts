@@ -3,6 +3,7 @@ import { callFunction, currentSession, rpc } from "../cloud.js";
 import { usingOwnProject } from "../cloud-config.js";
 import { askOnPage, note } from "../ui.js";
 import { booksLocale } from "../country.js";
+import { twoFactorForBooks } from "./two-factor-ui.js";
 
 /**
  * Who else can see a set of books kept on the server.
@@ -127,6 +128,9 @@ export function renderMembers(body: HTMLElement, book: { id: string; name: strin
 
   const list = document.createElement("div");
   body.append(list);
+
+  const twoFactor = twoFactorForBooks(book);
+  if (twoFactor !== null) body.append(twoFactor);
 
   const draw = async (): Promise<void> => {
     const rows = await rpc<MemberRow[]>("book_member_list", { book: book.id });

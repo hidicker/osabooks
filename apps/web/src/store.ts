@@ -744,6 +744,16 @@ async function readOnlyMember(bookId: string): Promise<boolean> {
   return mine === undefined || mine.role === "readonly";
 }
 
+let refusedCloudBook: { id: string; name: string } | null = null;
+
+/**
+ * The books online that were to open and the server would not open: waiting
+ * for a two-factor code, or access ended. Null when none was refused.
+ */
+export function cloudBookRefused(): { id: string; name: string } | null {
+  return refusedCloudBook;
+}
+
 /** Open a set of hosted books, or none. The page reloads around it, as switching always does. */
 export function openCloudBook(book: { id: string; name: string } | null): void {
   try {
@@ -1249,6 +1259,15 @@ async function loadFromCloud(): Promise<StoredLedger | null> {
   if (!cloudConfigured() || !signedIn()) return null;
   const book = cloudBook ?? rememberedCloudBook();
   if (book === null) return null;
+
+  // Asked first, because books the server will not open read back as empty
+  // rather than as refused: waiting for a two-factor code, or access ended.
+  // Opened, they would show as books with nothing in them. A question that
+  // could not be asked (no connection) goes on as before.
+  if ((await rpc<boolean>("is_member", { book: book.id })) === false) {
+    refusedCloudBook = book;
+    return null;
+  }
 
   const parts = await loadCloudParts(book.id);
   if (parts === null) return null;

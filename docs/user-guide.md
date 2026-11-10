@@ -35,6 +35,8 @@ Worth understanding before you put a year of your business into it, because it d
 
 Either way, **nothing is uploaded**. Your files are read on your own machine and the app does not send them anywhere. That is also why nobody can recover your books for you if you lose them — there is no copy but yours.
 
+**If you keep your books online** (`Books`, then sign in under Books on the server), they are kept on the OsaBooks server instead, where only you and the people you invite can open them, from any computer. Turn on **two-factor sign-in** there: a six-digit code from an authenticator app on your phone (Google Authenticator, Microsoft Authenticator, 1Password and the like), asked when you sign in on a new computer or browser, so your password on its own cannot open your books. Add a spare, such as your password manager, in case the phone is lost. An owner can also require it for everybody in a set of books, under who can see them.
+
 The app tells you which mode you are in: with a folder behind it, the ledger's name shows at the bottom of the sidebar and the demo offers to "Open the demo books"; without one, it offers to "Load demo data".
 
 **Back it up.** In folder mode, copy the folder. Wherever you are, `Books → Download a backup` (also on Bank import) writes everything to a single file you can keep somewhere else, the coding rules and the history included, and `Restore from a backup` puts it all back.

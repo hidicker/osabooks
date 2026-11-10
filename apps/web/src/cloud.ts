@@ -826,3 +826,109 @@ export async function answerConnectRequest(id: string, action: "approve" | "deny
     return null;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Two-factor sign-in: a six-digit code from an authenticator app.
+//
+// Supabase keeps the authenticators ("factors") and checks the codes. A
+// session that has given a code carries `aal2` in its token, and the database
+// decides from that what may be opened (is_member and has_role): somebody with
+// an authenticator gives the code on each new sign-in, and an owner can require
+// it for a set of books. A browser that has given it stays signed in, so the
+// code is asked again only on a new computer or browser, or after signing out.
+// ---------------------------------------------------------------------------
+
+/** One authenticator on this account. */
+export interface Authenticator {
+  id: string;
+  name: string;
+  /** Confirmed with a code. One that never was is a set-up left half done. */
+  verified: boolean;
+}
+
+/** Whether this sign-in has given an authenticator code. */
+export function signedInWithCode(): boolean {
+  const held = currentSession();
+  if (held === null) return false;
+  return (claimsOf(held.accessToken) as { aal?: string }).aal === "aal2";
+}
+
+async function authAs(method: "GET" | "POST" | "DELETE", path: string, body?: unknown): Promise<{ status: number; reply: Record<string, unknown> }> {
+  const token = await freshToken();
+  if (token === null) return { status: 401, reply: { msg: "Not signed in." } };
+  try {
+    const response = await fetch(`${CLOUD.url}/auth/v1/${path}`, {
+      method,
+      headers: {
+        apikey: CLOUD.publishableKey,
+        authorization: `Bearer ${token}`,
+        ...(body !== undefined ? { "content-type": "application/json" } : {}),
+      },
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    });
+    const reply = (await response.json().catch(() => ({}))) as Record<string, unknown>;
+    return { status: response.status, reply };
+  } catch {
+    return { status: 0, reply: { msg: "Could not reach the server." } };
+  }
+}
+
+const said = (reply: Record<string, unknown>, fallback: string): string =>
+  String(reply.error_description ?? reply.msg ?? reply.message ?? fallback);
+
+/** This account's authenticators, or null when they could not be read. */
+export async function authenticators(): Promise<Authenticator[] | null> {
+  const { status, reply } = await authAs("GET", "user");
+  if (status !== 200) return null;
+  const factors = Array.isArray(reply.factors) ? (reply.factors as Record<string, unknown>[]) : [];
+  return factors
+    .filter((f) => f.factor_type === "totp")
+    .map((f) => ({ id: String(f.id), name: String(f.friendly_name ?? "Authenticator"), verified: f.status === "verified" }));
+}
+
+/**
+ * Start setting one up: the QR code to scan and the same key as text, for an
+ * app that cannot scan. Nothing is required until it is confirmed with a code.
+ * A set-up left half done before is cleared first, or Supabase would refuse a
+ * second under the same name.
+ */
+export async function startAuthenticator(
+  name: string,
+): Promise<{ ok: true; id: string; qr: string; secret: string } | { ok: false; why: string }> {
+  for (const old of (await authenticators()) ?? []) {
+    if (!old.verified) await authAs("DELETE", `factors/${encodeURIComponent(old.id)}`);
+  }
+  const { status, reply } = await authAs("POST", "factors", { factor_type: "totp", friendly_name: name, issuer: "OsaBooks" });
+  const totp = reply.totp as { qr_code?: string; secret?: string } | undefined;
+  if (status !== 200 || typeof reply.id !== "string" || totp?.qr_code === undefined) {
+    return { ok: false, why: said(reply, "The authenticator could not be set up.") };
+  }
+  return { ok: true, id: reply.id, qr: totp.qr_code, secret: totp.secret ?? "" };
+}
+
+/**
+ * A code from an authenticator: confirms one being set up, or completes a
+ * sign-in. Either way the session it hands back has given the code.
+ */
+export async function giveCode(authenticatorId: string, code: string): Promise<{ ok: true } | { ok: false; why: string }> {
+  const id = encodeURIComponent(authenticatorId);
+  const challenge = await authAs("POST", `factors/${id}/challenge`, {});
+  if (challenge.status !== 200 || typeof challenge.reply.id !== "string") {
+    return { ok: false, why: said(challenge.reply, "The code could not be checked.") };
+  }
+  const verify = await authAs("POST", `factors/${id}/verify`, { challenge_id: challenge.reply.id, code: code.replace(/\s/g, "") });
+  const next = sessionFrom(verify.reply as TokenReply);
+  if (next === null) {
+    return { ok: false, why: verify.status === 422 || verify.status === 400 ? "That code was not right. Codes change every 30 seconds: try the one showing now." : said(verify.reply, "The code could not be checked.") };
+  }
+  const held = currentSession();
+  remember({ ...next, userId: next.userId || held?.userId || "", email: next.email || held?.email || "" });
+  return { ok: true };
+}
+
+/** Remove one. Supabase asks for a session that has given a code first. */
+export async function removeAuthenticator(authenticatorId: string): Promise<{ ok: true } | { ok: false; why: string }> {
+  const { status, reply } = await authAs("DELETE", `factors/${encodeURIComponent(authenticatorId)}`);
+  if (status === 200 || status === 204) return { ok: true };
+  return { ok: false, why: said(reply, "The authenticator could not be removed.") };
+}

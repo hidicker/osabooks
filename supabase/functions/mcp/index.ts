@@ -132,6 +132,18 @@ async function roleIn(book: string, person: string): Promise<string | null> {
   return row.role;
 }
 
+/** Whether this person must have given an authenticator code to reach these books. Asked when unsure. */
+async function twoFactorNeeded(book: string, person: string): Promise<boolean> {
+  const response = await service("/rest/v1/rpc/two_factor_needed", {
+    method: "POST",
+    body: JSON.stringify({ p_book: book, p_person: person }),
+  });
+  // Not answered (the function missing, the database busy): treated as needed,
+  // so a fault never opens books that should have asked for the code.
+  if (!response.ok) return true;
+  return (await response.json().catch(() => true)) !== false;
+}
+
 async function booksNamed(book: string): Promise<string | null> {
   const response = await service(`/rest/v1/books?select=name&id=eq.${book}&deleted_at=is.null`);
   if (!response.ok) return null;
@@ -208,6 +220,16 @@ Deno.serve(async (request) => {
   const name = role === null ? null : await booksNamed(book);
   if (role === null || name === null) {
     return json(rpcError(firstId, -32001, "These books are not open to you. Ask their owner to add you, or connect the books you work on."), 403);
+  }
+  // Two-factor, as is_member asks it of the app: somebody with an authenticator,
+  // or books whose owner requires it, need a sign-in that gave the code. Said
+  // rather than sent back to sign in, which would only go round again if the
+  // app's sign-in cannot carry the code.
+  if ((await twoFactorNeeded(book, person)) && claimsOf(token)["aal"] !== "aal2") {
+    return json(
+      rpcError(firstId, -32001, "These books need two-factor sign-in, and this connection was not made with the code from your authenticator app."),
+      403,
+    );
   }
 
   try {

@@ -163,6 +163,7 @@ import {
   openCloudBookId,
   ledgerId,
   savesPending,
+  cloudBookRefused,
 } from "./store.js";
 import { renderEntityFilter } from "./widgets.js";
 
@@ -436,6 +437,16 @@ async function init(): Promise<void> {
     // asks what it needs and hands over to Setup with the answers in. Once
     // there are transactions, Reconcile is the page you actually live on.
     if (state.ledger.transactions.length === 0) state.page = "migration";
+
+    // The books online that should have opened, and the server would not
+    // open: said, and the Books page shown, where the code is asked for.
+    const refused = cloudBookRefused();
+    if (refused !== null) {
+      state.startupMessage =
+        `${refused.name} did not open. If you use two-factor sign-in, give the code from your authenticator app ` +
+        "on the Books page; otherwise your access to these books may have ended.";
+      state.page = "books";
+    }
 
     showPage(state.page);
   } finally {

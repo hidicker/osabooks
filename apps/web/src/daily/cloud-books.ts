@@ -15,6 +15,7 @@ import {
 } from "../cloud.js";
 import { backupTools, buildBackup, restoredName } from "../backup.js";
 import { renderMembers } from "./cloud-members.js";
+import { booksWaitingForCode, codeAskedFor, twoFactorSettings } from "./two-factor-ui.js";
 import { myRoles, rpc } from "../cloud.js";
 import { state } from "../state.js";
 import { copyToCloudBook, openCloudBook, openCloudBookId } from "../store.js";
@@ -305,6 +306,17 @@ async function booksList(body: HTMLElement, email: string): Promise<void> {
   who.append(" ", out);
   body.append(who);
 
+  // Signed in, but this account has an authenticator and has not given its
+  // code: nothing opens until it does, so the code is all this page asks for.
+  // The list would otherwise read "no books yet", which is not true.
+  const askFor = await codeAskedFor();
+  if (askFor !== null) {
+    body.append(askFor);
+    const waiting = await booksWaitingForCode();
+    if (waiting !== null) body.append(waiting);
+    return;
+  }
+
   const said = document.createElement("p");
   said.className = "cloud-said";
   say(said, "Looking…");
@@ -441,7 +453,15 @@ async function booksList(body: HTMLElement, email: string): Promise<void> {
     body.append(table);
   }
 
+  // Books whose owner requires two-factor, when this account has not set it up.
+  const waiting = await booksWaitingForCode();
+  if (waiting !== null) body.append(waiting);
+
   await deletedSets(body);
+
+  // This account's own two-factor sign-in.
+  const twoFactor = twoFactorSettings();
+  if (twoFactor !== null) body.append(twoFactor);
 
   // Starting a set of books, which is also how somebody's first set is made.
   const add = document.createElement("div");
