@@ -1178,8 +1178,10 @@ function write(name, built) {
   b.open("950", -10_000);
   b.open("960", -Object.values(b.opening).reduce((s, v) => s + v, 0));
 
-  // Left to code.
-  b.line(bank, "2026-03-12", -126_500, "Sky Gear NZ", undefined, undefined, {
+  // Left to code, simplest first: Reconcile lists them oldest first, and the
+  // lessons start on the first. The reserve, an asset, comes last, because
+  // confirming it offers the asset register, which is not where to begin.
+  b.line(bank, "2026-03-27", -126_500, "Sky Gear NZ", undefined, undefined, {
     particulars: "Reserve parachute",
     example: {
       code: "730", confidence: 0.71, because: "A reserve parachute for school use, $1,100 before GST.",
@@ -1190,7 +1192,7 @@ function write(name, built) {
     particulars: "Vario",
     example: { code: "446", confidence: 0.84, because: "A vario for $520 before GST: under $1,000, so it can be written off this year." },
   });
-  b.line(bank, "2026-03-26", 88_500, "Chen W", undefined, undefined, {
+  b.line(bank, "2026-03-12", 88_500, "Chen W", undefined, undefined, {
     particulars: "Tandems x3",
     example: { code: "200", confidence: 0.9, because: "Three trial tandem flights at $295, paid by bank transfer." },
   });

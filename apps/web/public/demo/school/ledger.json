@@ -5804,16 +5804,16 @@
    "id": "school-0224",
    "occurrence": 1,
    "date": "2026-03-12",
-   "amount": -126500,
+   "amount": 88500,
    "currency": "NZD",
    "serial": "",
    "trn": "",
-   "particulars": "Reserve parachute",
+   "particulars": "Tandems x3",
    "code": "",
    "reference": "",
-   "otherParty": "Sky Gear NZ",
+   "otherParty": "Chen W",
    "origin": "",
-   "type": "DB",
+   "type": "CR",
    "batch": "",
    "otherPartyAccount": "",
    "account": "02-0948-0071234-000",
@@ -5986,14 +5986,14 @@
    "id": "school-0231",
    "occurrence": 1,
    "date": "2026-03-26",
-   "amount": 88500,
+   "amount": 57229,
    "currency": "NZD",
    "serial": "",
    "trn": "",
-   "particulars": "Tandems x3",
+   "particulars": "Stripe payout",
    "code": "",
    "reference": "",
-   "otherParty": "Chen W",
+   "otherParty": "Stripe",
    "origin": "",
    "type": "CR",
    "batch": "",
@@ -6011,17 +6011,17 @@
   {
    "id": "school-0232",
    "occurrence": 1,
-   "date": "2026-03-26",
-   "amount": 57229,
+   "date": "2026-03-27",
+   "amount": -126500,
    "currency": "NZD",
    "serial": "",
    "trn": "",
-   "particulars": "Stripe payout",
+   "particulars": "Reserve parachute",
    "code": "",
    "reference": "",
-   "otherParty": "Stripe",
+   "otherParty": "Sky Gear NZ",
    "origin": "",
-   "type": "CR",
+   "type": "DB",
    "batch": "",
    "otherPartyAccount": "",
    "account": "02-0948-0071234-000",
@@ -7926,7 +7926,7 @@
    "note": "Drawings",
    "at": "2026-03-25"
   },
-  "school-0232": {
+  "school-0231": {
    "confirmed": true,
    "treatment": "standard",
    "side": "sales",
@@ -8151,7 +8151,7 @@
     "note": "Stripe's fee"
    }
   ],
-  "school-0232": [
+  "school-0231": [
    {
     "amount": 59000,
     "code": "Gift vouchers sold - 210",
@@ -8680,10 +8680,9 @@
  "exampleAiSuggestions": [
   {
    "id": "school-0224",
-   "code": "730",
-   "confidence": 0.71,
-   "because": "A reserve parachute for school use, $1,100 before GST.",
-   "caution": "Over $1,000 before GST, so it goes in the asset register rather than Low Value Assets."
+   "code": "200",
+   "confidence": 0.9,
+   "because": "Three trial tandem flights at $295, paid by bank transfer."
   },
   {
    "id": "school-0227",
@@ -8692,10 +8691,11 @@
    "because": "A vario for $520 before GST: under $1,000, so it can be written off this year."
   },
   {
-   "id": "school-0231",
-   "code": "200",
-   "confidence": 0.9,
-   "because": "Three trial tandem flights at $295, paid by bank transfer."
+   "id": "school-0232",
+   "code": "730",
+   "confidence": 0.71,
+   "because": "A reserve parachute for school use, $1,100 before GST.",
+   "caution": "Over $1,000 before GST, so it goes in the asset register rather than Low Value Assets."
   }
  ],
  "manualJournals": [
