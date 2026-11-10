@@ -1,5 +1,6 @@
 import { renderAuRentalSchedule, renderAuTax, renderBas, renderContractors, renderKrBusiness, renderKrRental, renderKrTax, renderKrVat, renderScheduleC, renderBudgetVsActual, renderProfitByClass, renderProfitByJob, renderPayrollTax, renderSalesTax, renderScheduleE, renderUsTax } from "./country-reports.js";
 import { attachmentsControl } from "./attachments-ui.js";
+import { renderDashboard } from "./dashboard-report.js";
 import { comparing, drawPeriodControls, earlierRange, periodFileName, periodHeading, reportRange } from "./report-period.js";
 import { bestAccountMatch, cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell, localToday } from "@nzosa/core";
 import type { OpeningBalances, OwingDocument } from "@nzosa/core";
@@ -1715,6 +1716,24 @@ function companyTaxSection(year: number, taxableProfit: Cents): HTMLElement {
  * sheet, it is a wrong one, and it is said rather than left to be discovered.
  */
 /** The balance sheet for the year chosen, and a year earlier when comparing: what the page and its CSV both show. */
+/**
+ * The balance sheet on any day, for the entity chosen, set out as the balance
+ * sheet report sets it out. For the dashboard's month ends.
+ */
+export function balanceSheetOn(date: string): ReturnType<typeof computeBalanceSheet> {
+  const position = positionJournals();
+  const { journals, opening } = entityPart(position.journals, state.ledger.openingBalances);
+  const company = companyBooks();
+  return computeBalanceSheet({
+    asAt: date,
+    ...(opening ? { openingBalances: opening } : {}),
+    journals,
+    chart: state.chart,
+    shareholderCurrentAccounts: company && booksCountry().id === "nz",
+    profitInRetainedEarnings: company,
+  });
+}
+
 function balanceSheetFor(year: number) {
   const asAt = reportRange(year).to;
   const position = positionJournals();
@@ -4409,6 +4428,7 @@ const REPORT_DESCRIPTIONS: Record<string, string> = {
   byitem: "What each product or service sold for in the period, and how many, from the invoice lines. Invoices and sales receipts only.",
   agedreceivables: "What each customer owes on a day, by how late, agreed to Accounts Receivable.",
   charts: "The year's income and spending, month by month.",
+  dashboard: "The books at a glance: the bank, what is owed each way, the year's profit, invoices by status and this month against last. Worked out when opened; Refresh brings it up to date.",
   schedulee: "Each rental property on Schedule E's lines, from its own accounts.",
   schedulec: "The business on Schedule C's lines, with the estimated tax dates.",
   contractors: "Who was paid for contract labor, and whether a 1099-NEC is due.",
@@ -5048,6 +5068,12 @@ export function renderReportsPage(): void {
     return;
   }
 
+  if (kind === "dashboard") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderDashboard(body, chosenYearNow);
+    return;
+  }
+
   if (kind === "charts") {
     ownerSelect.hidden = true;
     if (chosenYearNow !== undefined) renderCharts(body, chosenYearNow);
@@ -5657,7 +5683,7 @@ function renderPlColumns(body: HTMLElement, year: number, by: "month" | "quarter
   body.append(wideTable(table));
 }
 
-function monthsOfYear(year: number): { label: string; from: string; to: string }[] {
+export function monthsOfYear(year: number): { label: string; from: string; to: string }[] {
   return monthsOfTaxYear(year, "en-US");
 }
 

@@ -40,6 +40,7 @@ function reportKinds() {
 /** Reports with nothing to save as a file of their own. */
 const NO_DOWNLOAD = new Set([
   "home",
+  "dashboard",
   "cashflow",
   "shareholders",
   "ir10",

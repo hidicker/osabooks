@@ -867,6 +867,7 @@
      the only thing saying which bar is which. */
   --chart-1: #2a78d6;
   --chart-2: #eb6834;
+  --chart-3: #1f9e8a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -891,6 +892,7 @@
     --out: #f08a76;
     --chart-1: #3987e5;
     --chart-2: #d95926;
+    --chart-3: #2bb39c;
     --review: #e0aa5a;
     --review-bg: #2e2617;
     --duplicate-bg: #1c2830;
@@ -919,6 +921,7 @@
     --out: #f08a76;
     --chart-1: #3987e5;
     --chart-2: #d95926;
+    --chart-3: #2bb39c;
     --review: #e0aa5a;
     --review-bg: #2e2617;
     --duplicate-bg: #1c2830;
@@ -2349,6 +2352,9 @@ tr.job-open td { background: var(--accent-soft, #eef4fa); }
 .chart-value { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
 .chart-series-1 { fill: var(--chart-1); }
 .chart-series-2 { fill: var(--chart-2); }
+.chart-series-3 { fill: var(--chart-3); }
+.chart-series-4 { fill: var(--muted); opacity: 0.55; }
+.chart-series-5 { fill: var(--muted); opacity: 0.25; }
 
 .chart-legend { display: flex; gap: 1.1rem; margin: 0 0 0.5rem 76px; font-size: 0.8rem;
   color: var(--muted); }
@@ -2356,6 +2362,11 @@ tr.job-open td { background: var(--accent-soft, #eef4fa); }
 .chart-swatch { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
 .chart-swatch.chart-series-1 { background: var(--chart-1); }
 .chart-swatch.chart-series-2 { background: var(--chart-2); }
+.chart-swatch.chart-series-3 { background: var(--chart-3); }
+.chart-swatch.chart-series-4 { background: var(--muted); opacity: 0.55; }
+.chart-swatch.chart-series-5 { background: var(--muted); opacity: 0.25; }
+.chart-line-1 { stroke: var(--chart-1); fill: none; stroke-width: 2.5; }
+.chart-line-2 { stroke: var(--chart-2); fill: none; stroke-width: 2.5; }
 
 .chart-tip { position: absolute; pointer-events: none; z-index: 5; background: var(--surface);
   border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem;
@@ -2372,6 +2383,23 @@ tr.job-open td { background: var(--accent-soft, #eef4fa); }
 .chart-tile-note { font-size: 0.74rem; color: var(--muted); }
 
 .chart-heading { font-size: 0.95rem; margin: 1.4rem 0 0.2rem; }
+.dashboard-bar { display: flex; align-items: center; gap: 0.8rem; margin: 0 0 0.8rem; flex-wrap: wrap; }
+.dashboard-said { font-size: 0.85rem; color: var(--muted); }
+.dashboard-said.dashboard-stale { color: var(--warn, #b45309); }
+.dashboard-title { margin: 0 0 0.8rem; }
+.dashboard-pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1rem 1.4rem; }
+.dashboard-panel { background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 0.4rem 1rem 0.8rem; margin: 0 0 1rem; min-width: 0; }
+.dashboard-panel .chart-heading { margin-top: 0.6rem; }
+.dashboard-panel .chart-figure { margin-bottom: 0.4rem; }
+.dashboard-table { width: 100%; }
+.change-good { color: var(--in); }
+.change-bad { color: var(--out); }
+.chart-ring { display: flex; flex-wrap: wrap; align-items: center; gap: 1.2rem; overflow: visible; }
+.chart-ring > svg { flex: 0 0 auto; width: 200px; height: 200px; }
+.chart-ring-centre { fill: var(--text); font-size: 15px; font-weight: 600; }
+.chart-ring-key { list-style: none; margin: 0; padding: 0; font-size: 0.85rem; display: grid; gap: 0.35rem; }
+.chart-ring-key li { display: flex; align-items: center; gap: 0.4rem; }
 
 /* Which ledger account a chart's bank row is, and what it serves. */
 .bank-link { max-width: 17rem; }

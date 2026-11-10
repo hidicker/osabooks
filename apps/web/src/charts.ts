@@ -120,7 +120,10 @@ export interface MonthPoint {
  * Two series that have to be told apart, so grouped columns and the
  * categorical pair, with a legend rather than a number on every column.
  */
-export function monthlyColumns(months: readonly MonthPoint[]): HTMLElement {
+export function monthlyColumns(
+  months: readonly MonthPoint[],
+  names: { first: string; second: string; net: boolean } = { first: "Money in", second: "Money out", net: true },
+): HTMLElement {
   const wrap = document.createElement("figure");
   wrap.className = "chart-figure";
 
@@ -162,9 +165,9 @@ export function monthlyColumns(months: readonly MonthPoint[]): HTMLElement {
     const middle = AXIS_LEFT + band * index + band / 2;
     const tip =
       `<strong>${safe(month.label)}</strong><br>` +
-      `In ${formatAmount(month.income)}<br>` +
-      `Out ${formatAmount(Math.abs(month.expenses))}<br>` +
-      `Net ${formatAmount(month.income - Math.abs(month.expenses))}`;
+      `${safe(names.first)} ${formatAmount(month.income)}<br>` +
+      `${safe(names.second)} ${formatAmount(Math.abs(month.expenses))}` +
+      (names.net ? `<br>Net ${formatAmount(month.income - Math.abs(month.expenses))}` : "");
 
     const pairs: readonly (readonly [Cents, string])[] = [
       [month.income, "chart-series-1"],
@@ -204,8 +207,8 @@ export function monthlyColumns(months: readonly MonthPoint[]): HTMLElement {
 
   wrap.append(
     legend([
-      ["chart-series-1", "Money in"],
-      ["chart-series-2", "Money out"],
+      ["chart-series-1", names.first],
+      ["chart-series-2", names.second],
     ]),
     chart,
   );
@@ -332,4 +335,149 @@ export function statTiles(
     row.append(box);
   }
   return row;
+}
+
+/** Two balances over time, such as what customers owe and what is owed to suppliers. */
+export interface LinePoint {
+  label: string;
+  first: Cents;
+  second: Cents;
+}
+
+/**
+ * Two balances, month end by month end.
+ *
+ * Lines rather than columns: these are balances on a day, not amounts over a
+ * month, and a line says "this is where it stood, then here" where a column
+ * says "this much happened". Straight segments between the month ends, not a
+ * smoothed curve: a curve draws values on days nobody measured.
+ */
+export function lineChart(points: readonly LinePoint[], names: { first: string; second: string }): HTMLElement {
+  const wrap = document.createElement("figure");
+  wrap.className = "chart-figure";
+  const width = 760;
+  const height = 260;
+  const chart = svgRoot(width, height);
+  const plotWidth = width - AXIS_LEFT - 24;
+  const plotHeight = height - AXIS_BOTTOM - TOP_ROOM;
+  const baseline = TOP_ROOM + plotHeight;
+
+  const biggest = Math.max(0, ...points.map((p) => Math.max(Math.abs(p.first), Math.abs(p.second))));
+  const { top, values } = ticksTo(biggest / 100);
+  const yOf = (cents: Cents): number => (top === 0 ? baseline : baseline - (Math.max(0, cents) / 100 / top) * plotHeight);
+  for (const value of values) {
+    const at = baseline - (value / top) * plotHeight;
+    chart.append(node("line", { x1: AXIS_LEFT, y1: at, x2: AXIS_LEFT + plotWidth, y2: at, class: "chart-grid" }));
+    const label = node("text", { x: AXIS_LEFT - 10, y: at + 4, class: "chart-tick", "text-anchor": "end" });
+    label.textContent = short(value);
+    chart.append(label);
+  }
+
+  const step = points.length > 1 ? plotWidth / (points.length - 1) : 0;
+  const xOf = (index: number): number => AXIS_LEFT + (points.length > 1 ? step * index : plotWidth / 2);
+  const showTip = hoverLayer(wrap);
+  const series: readonly (readonly ["first" | "second", string, string])[] = [
+    ["first", "chart-line-1", "chart-series-1"],
+    ["second", "chart-line-2", "chart-series-2"],
+  ];
+  for (const [key, lineClass] of series) {
+    const d = points.map((p, i) => `${i === 0 ? "M" : "L"} ${xOf(i).toFixed(1)} ${yOf(p[key]).toFixed(1)}`).join(" ");
+    if (points.length > 1) chart.append(node("path", { d, class: lineClass }));
+  }
+  points.forEach((point, index) => {
+    const tip =
+      `<strong>${safe(point.label)}</strong><br>` +
+      `${safe(names.first)} ${formatAmount(point.first)}<br>${safe(names.second)} ${formatAmount(point.second)}`;
+    for (const [key, , dotClass] of series) {
+      const dot = node("circle", { cx: xOf(index), cy: yOf(point[key]), r: 4, class: dotClass });
+      chart.append(dot);
+      showTip(dot, tip);
+    }
+    const label = node("text", { x: xOf(index), y: baseline + 20, class: "chart-tick", "text-anchor": "middle" });
+    label.textContent = point.label;
+    chart.append(label);
+  });
+  chart.append(node("line", { x1: AXIS_LEFT, y1: baseline, x2: AXIS_LEFT + plotWidth, y2: baseline, class: "chart-axis" }));
+
+  wrap.append(
+    legend([
+      ["chart-series-1", names.first],
+      ["chart-series-2", names.second],
+    ]),
+    chart,
+  );
+  return wrap;
+}
+
+/** One part of a whole, for a ring. `series` is 1 to 5, a chart-series class. */
+export interface RingSlice {
+  label: string;
+  value: Cents;
+  series: 1 | 2 | 3 | 4 | 5;
+  /** Shown beside the amount in the legend, such as a count. */
+  note?: string;
+}
+
+/**
+ * Parts of a whole, as a ring with its legend beside it.
+ *
+ * A ring rather than a pie for a few parts of one total: the hole carries the
+ * total. The legend carries every amount, so no part is read from its colour
+ * or its angle alone.
+ */
+export function ringChart(slices: readonly RingSlice[], centre: string): HTMLElement {
+  const wrap = document.createElement("figure");
+  wrap.className = "chart-figure chart-ring";
+  const size = 200;
+  const chart = svgRoot(size, size);
+  chart.setAttribute("width", String(size));
+  const total = slices.reduce((sum, s) => sum + Math.max(0, s.value), 0);
+  const outer = 92;
+  const inner = 58;
+  const middle = size / 2;
+  const showTip = hoverLayer(wrap);
+  const point = (radius: number, turn: number): [number, number] => [
+    middle + radius * Math.sin(turn * 2 * Math.PI),
+    middle - radius * Math.cos(turn * 2 * Math.PI),
+  ];
+  let from = 0;
+  for (const slice of slices) {
+    if (slice.value <= 0 || total === 0) continue;
+    const share = slice.value / total;
+    // A whole ring cannot be drawn as one arc: stop just short of it.
+    const to = from + Math.min(share, 0.9999);
+    const [x1, y1] = point(outer, from);
+    const [x2, y2] = point(outer, to);
+    const [x3, y3] = point(inner, to);
+    const [x4, y4] = point(inner, from);
+    const large = to - from > 0.5 ? 1 : 0;
+    const path = node("path", {
+      d:
+        `M ${x1} ${y1} A ${outer} ${outer} 0 ${large} 1 ${x2} ${y2} ` +
+        `L ${x3} ${y3} A ${inner} ${inner} 0 ${large} 0 ${x4} ${y4} Z`,
+      class: `chart-series-${slice.series}`,
+    });
+    chart.append(path);
+    showTip(path, `<strong>${safe(slice.label)}</strong><br>${formatAmount(slice.value)}${slice.note ? ` (${safe(slice.note)})` : ""}`);
+    from += share;
+  }
+  if (total === 0) chart.append(node("circle", { cx: middle, cy: middle, r: (outer + inner) / 2, class: "chart-grid", fill: "none", "stroke-width": outer - inner }));
+  const label = node("text", { x: middle, y: middle + 5, class: "chart-ring-centre", "text-anchor": "middle" });
+  label.textContent = centre;
+  chart.append(label);
+
+  const key = document.createElement("ul");
+  key.className = "chart-ring-key";
+  for (const slice of slices) {
+    const item = document.createElement("li");
+    const swatch = document.createElement("span");
+    swatch.className = `chart-swatch chart-series-${slice.series}`;
+    const amount = document.createElement("strong");
+    amount.textContent = formatAmount(slice.value);
+    item.append(swatch, document.createTextNode(` ${slice.label} `), amount);
+    if (slice.note) item.append(document.createTextNode(` (${slice.note})`));
+    key.append(item);
+  }
+  wrap.append(chart, key);
+  return wrap;
 }
