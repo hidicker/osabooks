@@ -46,6 +46,103 @@ const opened = (): boolean => document.querySelector("#reports-body tr.report-be
 
 export const LESSONS: readonly Lesson[] = [
   {
+    id: "code-a-line",
+    title: "Code a bank line",
+    get summary() {
+      return noSalesTax()
+        ? "Give a bank line its account, confirm it, and see what OsaBooks learns from it."
+        : "Give a bank line its account and GST, confirm it, and see what OsaBooks learns from it.";
+    },
+    minutes: 3,
+    steps: [
+      {
+        title: "Bank lines to code",
+        // The first lesson now, so it says whose books these are, as the
+        // welcome does.
+        body: () =>
+          (DEMO_PERSONAS.find((p) => p.id === currentDemoPersona())?.about ?? "").replace(/(.)$/, "$1 ") +
+          "Every line from your bank files and feeds lands here until it has an account. Coding is most of " +
+          "bookkeeping, so this is where the time goes, and where OsaBooks saves the most of it.",
+        page: "reconcile",
+        target: firstLine,
+      },
+      {
+        title: "What the bank said",
+        body: "The date, who the money went to or came from, the bank's description, and which of your accounts it was on.",
+        target: () => firstLine()?.querySelector(".code-bank") ?? null,
+      },
+      {
+        title: "The account",
+        body: () =>
+          suggested()
+            ? "OsaBooks has already suggested one, from how lines like this were coded before. Type in the box to " +
+              "choose a different account."
+            : "Nothing like this line has been coded before, so there is no suggestion yet. Type in the box to " +
+              "search the accounts: a name or a number.",
+        target: () => firstLine()?.querySelector(".combo") ?? null,
+      },
+      {
+        title: "Why it was suggested",
+        body: "The GST treatment, and the reason for the suggestion, so you can tell a good guess from a lucky one.",
+        target: () => firstLine()?.querySelector(".code-reason") ?? null,
+      },
+      {
+        title: "GST",
+        body: () =>
+          booksCountry().id === "au"
+            ? "10% for an ordinary purchase or sale. GST-free (bank fees, exports) and input taxed (interest, " +
+              "residential rent) each have their own place on the BAS; BAS excluded is for wages, drawings and " +
+              "transfers. The BAS adds these up for you."
+            : `${booksCountry().id === "nz" ? "15" : gstPercent()}% for an ordinary purchase or sale, 0% for anything with no GST in it, such as bank fees or wages. ` +
+              "The GST return adds these up for you.",
+        target: () => firstLine()?.querySelector(".gst-select") ?? null,
+        // Where there is no sales tax there is no rate to choose.
+        when: () => !noSalesTax(),
+      },
+      {
+        title: "Confirm it",
+        body: () =>
+          noSalesTax()
+            ? "Confirming puts the line in the books: it now counts in the reports and the tax schedules."
+            : "Confirming puts the line in the books: it now counts in the reports and the GST return.",
+        task: () => (suggested() ? "Press ✓ on this line." : "Choose an account, then press ✓."),
+        target: () => firstLine()?.querySelector(".code-tick") ?? null,
+        before: () => {
+          watchedLine = firstLine()?.dataset["id"] ?? "";
+        },
+        done: () => {
+          if (watchedLine === "") return false;
+          const row = document.querySelector<HTMLElement>(`#reconcile-body .code-row[data-id="${watchedLine}"]`);
+          return row === null || row.querySelector(".code-tick.tick-live") === null;
+        },
+      },
+      {
+        title: "Suggested by AI",
+        body:
+          "Where nothing you have coded before fits, an AI model you choose can suggest the account, and says how " +
+          "sure it is, why, and anything to check. The ones in this demo are examples, written by hand. Nothing " +
+          "is used until you confirm it.",
+        target: lineSuggestedBy(/^AI suggestion/),
+      },
+      {
+        title: "A known New Zealand business",
+        body:
+          "OsaBooks also recognises well-known New Zealand businesses, such as fuel stations, phone companies and " +
+          "couriers, and suggests the one account in your chart that fits. It needs no AI and sends nothing anywhere.",
+        target: lineSuggestedBy(/^Known business/),
+        // New Zealand's directory: elsewhere there may be no such line to show.
+        when: () => booksCountry().id === "nz" && lineSuggestedBy(/^Known business/)() !== null,
+      },
+      {
+        title: "Done",
+        body:
+          "The line you confirmed is in the books, and the next line from the same payee will be suggested the " +
+          "same way. When the suggestions on a page all look right, Accept all confirms them in one go.",
+        target: q("#accept-all"),
+      },
+    ],
+  },
+  {
     id: "welcome",
     title: "Get to know OsaBooks",
     summary: "What OsaBooks does, how the menu is arranged, and where your books live.",
@@ -135,100 +232,6 @@ export const LESSONS: readonly Lesson[] = [
           text: "How to host OsaBooks online yourself",
           href: "https://nbparagliding.nz/osabooks/home/help/self-hosting.html",
         },
-      },
-    ],
-  },
-  {
-    id: "code-a-line",
-    title: "Code a bank line",
-    get summary() {
-      return noSalesTax()
-        ? "Give a bank line its account, confirm it, and see what OsaBooks learns from it."
-        : "Give a bank line its account and GST, confirm it, and see what OsaBooks learns from it.";
-    },
-    minutes: 3,
-    steps: [
-      {
-        title: "Bank lines to code",
-        body:
-          "Every line from your bank files and feeds lands here until it has an account. Coding is most of " +
-          "bookkeeping, so this is where the time goes, and where OsaBooks saves the most of it.",
-        page: "reconcile",
-        target: firstLine,
-      },
-      {
-        title: "What the bank said",
-        body: "The date, who the money went to or came from, the bank's description, and which of your accounts it was on.",
-        target: () => firstLine()?.querySelector(".code-bank") ?? null,
-      },
-      {
-        title: "The account",
-        body: () =>
-          suggested()
-            ? "OsaBooks has already suggested one, from how lines like this were coded before. Type in the box to " +
-              "choose a different account."
-            : "Nothing like this line has been coded before, so there is no suggestion yet. Type in the box to " +
-              "search the accounts: a name or a number.",
-        target: () => firstLine()?.querySelector(".combo") ?? null,
-      },
-      {
-        title: "Why it was suggested",
-        body: "The GST treatment, and the reason for the suggestion, so you can tell a good guess from a lucky one.",
-        target: () => firstLine()?.querySelector(".code-reason") ?? null,
-      },
-      {
-        title: "GST",
-        body: () =>
-          booksCountry().id === "au"
-            ? "10% for an ordinary purchase or sale. GST-free (bank fees, exports) and input taxed (interest, " +
-              "residential rent) each have their own place on the BAS; BAS excluded is for wages, drawings and " +
-              "transfers. The BAS adds these up for you."
-            : `${booksCountry().id === "nz" ? "15" : gstPercent()}% for an ordinary purchase or sale, 0% for anything with no GST in it, such as bank fees or wages. ` +
-              "The GST return adds these up for you.",
-        target: () => firstLine()?.querySelector(".gst-select") ?? null,
-        // Where there is no sales tax there is no rate to choose.
-        when: () => !noSalesTax(),
-      },
-      {
-        title: "Confirm it",
-        body: () =>
-          noSalesTax()
-            ? "Confirming puts the line in the books: it now counts in the reports and the tax schedules."
-            : "Confirming puts the line in the books: it now counts in the reports and the GST return.",
-        task: () => (suggested() ? "Press ✓ on this line." : "Choose an account, then press ✓."),
-        target: () => firstLine()?.querySelector(".code-tick") ?? null,
-        before: () => {
-          watchedLine = firstLine()?.dataset["id"] ?? "";
-        },
-        done: () => {
-          if (watchedLine === "") return false;
-          const row = document.querySelector<HTMLElement>(`#reconcile-body .code-row[data-id="${watchedLine}"]`);
-          return row === null || row.querySelector(".code-tick.tick-live") === null;
-        },
-      },
-      {
-        title: "Suggested by AI",
-        body:
-          "Where nothing you have coded before fits, an AI model you choose can suggest the account, and says how " +
-          "sure it is, why, and anything to check. The ones in this demo are examples, written by hand. Nothing " +
-          "is used until you confirm it.",
-        target: lineSuggestedBy(/^AI suggestion/),
-      },
-      {
-        title: "A known New Zealand business",
-        body:
-          "OsaBooks also recognises well-known New Zealand businesses, such as fuel stations, phone companies and " +
-          "couriers, and suggests the one account in your chart that fits. It needs no AI and sends nothing anywhere.",
-        target: lineSuggestedBy(/^Known business/),
-        // New Zealand's directory: elsewhere there may be no such line to show.
-        when: () => booksCountry().id === "nz" && lineSuggestedBy(/^Known business/)() !== null,
-      },
-      {
-        title: "Done",
-        body:
-          "The line you confirmed is in the books, and the next line from the same payee will be suggested the " +
-          "same way. When the suggestions on a page all look right, Accept all confirms them in one go.",
-        target: q("#accept-all"),
       },
     ],
   },
