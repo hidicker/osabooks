@@ -461,20 +461,20 @@
 
     if (s2Stage === 0) {
       document.getElementById('s2SummaryText').innerHTML = `▼ <strong>Invoice Lifecycle:</strong> Ready to post <strong>INV-0049</strong> ($225.00) for Sophie Carter.`;
-      document.getElementById('s2HintText').innerHTML = `💡 <strong>Pointer:</strong> Click <strong>1. Enter Invoice (INV-0049)</strong> above to start.`;
+      document.getElementById('s2HintText').innerHTML = `Click <strong>1. Enter Invoice (INV-0049)</strong> above to start.`;
       tbody.innerHTML = `<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-muted);">Click <strong>1. Enter Invoice (INV-0049)</strong> above to post the invoice lines into the ledger.</td></tr>`;
       return;
     }
 
     if (s2Stage === 1) {
       document.getElementById('s2SummaryText').innerHTML = `▼ <strong>Step 1 (Invoice Entered):</strong> 225.00 Dr to 610 AR | 195.65 Cr Sales + 29.35 Cr GST (Unpaid on Cash Basis).`;
-      document.getElementById('s2HintText').innerHTML = `💡 <strong>Pointer:</strong> Now click <strong>2. Bank Payment Lands ($225.00)</strong> when the customer pays.`;
+      document.getElementById('s2HintText').innerHTML = `Now click <strong>2. Bank Payment Lands ($225.00)</strong> when the customer pays.`;
     } else if (s2Stage === 2) {
       document.getElementById('s2SummaryText').innerHTML = `▼ <strong>Step 2 (Bank Payment Landed):</strong> $225.00 received in Bank (450.00 Dr vs 225.00 Cr).`;
-      document.getElementById('s2HintText').innerHTML = `💡 <strong>Pointer:</strong> Click the green <strong>✓</strong> tick in the bank row below to match the invoice and clear AR.`;
+      document.getElementById('s2HintText').innerHTML = `Click the green <strong>✓</strong> tick in the bank row below to match the invoice and clear AR.`;
     } else if (s2Stage === 3) {
       document.getElementById('s2SummaryText').innerHTML = `▼ <strong>Today:</strong> 1 invoice &amp; 1 bank decision matched: <strong>450.00</strong> of debits and <strong>450.00</strong> of credits.`;
-      document.getElementById('s2HintText').innerHTML = `🎉 <strong>Complete!</strong> 610 AR is cleared to $0.00, and $29.35 GST is now unlocked for the Cash Basis GST return.`;
+      document.getElementById('s2HintText').innerHTML = `<strong>Done.</strong> 610 AR is back to $0.00, and the $29.35 of GST now counts in the GST return.`;
     }
 
     const arStrike = isCleared ? 'nzosa-strike' : '';
