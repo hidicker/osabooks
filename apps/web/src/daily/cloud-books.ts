@@ -317,6 +317,11 @@ async function booksList(body: HTMLElement, email: string): Promise<void> {
     return;
   }
 
+  // This account's own two-factor sign-in, under who is signed in: it is the
+  // person's setting, for all their books.
+  const twoFactor = twoFactorSettings();
+  if (twoFactor !== null) body.append(twoFactor);
+
   const said = document.createElement("p");
   said.className = "cloud-said";
   say(said, "Looking…");
@@ -453,17 +458,8 @@ async function booksList(body: HTMLElement, email: string): Promise<void> {
     body.append(table);
   }
 
-  // Books whose owner requires two-factor, when this account has not set it up.
-  const waiting = await booksWaitingForCode();
-  if (waiting !== null) body.append(waiting);
-
-  await deletedSets(body);
-
-  // This account's own two-factor sign-in.
-  const twoFactor = twoFactorSettings();
-  if (twoFactor !== null) body.append(twoFactor);
-
-  // Starting a set of books, which is also how somebody's first set is made.
+  // Starting a set of books, right under the list it adds to; also how
+  // somebody's first set is made.
   const add = document.createElement("div");
   add.className = "cloud-add";
   const name = document.createElement("input");
@@ -513,10 +509,23 @@ async function booksList(body: HTMLElement, email: string): Promise<void> {
   add.append(name, country, make);
   body.append(add);
 
+  // Books whose owner requires two-factor, when this account has not set it up.
+  const waiting = await booksWaitingForCode();
+  if (waiting !== null) body.append(waiting);
+
+  await deletedSets(body);
+
+  // Everything after this is about the books open now, not the account.
   const openNow = books.find((book) => book.id === open);
   if (openNow !== undefined) {
-    renderMembers(body, openNow);
-    backupTools(body, openNow.name, true);
+    const section = document.createElement("section");
+    section.className = "open-books-settings";
+    const title = document.createElement("h2");
+    title.textContent = `Settings for ${openNow.name}`;
+    section.append(title);
+    body.append(section);
+    renderMembers(section, openNow);
+    backupTools(section, openNow.name, true);
   } else {
     browserBackup(body);
     saveToServer(body);

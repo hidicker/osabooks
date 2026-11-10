@@ -2063,6 +2063,13 @@ main:has(#page-check:not([hidden])) { max-width: none; }
 .cloud-add { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.8rem 0; }
 .cloud-add input { font-size: 0.95rem; padding: 0.35rem 0.45rem; flex: 1 1 18rem; max-width: 24rem; }
 .backup-tools { display: flex; gap: 0.5rem; flex-wrap: wrap; margin: 0.4rem 0 1.4rem; }
+/* The account's own settings (who is signed in, two-factor) stand apart from
+   the books' (who can see them, backup), which follow the list. */
+details.two-factor { margin: 0.4rem 0 1rem; font-size: 0.9rem; }
+details.two-factor > summary { cursor: pointer; font-weight: 600; }
+.open-books-settings { margin-top: 1.6rem; padding-top: 1rem;
+  border-top: 1px solid rgba(128,128,128,0.28); }
+.open-books-settings > h2 { font-size: 1.15rem; margin: 0 0 0.4rem; }
 
 /* Migration (on trial) ----------------------------------------------------- */
 .migration-card { border: 1px solid rgba(128,128,128,0.28); border-radius: 6px;

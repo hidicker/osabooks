@@ -156,7 +156,7 @@ export function twoFactorSettings(): HTMLElement | null {
       return;
     }
     const mine = all.filter((a) => a.verified);
-    summary.textContent = mine.length > 0 ? "Two-factor sign-in: on" : "Two-factor sign-in: off";
+    summary.textContent = mine.length > 0 ? "Two-factor sign-in: on" : "Two-factor sign-in: off (recommended: turn it on)";
 
     if (mine.length === 0) {
       inside.append(
