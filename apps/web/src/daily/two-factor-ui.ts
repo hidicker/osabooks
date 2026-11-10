@@ -227,11 +227,17 @@ export function twoFactorSettings(): HTMLElement | null {
  * security rules allow blob images). Anything else is used as it comes.
  */
 export function qrSource(qr: string): string {
-  // Taken by what is in it, not by its label: Supabase's says `data:img/svg+xml`,
-  // which no browser shows as an image whatever comes after it.
-  const comma = qr.indexOf(",");
-  if (!qr.startsWith("data:") || comma < 0 || /;base64/i.test(qr.slice(0, comma))) return qr;
-  let svg = qr.slice(comma + 1);
+  // Taken by what is in it, not by its label. This project's Supabase sends the
+  // SVG itself, `<?xml …?><svg …>` with no `data:` in front, which an image
+  // took for a web address; others send `data:img/svg+xml,` or similar.
+  let svg: string;
+  if (/^\s*</.test(qr)) {
+    svg = qr;
+  } else {
+    const comma = qr.indexOf(",");
+    if (!qr.startsWith("data:") || comma < 0 || /;base64/i.test(qr.slice(0, comma))) return qr;
+    svg = qr.slice(comma + 1);
+  }
   if (/^\s*%3C/i.test(svg)) {
     try {
       svg = decodeURIComponent(svg);
