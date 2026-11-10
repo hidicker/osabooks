@@ -98,7 +98,7 @@ If any journal fails to balance to zero, OsaBooks flags the offending journal ID
 
 ## 3. The Three Accounting Bases
 
-One of the most common pitfalls in small business software is conflating cash movements with accrual financial statements. OsaBooks clearly separates three accounting bases:
+One of the most common pitfalls in bookkeeping software is conflating cash movements with accrual financial statements. OsaBooks clearly separates three accounting bases:
 
 | Feature | Cash Basis | Accrual (Own Postings) | Accrual (Imported General Ledger) |
 | :--- | :--- | :--- | :--- |
@@ -308,4 +308,4 @@ When using OsaBooks to review client books or compile financial statements:
 8. **Check for Draft Invoices:** Confirm that only approved invoices are in the figures.
 9. **Explain Every GST Difference:** Load the filed returns and record an explanation for each period until nothing is left unexplained.
 
-With these safeguards in place, OsaBooks provides an exceptionally rigorous, auditable, and transparent accounting platform for New Zealand small businesses and their professional advisors.
+With these safeguards in place, OsaBooks provides an exceptionally rigorous, auditable, and transparent accounting platform for businesses and their professional advisors.
