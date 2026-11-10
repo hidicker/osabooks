@@ -323,6 +323,7 @@ function rawFields(transaction: Transaction): HTMLElement {
       `${transaction.extras?.["accountLabel"] ?? ""} ${transaction.account}`.trim(),
     ],
     ["Other party", transaction.otherParty],
+    ["Bank's description", String(transaction.extras?.["description"] ?? "")],
     ["Other party account", transaction.otherPartyAccount ?? ""],
     ["Particulars", transaction.particulars ?? ""],
     ["Code", transaction.code ?? ""],
@@ -414,7 +415,9 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
 
   const what = document.createElement("div");
   what.className = "code-what";
-  what.textContent = [one.transaction.particulars, one.transaction.reference]
+  // The bank's own description first, where the feed showed a merchant's
+  // name in its place: "PADDLE.NET* SKYSIGHT London" under "Paddle.net".
+  what.textContent = [String(one.transaction.extras?.["description"] ?? ""), one.transaction.particulars, one.transaction.reference]
     .filter((part) => part !== undefined && part !== "")
     .join(" · ");
   const details = document.createElement("button");
@@ -2259,7 +2262,7 @@ export function resolveSettlement(transaction: Transaction, said: readonly strin
     let pick =
       (said.length === 1 ? open.find((i) => owingOn(i) === paying) : undefined) ?? open[0];
     if (pick === undefined && said.length === 1) {
-      const text = `${transaction.otherParty} ${transaction.particulars}`.toLowerCase();
+      const text = `${transaction.otherParty} ${String(transaction.extras?.["description"] ?? "")} ${transaction.particulars}`.toLowerCase();
       const theirs = invoices.filter(
         (i) => usable(i, numbers) && i.contact.trim() !== "" && text.includes(i.contact.trim().toLowerCase()) && owingOn(i) >= paying,
       );

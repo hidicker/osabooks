@@ -149,6 +149,31 @@ export function feedLines(
   });
 }
 
+/**
+ * The bank's own description, onto lines already held that came from the feed
+ * before it was kept: matched by the feed's own id, so nothing else about a
+ * line changes. True when any line was given one, and the books want saving.
+ */
+export function fillFeedDescriptions(fetched: readonly Transaction[]): boolean {
+  const said = new Map<string, string>();
+  for (const t of fetched) {
+    const id = String(t.extras?.["akahuId"] ?? "");
+    const description = t.extras?.["description"];
+    if (id !== "" && typeof description === "string" && description !== "") said.set(id, description);
+  }
+  if (said.size === 0) return false;
+  let changed = false;
+  const transactions = state.ledger.transactions.map((t) => {
+    const id = String(t.extras?.["akahuId"] ?? "");
+    const description = said.get(id);
+    if (id === "" || description === undefined || t.extras?.["description"] === description) return t;
+    changed = true;
+    return { ...t, extras: { ...(t.extras ?? {}), description } };
+  });
+  if (changed) state.ledger = { ...state.ledger, transactions };
+  return changed;
+}
+
 /** The feed's new lines that belong in these books: from the day they start. */
 export function feedLinesForBooks(
   items: Parameters<typeof fromAkahu>[0],
@@ -197,6 +222,8 @@ export async function autoFetchFromFeed(morning?: Morning): Promise<void> {
     const unnamed = Object.values(now).some((to) => to !== "" && bankLabel(to) === to);
     const labels = unnamed ? akahuLabels(await feedAccounts().catch(() => [])) : {};
     const fetched = feedLines(items, now, labels);
+    // Lines fetched before the bank's description was kept get it now.
+    if (fillFeedDescriptions(fetched.transactions)) state.persistent = await save(state.ledger);
     // Asked for from a week early; nothing from before the books start goes
     // into them -- but what is dated in the week before is held for a decision.
     await holdJustBefore(fetched.transactions);
@@ -804,6 +831,8 @@ async function pullFromFeed(
       },
       labelFor: (id) => labels[id],
     });
+    // Lines fetched before the bank's description was kept get it now.
+    if (fillFeedDescriptions(fetched.transactions)) state.persistent = await save(state.ledger);
     // Asked for from a week early, to catch lines stamped the evening before
     // in UTC; only those from the day chosen are kept, and those in the week
     // before the books start are held for a decision.

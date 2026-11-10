@@ -37,6 +37,20 @@ test("a merchant name is preferred over the raw description", () => {
   assert.equal(transactions[0].otherParty, "Harbour Roastery");
 });
 
+test("the bank's description is kept beside the merchant, and does not change the line's identity", () => {
+  const card = item({ description: "PADDLE.NET* SKYSIGHT London USD8900", merchant: { name: "Paddle.net" }, meta: {} });
+  const [kept] = fromAkahu([card], options).transactions;
+  assert.equal(kept.otherParty, "Paddle.net");
+  assert.equal(kept.extras.description, "PADDLE.NET* SKYSIGHT London USD8900");
+  // The same line as it was read before the description was kept.
+  const before = { ...kept, extras: { akahuId: kept.extras.akahuId } };
+  assert.equal(dedupeKey(kept), dedupeKey(before));
+  assert.equal(looseKey(kept), looseKey(before));
+  // Nothing more to say when the description is the merchant's name, or there is no merchant.
+  assert.equal(fromAkahu([item({ description: "HARBOUR ROASTERY", merchant: { name: "Harbour Roastery" } })], options).transactions[0].extras.description, undefined);
+  assert.equal(fromAkahu([item()], options).transactions[0].extras.description, undefined);
+});
+
 test("an account this ledger does not know is skipped, not invented", () => {
   // A feed can carry personal accounts. Filing them under an Akahu id would
   // put somebody's own spending into the company's books.

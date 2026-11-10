@@ -124,7 +124,10 @@ const BANK_WORDS =
 
 /** What the bank said, with the empty fields left out rather than sent as blanks. */
 export function askAbout(transaction: Transaction, paidFrom: string): AskedAbout {
-  const parts = [transaction.particulars, transaction.code, transaction.reference]
+  // The bank's own description first, where a feed named a merchant instead:
+  // "PAYPAL *GOOGLE TILE INC" says what "PayPal" does not.
+  const description = typeof transaction.extras?.["description"] === "string" ? transaction.extras["description"] : "";
+  const parts = [description, transaction.particulars, transaction.code, transaction.reference]
     .map((part) => part.trim())
     .filter((part) => part !== "");
   const said = transaction.otherParty.trim();

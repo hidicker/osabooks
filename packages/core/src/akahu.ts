@@ -258,6 +258,12 @@ export function fromAkahu(
       occurrence: 1,
       extras: {
         akahuId: item._id,
+        // The bank's own words, when Akahu named a merchant in their place:
+        // "PADDLE.NET* SKYSIGHT London USD8900" behind "Paddle.net", and
+        // "PAYPAL *GOOGLE TILE INC" behind "PayPal". Kept beside the merchant,
+        // in extras rather than a field the duplicate check compares, so lines
+        // already held still match the same line fetched again.
+        ...(bankDescription(item) !== "" ? { description: bankDescription(item) } : {}),
         ...(options.labelFor?.(item._account) ? { accountLabel: options.labelFor(item._account) } : {}),
       },
       source: { importer: "akahu", file: "feed", line },
@@ -265,6 +271,17 @@ export function fromAkahu(
   });
 
   return { transactions, problems, unmappedAccounts: [...unmapped] };
+}
+
+/**
+ * What the bank called a transaction, when it says more than the merchant name
+ * the line is shown under; empty when it does not.
+ */
+export function bankDescription(item: { description?: string; merchant?: { name?: string } }): string {
+  const description = (item.description ?? "").replace(/\s+/g, " ").trim();
+  const merchant = (item.merchant?.name ?? "").trim();
+  if (description === "" || merchant === "") return "";
+  return description.toLowerCase() === merchant.toLowerCase() ? "" : description;
 }
 
 /**

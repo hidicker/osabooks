@@ -97,7 +97,7 @@ export function searchBooks(query: string, from: SearchSources, limit = 8): Sear
       t.id,
       who === "" ? from.money(t.amount) : who,
       `Bank line · ${t.date} · ${from.money(t.amount)} · ${from.bankName?.(t.account) ?? t.account}`,
-      `${t.otherParty} ${t.particulars} ${t.code} ${t.reference}`,
+      `${t.otherParty} ${String(t.extras?.["description"] ?? "")} ${t.particulars} ${t.code} ${t.reference}`,
       [t.amount],
       t.date,
     );

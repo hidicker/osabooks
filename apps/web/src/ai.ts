@@ -373,7 +373,7 @@ const FOREIGN = /\b(USD|AUD|EUR|GBP|CAD|KRW|JPY|SGD|HKD|CNY|CHF|THB)\s?\d/;
 
 export function paidInForeignCurrency(transaction: Suggestion["transaction"]): boolean {
   return FOREIGN.test(
-    [transaction.otherParty, transaction.particulars, transaction.code, transaction.reference].join(" "),
+    [transaction.otherParty, String(transaction.extras?.["description"] ?? ""), transaction.particulars, transaction.code, transaction.reference].join(" "),
   );
 }
 
