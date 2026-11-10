@@ -218,6 +218,28 @@ export function twoFactorSettings(): HTMLElement | null {
   return fold;
 }
 
+/**
+ * Supabase's QR code as an image the browser will show.
+ *
+ * It comes as `data:image/svg+xml;utf-8,<svg …>` with the SVG unencoded, and
+ * its colours (`fill="#000000"`) put a `#` in the address, which ends it there:
+ * the image broke. Handed over as a file of its own instead (the page's
+ * security rules allow blob images). Anything else is used as it comes.
+ */
+export function qrSource(qr: string): string {
+  const parts = /^data:image\/svg\+xml(;[^,]*)?,([\s\S]*)$/.exec(qr);
+  if (parts === null || /;base64/i.test(parts[1] ?? "")) return qr;
+  let svg = parts[2] ?? "";
+  if (/^%3C/i.test(svg)) {
+    try {
+      svg = decodeURIComponent(svg);
+    } catch {
+      // Left as it came: the image breaks, and the key below still works.
+    }
+  }
+  return URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
+}
+
 /** Setting one up: scan, then confirm with the code it shows. */
 function setUp(first: boolean, done: () => Promise<void>): HTMLElement {
   const wrap = document.createElement("div");
@@ -246,7 +268,7 @@ function setUp(first: boolean, done: () => Promise<void>): HTMLElement {
       const scan = document.createElement("li");
       scan.append("In your authenticator app, add an account and scan this code.");
       const qr = document.createElement("img");
-      qr.src = made.qr;
+      qr.src = qrSource(made.qr);
       qr.alt = "QR code to scan with an authenticator app";
       qr.width = 180;
       qr.height = 180;
