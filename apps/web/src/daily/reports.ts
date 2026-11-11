@@ -380,7 +380,8 @@ export function currentReport(
   // Only where it can be honoured. A ledger read from a file keeps its GST on
   // separate lines with nothing tying them to the cost, so there is no gross
   // to report and pretending otherwise would just show the net twice.
-  const includeGst = $<HTMLSelectElement>("report-gst").value === "gross" && basis !== "accrual";
+  // Never where there is no GST to include: a US sale's tax is owed to the state, not income.
+  const includeGst = $<HTMLSelectElement>("report-gst").value === "gross" && basis !== "accrual" && !noSalesTax();
   const period = over ?? reportRange(chosenYear);
 
   if (basis === "posted") {
@@ -6473,7 +6474,7 @@ function downloadProfitAndLoss(): void {
       : exportBasis === "posted"
         ? "Accrual basis, from our postings."
         : "Accrual basis, from the imported file.") +
-    ($<HTMLSelectElement>("report-gst").value === "gross" && exportBasis !== "accrual"
+    ($<HTMLSelectElement>("report-gst").value === "gross" && exportBasis !== "accrual" && !noSalesTax()
       ? " GST inclusive."
       : " GST exclusive.");
 
