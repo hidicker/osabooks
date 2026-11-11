@@ -2226,6 +2226,7 @@ tr.job-open td { background: var(--accent-soft, #eef4fa); }
 .payment-file-detail { color: var(--muted); }
 .payment-file-total { font-weight: 600; margin: 10px 0 4px; }
 .payment-file-said { color: var(--muted); margin: 6px 0; }
+.chart-plan-clash { color: var(--danger); font-weight: 600; }
 .payslip-frame { width: 100%; height: min(70vh, 900px); border: 1px solid var(--border); border-radius: 8px; background: #f3f5f7; margin-bottom: 12px; }
 .migration-table { max-width: none; }
 .migration-table td { white-space: normal; vertical-align: top; font-size: 0.82rem; }

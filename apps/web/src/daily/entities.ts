@@ -1305,7 +1305,7 @@ export function renderEntities(): void {
   if (accountRows.length === 0) {
     body.append(
       note(
-        "No accounts yet. Load a chart of accounts above, or add accounts below.",
+        "No accounts yet. Load a chart of accounts from a file, or add accounts below.",
       ),
     );
   } else {
@@ -1328,18 +1328,8 @@ export function renderEntities(): void {
   }
 
 
-  if (accountRows.length === 0) {
-    body.append(addAccountForm(model, accountRows));
-    return;
-  }
-
-  // Accounts nothing uses -- a starter chart's, mostly -- to take out together.
-  const tidy = document.createElement("button");
-  tidy.type = "button";
-  tidy.textContent = "Remove unused accounts";
-  tidy.title = "Accounts nothing is coded to, posted to or set up with, to take out of the chart together";
-  tidy.addEventListener("click", () => openRemoveUnused());
-  // Accounts from a file, shown as a plan before anything changes.
+  // Accounts from a file, shown as a plan before anything changes. Offered on
+  // an empty chart too: that is when a chart is most wanted from a file.
   const load = document.createElement("button");
   load.type = "button";
   load.textContent = "Load accounts…";
@@ -1354,6 +1344,17 @@ export function renderEntities(): void {
     loadInput.value = "";
     if (file !== undefined) void file.text().then((text) => openChartImport(file.name, text));
   });
+  if (accountRows.length === 0) {
+    body.append(actionsRow(load, loadInput), addAccountForm(model, accountRows));
+    return;
+  }
+
+  // Accounts nothing uses -- a starter chart's, mostly -- to take out together.
+  const tidy = document.createElement("button");
+  tidy.type = "button";
+  tidy.textContent = "Remove unused accounts";
+  tidy.title = "Accounts nothing is coded to, posted to or set up with, to take out of the chart together";
+  tidy.addEventListener("click", () => openRemoveUnused());
   const saveChart = document.createElement("button");
   saveChart.type = "button";
   saveChart.textContent = "Download (CSV)";
@@ -2365,7 +2366,8 @@ function openChartImport(fileName: string, text: string): void {
     void tellOnPage(`${fileName}: ${read.problems[0] ?? "no accounts could be read from it."}`);
     return;
   }
-  const plan = chartImportPlan(state.chart, read.accounts);
+  const free = new Set(unusedAccounts());
+  const plan = chartImportPlan(state.chart, read.accounts, (account) => free.has(account));
   const box = document.createElement("dialog");
   box.className = "ask-on-page payment-file-view";
   const heading = document.createElement("h3");
@@ -2373,9 +2375,20 @@ function openChartImport(fileName: string, text: string): void {
   const said = document.createElement("p");
   said.className = "payment-file-said";
   said.textContent =
-    `${plan.added.length} would be added, ${plan.changed.length} would change type or tax code, and ${plan.same} are here already. ` +
-    "Nothing is taken out, and nothing is renamed.";
+    `${plan.added.length} would be added, ${plan.changed.length} would change type or tax code, ` +
+    (plan.renamed.length > 0 ? `${plan.renamed.length} that nothing uses yet would take the file's name, ` : "") +
+    `and ${plan.same} are here already. Nothing is taken out, and no account in use is renamed.`;
   box.append(heading, said);
+  if (plan.clashes.length > 0) {
+    const warn = document.createElement("p");
+    warn.className = "payment-file-said chart-plan-clash";
+    warn.textContent =
+      `${plan.clashes.length} ${plan.clashes.length === 1 ? "code means" : "codes mean"} one thing here and another in the file, and ` +
+      `${plan.clashes.length === 1 ? "is" : "are"} in use here, so ${plan.clashes.length === 1 ? "it stays as it is" : "they stay as they are"} ` +
+      "and the file's account is not brought in. Give it another code in the file and load it again, " +
+      "or rename the account on the chart if the two are the same thing.";
+    box.append(warn);
+  }
   const list = (title: string, rows: string[]): void => {
     if (rows.length === 0) return;
     const h = document.createElement("h4");
@@ -2405,6 +2418,14 @@ function openChartImport(fileName: string, text: string): void {
     }),
   );
   list(
+    "The same code, another account in the file: in use here, left as they are",
+    plan.clashes.map((n) => `${n.account.code ? `${n.account.code} ` : ""}${n.account.name}: the file's is ${n.fileName}`),
+  );
+  list(
+    "Not used yet, taking the file's name",
+    plan.renamed.map((r) => `${r.before.code ? `${r.before.code} ` : ""}${r.before.name} becomes ${r.after.name}`),
+  );
+  list(
     "Named differently in the file, kept as they are (rename on the chart to carry the coding with it)",
     plan.named.map((n) => `${n.account.code ? `${n.account.code} ` : ""}${n.account.name}: the file says ${n.fileName}`),
   );
@@ -2417,8 +2438,11 @@ function openChartImport(fileName: string, text: string): void {
   const go = document.createElement("button");
   go.type = "button";
   go.className = "primary";
-  const doing = plan.added.length + plan.changed.length;
-  go.textContent = doing === 0 ? "Nothing to do" : `Add ${plan.added.length}, change ${plan.changed.length}`;
+  const doing = plan.added.length + plan.changed.length + plan.renamed.length;
+  go.textContent =
+    doing === 0
+      ? "Nothing to do"
+      : `Add ${plan.added.length}, change ${plan.changed.length}` + (plan.renamed.length > 0 ? `, rename ${plan.renamed.length}` : "");
   go.disabled = doing === 0;
   actions.append(cancel, go);
   box.append(actions);
@@ -2438,7 +2462,13 @@ function openChartImport(fileName: string, text: string): void {
       state.chart = chart;
       state.ledger = { ...state.ledger, chart };
       state.persistent = await savePart(state.ledger, "chart");
-      await record("chartImport", `${fileName}: ${plan.added.length} accounts added, ${plan.changed.length} changed`, before, chart);
+      await record(
+        "chartImport",
+        `${fileName}: ${plan.added.length} accounts added, ${plan.changed.length} changed` +
+          (plan.renamed.length > 0 ? `, ${plan.renamed.length} renamed` : ""),
+        before,
+        chart,
+      );
       finish();
       redraw("entities");
     })();

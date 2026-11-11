@@ -58,3 +58,37 @@ test("the plan: new accounts added, matched ones changed in place, nothing taken
   assert.equal(after[0].entity, "shop", "what the file does not say is kept");
   assert.equal(after[2].ledgerAccount, "bnz-1");
 });
+
+test("a code the file gives to another account: renamed where nothing uses it, a clash where something does", () => {
+  // Two charts numbered over the same range. 6100 is rent here and vehicles
+  // in the file; 6110 is rent here, with lines coded to it, and wages there.
+  const current = [
+    account("4000", "Sales", "Revenue"),
+    account("6100", "Rent or lease - equipment", "Expense"),
+    account("6110", "Rent or lease - property", "Expense"),
+    account("6400", "Office supplies", "Expense"),
+  ];
+  const incoming = [
+    account("4000", "Service Income", "Revenue"),
+    account("6100", "Auto & Truck Expense", "Overhead"),
+    account("6110", "Wages & Salaries", "Expense"),
+    account("6400", "Office Supplies & Software", "Expense"),
+  ];
+  const inUse = new Set(["6110"]);
+  const plan = chartImportPlan(current, incoming, (a) => !inUse.has(a.code));
+  assert.deepEqual(
+    plan.renamed.map((r) => [r.before.code, r.after.name, r.after.type]),
+    [["4000", "Service Income", "Revenue"], ["6100", "Auto & Truck Expense", "Overhead"]],
+    "nothing uses them, so they are the file's accounts now",
+  );
+  assert.deepEqual(plan.clashes.map((c) => [c.account.code, c.fileName]), [["6110", "Wages & Salaries"]]);
+  assert.deepEqual(plan.named.map((n) => n.account.code), ["6400"], "one account spelt two ways is not a clash");
+  assert.deepEqual(plan.changed, [], "an account in use under another name keeps its type too");
+  const after = applyChartPlan(current, plan);
+  assert.deepEqual(after.map((a) => a.name), ["Service Income", "Auto & Truck Expense", "Rent or lease - property", "Office supplies"]);
+
+  // With nothing said about use, nothing is renamed.
+  const careful = chartImportPlan(current, incoming);
+  assert.equal(careful.renamed.length, 0);
+  assert.equal(careful.clashes.length, 3);
+});

@@ -118,8 +118,35 @@ export interface ChartPlan {
    * done on the chart, which carries the codings with it.
    */
   named: { account: Account; fileName: string }[];
+  /**
+   * An account nothing uses yet, whose code the file gives to an account of
+   * another name: it takes the file's name, type and tax code. With nothing
+   * coded or posted to it there is nothing a rename could leave behind, and
+   * left as it was the file's account would go by a name that is not its own.
+   */
+  renamed: { before: Account; after: Account }[];
+  /**
+   * An account in use, whose code the file gives to something else: Wages in
+   * the file where the chart has Rent. Left wholly as it is, and the file's
+   * account is not brought in. For the person to see before anything is coded
+   * by a number that means two things.
+   */
+  clashes: { account: Account; fileName: string }[];
   /** Accounts in the file already in the chart as they are. */
   same: number;
+}
+
+/** A name down to its letters and digits, for telling one account's two spellings from two accounts. */
+function plainName(name: string): string {
+  return name.toLowerCase().replace(/&/g, "and").replace(/[^a-z0-9]+/g, "");
+}
+
+/** Whether two names read as one account's: the same, or one inside the other ("General", "General Expenses"). */
+function namesAlike(a: string, b: string): boolean {
+  const x = plainName(a);
+  const y = plainName(b);
+  if (x === "" || y === "") return false;
+  return x.includes(y) || y.includes(x);
 }
 
 /**
@@ -127,11 +154,20 @@ export interface ChartPlan {
  * its code where both have a code, else by its name. A matched account takes
  * the file's type and tax code where the file gives them, and keeps
  * everything else it has, its name and code included. Nothing is taken out.
+ *
+ * Two charts numbered over the same range share codes without sharing
+ * meanings. Where the file's name for a code is another account altogether,
+ * the account takes the file's name if nothing uses it yet (`unused`), and
+ * is otherwise left alone and reported as a clash.
  */
-export function chartImportPlan(current: readonly Account[], incoming: readonly Account[]): ChartPlan {
+export function chartImportPlan(
+  current: readonly Account[],
+  incoming: readonly Account[],
+  unused: (account: Account) => boolean = () => false,
+): ChartPlan {
   const byCode = new Map(current.filter((a) => a.code.trim() !== "").map((a) => [a.code.trim().toLowerCase(), a]));
   const byName = new Map(current.map((a) => [a.name.trim().toLowerCase(), a]));
-  const plan: ChartPlan = { added: [], changed: [], named: [], same: 0 };
+  const plan: ChartPlan = { added: [], changed: [], named: [], renamed: [], clashes: [], same: 0 };
   const touched = new Set<Account>();
   for (const one of incoming) {
     const code = one.code.trim().toLowerCase();
@@ -143,14 +179,19 @@ export function chartImportPlan(current: readonly Account[], incoming: readonly 
     }
     if (touched.has(match)) continue;
     touched.add(match);
-    if (one.name.trim() !== "" && one.name.trim().toLowerCase() !== match.name.trim().toLowerCase()) {
-      plan.named.push({ account: match, fileName: one.name.trim() });
-    }
     const after: Account = {
       ...match,
       ...(one.type.trim() !== "" ? { type: one.type.trim() } : {}),
       ...(one.taxCode.trim() !== "" ? { taxCode: one.taxCode.trim() } : {}),
     };
+    if (one.name.trim() !== "" && one.name.trim().toLowerCase() !== match.name.trim().toLowerCase()) {
+      if (!namesAlike(one.name, match.name)) {
+        if (unused(match)) plan.renamed.push({ before: match, after: { ...after, name: one.name.trim() } });
+        else plan.clashes.push({ account: match, fileName: one.name.trim() });
+        continue;
+      }
+      plan.named.push({ account: match, fileName: one.name.trim() });
+    }
     if (after.type !== match.type || after.taxCode !== match.taxCode) {
       plan.changed.push({ before: match, after });
     } else {
@@ -162,6 +203,6 @@ export function chartImportPlan(current: readonly Account[], incoming: readonly 
 
 /** The chart with a plan applied: changed accounts in their place, new ones after. */
 export function applyChartPlan(current: readonly Account[], plan: ChartPlan): Account[] {
-  const swap = new Map(plan.changed.map((c) => [c.before, c.after]));
+  const swap = new Map([...plan.changed, ...plan.renamed].map((c) => [c.before, c.after]));
   return [...current.map((a) => swap.get(a) ?? a), ...plan.added];
 }
