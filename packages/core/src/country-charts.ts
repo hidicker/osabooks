@@ -8,7 +8,8 @@ import { starterChart } from "./starter-chart.js";
  * New Zealand's is the standard small-company chart (starter-chart.ts). The
  * others follow what an accountant in that country expects to see: Xero's
  * Australian chart and tax codes; a United States chart whose names fall on
- * the Schedule C and E lines; Korea's standard account names in Korean and
+ * the Schedule C and E lines, with no payroll liabilities because a payday
+ * adds the ones it uses (codes from 2100 and 6300, left free here); Korea's standard account names in Korean and
  * English. Each is read by the same parser as an imported chart.
  */
 
@@ -55,6 +56,7 @@ const AU_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 const US_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 4000,Sales,Revenue,Tax Exempt,Schedule C line 1
 4100,Rent received,Revenue,Tax Exempt,Schedule E line 3
+4200,Other income,Revenue,Tax Exempt,"Refunds, rebates and anything else received outside normal sales"
 4900,Interest income,Revenue,Tax Exempt,
 5000,Cost of goods sold,Direct Costs,Tax Exempt,Schedule C line 4
 6000,Advertising,Expense,Tax Exempt,
@@ -74,14 +76,29 @@ const US_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 6140,Taxes and licenses,Expense,Tax Exempt,
 6150,Travel,Expense,Tax Exempt,
 6160,Business meals,Expense,Tax Exempt,50% deductible
+6165,Entertainment,Expense,Tax Exempt,Not deductible
 6170,Utilities,Expense,Tax Exempt,
 6180,Wages,Expense,Tax Exempt,
 6190,Property management fees,Expense,Tax Exempt,
 6200,Cleaning and maintenance,Expense,Tax Exempt,
+6210,Bank fees,Expense,Tax Exempt,Account and wire fees charged by the bank
+6220,Merchant fees,Expense,Tax Exempt,Card processing and payment platform fees
+6230,Dues and subscriptions,Expense,Tax Exempt,"Software, memberships and publications"
 6900,Other expenses,Expense,Tax Exempt,
 1200,Accounts receivable,Current Asset,Tax Exempt,
+1300,Inventory,Inventory,Tax Exempt,Goods held for resale
+1400,Prepaid expenses,Current Asset,Tax Exempt,Paid in advance for a later period
+1500,Equipment,Fixed Asset,Tax Exempt,Machinery and equipment the business owns
+1510,Accumulated depreciation - equipment,Fixed Asset,Tax Exempt,
+1520,Vehicles,Fixed Asset,Tax Exempt,Vehicles the business owns
+1530,Accumulated depreciation - vehicles,Fixed Asset,Tax Exempt,
+1540,Furniture and fixtures,Fixed Asset,Tax Exempt,
+1550,Accumulated depreciation - furniture and fixtures,Fixed Asset,Tax Exempt,
 2000,Accounts payable,Current Liability,Tax Exempt,
 2200,Sales tax payable,Current Liability,Tax Exempt,State sales tax collected
+2700,Loan,Non-current Liability,Tax Exempt,Money borrowed from a lender
+2710,Loan from owner,Non-current Liability,Tax Exempt,Money the owner has lent to the business
+2900,Suspense,Current Liability,Tax Exempt,"Holds a line nobody can place yet, to be cleared later"
 3000,Owner contributions,Equity,Tax Exempt,
 3100,Owner draws,Equity,Tax Exempt,
 3900,Retained earnings,Equity,Tax Exempt,

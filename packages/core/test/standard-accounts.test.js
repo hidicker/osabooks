@@ -144,3 +144,29 @@ test("a partnership's chart: no income tax or directors, and an account each for
   assert.equal(sole.find((a) => a.code === "910")?.name, "Loan from owner");
   assert.ok(codes(sole).includes("980"), "a sole trader keeps owner drawings");
 });
+
+test("a partnership abroad: the country's own owner accounts go, and partners take its numbering", () => {
+  const codes = (list) => list.map((a) => a.code);
+  const us = standardAccounts("business", { structure: "partnership", partners: ["Ana", "Tom"], country: "us" });
+  assert.ok(!codes(us).includes("3000") && !codes(us).includes("3100"), "no single owner's equity");
+  assert.equal(us.find((a) => a.code === "2710")?.name, "Loans from partners");
+  assert.deepEqual(
+    us.filter((a) => /: /.test(a.name)).map((a) => `${a.code} ${a.name}`),
+    [
+      "3110 Ana: capital introduced", "3120 Ana: share of profit", "3130 Ana: private share of expenses", "3140 Ana: drawings",
+      "3210 Tom: capital introduced", "3220 Tom: share of profit", "3230 Tom: private share of expenses", "3240 Tom: drawings",
+    ],
+  );
+  assert.equal(new Set(codes(us)).size, us.length, "no code twice");
+  const many = standardAccounts("business", { structure: "partnership", partners: "ABCDEFGHIJ".split(""), country: "us" });
+  assert.equal(new Set(codes(many)).size, many.length, "no code twice, however many partners");
+  assert.ok(codes(many).includes("3900"), "retained earnings is still its own");
+  const usSole = standardAccounts("business", { structure: "sole-trader", country: "us" });
+  assert.ok(codes(usSole).includes("3000") && codes(usSole).includes("3100"));
+  assert.equal(usSole.find((a) => a.code === "2710")?.name, "Loan from owner");
+
+  const au = standardAccounts("business", { structure: "partnership", partners: ["Ana", "Tom"], country: "au" });
+  assert.ok(!codes(au).includes("880") && !codes(au).includes("881"), "no single owner's equity");
+  assert.ok(codes(au).includes("951") && codes(au).includes("982"));
+  assert.equal(new Set(codes(au)).size, au.length, "no code twice");
+});

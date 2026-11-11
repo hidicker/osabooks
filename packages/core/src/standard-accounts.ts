@@ -218,6 +218,45 @@ const TAX_CODE = {
  */
 const COMPANY_ONLY = new Set(["505", "830"]);
 
+/**
+ * Where each country's starter chart keeps the accounts a business's structure
+ * changes: those only a company has, the loan from whoever owns it, the single
+ * owner's equity a partnership replaces with an account for each partner, and
+ * the codes those partners' accounts take. The United States chart is a sole
+ * proprietor's already, so it has nothing to take out for one.
+ */
+interface StructureCodes {
+  companyOnly: ReadonlySet<string>;
+  ownerLoan?: string;
+  ownerEquity: ReadonlySet<string>;
+  /** The code of partner `n`'s account `part` (0 capital, 1 profit, 2 private, 3 drawings). */
+  partnerCode: (n: number, part: number) => string;
+  /** How many partners the numbering has room for. */
+  partners: number;
+}
+
+const threeDigit = (n: number, part: number): string => `9${5 + part}${n}`;
+
+const NZ_STRUCTURE: StructureCodes = {
+  companyOnly: COMPANY_ONLY,
+  ownerLoan: "910",
+  ownerEquity: new Set(["970", "980"]),
+  partnerCode: threeDigit,
+  partners: 9,
+};
+
+const STRUCTURE: Readonly<Record<string, StructureCodes>> = {
+  au: { companyOnly: new Set(), ownerEquity: new Set(["880", "881"]), partnerCode: threeDigit, partners: 9 },
+  // 3110 to 3840: clear of owner contributions (3000) and retained earnings (3900).
+  us: {
+    companyOnly: new Set(),
+    ownerLoan: "2710",
+    ownerEquity: new Set(["3000", "3100"]),
+    partnerCode: (n, part) => `3${n}${part + 1}0`,
+    partners: 8,
+  },
+};
+
 const LOAN_FROM = {
   partnership: { name: "Loans from partners", description: "Money lent to the partnership by a partner, beyond their capital" },
   "sole-trader": { name: "Loan from owner", description: "Money the owner has lent to the business" },
@@ -236,11 +275,12 @@ const LOAN_FROM = {
  * per partner, which their software needs to roll a year over; the books here
  * carry balances forward themselves, so neither is wanted.
  *
- * Codes 95N to 98N for partner N, up to nine. Partners not yet named are
+ * Codes 95N to 98N for partner N, up to nine, on a three-digit chart; a
+ * country with its own numbering gives its own. Partners not yet named are
  * numbered, to be renamed when they are.
  */
-function partnerAccounts(partners: readonly string[]): Account[] {
-  const names = partners.length > 0 ? partners.slice(0, 9) : ["Partner 1", "Partner 2"];
+function partnerAccounts(partners: readonly string[], codes: StructureCodes): Account[] {
+  const names = partners.length > 0 ? partners.slice(0, codes.partners) : ["Partner 1", "Partner 2"];
   const equity = (code: string, name: string, description: string): Account => ({
     code,
     name,
@@ -249,14 +289,14 @@ function partnerAccounts(partners: readonly string[]): Account[] {
     description,
   });
   return names.flatMap((name, i) => [
-    equity(`95${i + 1}`, `${name}: capital introduced`, `Money and assets ${name} put into the partnership`),
-    equity(`96${i + 1}`, `${name}: share of profit`, `${name}'s share of the year's profit (or loss), credited at year end`),
+    equity(codes.partnerCode(i + 1, 0), `${name}: capital introduced`, `Money and assets ${name} put into the partnership`),
+    equity(codes.partnerCode(i + 1, 1), `${name}: share of profit`, `${name}'s share of the year's profit (or loss), credited at year end`),
     equity(
-      `97${i + 1}`,
+      codes.partnerCode(i + 1, 2),
       `${name}: private share of expenses`,
       `The private part of costs the partnership paid, such as ${name}'s personal use of the phone or vehicle`,
     ),
-    equity(`98${i + 1}`, `${name}: drawings`, `What ${name} took out during the year`),
+    equity(codes.partnerCode(i + 1, 3), `${name}: drawings`, `What ${name} took out during the year`),
   ]);
 }
 
@@ -291,12 +331,13 @@ export function standardAccounts(
     const unincorporated = options.structure === "partnership" || options.structure === "sole-trader";
     // The books' country's own starter chart where it has one: Australia's
     // accounts and tax codes, not New Zealand's.
+    const codes = STRUCTURE[options.country ?? "nz"] ?? NZ_STRUCTURE;
     const base = (options.country !== undefined && options.country !== "nz" ? starterChartFor(options.country) : starterChart())
       .filter((a) => registered || a.type !== "GST")
-      .filter((a) => !unincorporated || !COMPANY_ONLY.has(a.code))
-      .map((a) => (unincorporated && a.code === "910" ? { ...a, ...LOAN_FROM[options.structure === "partnership" ? "partnership" : "sole-trader"] } : a))
-      .filter((a) => options.structure !== "partnership" || (a.code !== "970" && a.code !== "980"));
-    const extra = options.structure === "partnership" ? partnerAccounts(options.partners ?? []) : [];
+      .filter((a) => !unincorporated || !codes.companyOnly.has(a.code))
+      .map((a) => (unincorporated && a.code === codes.ownerLoan ? { ...a, ...LOAN_FROM[options.structure === "partnership" ? "partnership" : "sole-trader"] } : a))
+      .filter((a) => options.structure !== "partnership" || !codes.ownerEquity.has(a.code));
+    const extra = options.structure === "partnership" ? partnerAccounts(options.partners ?? [], codes) : [];
     return [...base, ...extra].map((a) => withSuffix(registered ? a : { ...a, taxCode: "No GST" }));
   }
   const rows = kind === "residential" && options.country === "au" ? AU_RESIDENTIAL : STANDARD[kind];
