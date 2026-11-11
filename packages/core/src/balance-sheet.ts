@@ -217,8 +217,13 @@ export function computeBalanceSheet(options: {
    * the chart gave the accounts. Left to their types, the loan sat under
    * non-current liabilities and the drawings in equity: the totals the same,
    * but net assets read 23,000 lower than the statements beside them.
+   *
+   * A test of the account's code where only some of the books are a company's:
+   * with a company and its owners' rentals shown together, the rentals' funds
+   * introduced and drawings are their owners' equity, and gathered in with
+   * the company's they read as money the company owed.
    */
-  shareholderCurrentAccounts?: boolean;
+  shareholderCurrentAccounts?: boolean | ((code: string) => boolean);
   /**
    * Show the year's profit inside retained earnings, as the statements do,
    * rather than on a line of its own.
@@ -266,8 +271,9 @@ export function computeBalanceSheet(options: {
     // but for depreciation on an asset type the chart has no contra account
     // for, posted by name: that belongs with the assets it wears down.
     const type = account?.type ?? (/accumulated depreciation/i.test(code) ? "Fixed Asset" : "Bank");
+    const gathered = options.shareholderCurrentAccounts;
     if (
-      options.shareholderCurrentAccounts === true &&
+      (gathered === true || (typeof gathered === "function" && gathered(code))) &&
       account !== undefined &&
       isShareholderCurrentAccount(code, account.name, type)
     ) {

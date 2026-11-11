@@ -399,8 +399,10 @@ export function ir10Summary(options: Ir10Options): Ir10Summary {
       currentAccounts -= balance;
       if (/drawing/i.test(name)) drawings += moved;
       // Equity rather than a liability: left to owners equity, which is worked
-      // out as the difference.
-      if (!asLiabilities) continue;
+      // out as the difference. Not an account the chart itself calls a
+      // liability, a trust's beneficiary accounts for one: the balance sheet
+      // sets those out as owed, and the form has to agree with it.
+      if (!asLiabilities && !klass.includes("liability")) continue;
     }
     if (/dividends? paid/i.test(name) || (klass === "equity" && /dividend/i.test(name))) {
       dividendsPaid += moved;

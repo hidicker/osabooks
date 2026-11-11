@@ -297,6 +297,25 @@ const TYPED = [
   { code: "970", name: "Owner Funds Introduced", type: "Equity" },
   { code: "980", name: "Owner Drawings", type: "Equity" },
 ];
+test("only the accounts asked for are gathered as shareholder current accounts", () => {
+  // A company and its owners' rental in one set of books: the rental's funds
+  // introduced are its owners' equity, not money the company owes.
+  const chart = [...TYPED, { code: "951RL", name: "Ana Whitcombe: funds introduced", type: "Equity" }];
+  const sheet = computeBalanceSheet({
+    asAt: "2026-03-31",
+    openingBalances: { asAt: "2025-04-01", accounts: { "02-1100-0022001-001": 1000000, "910": -600000, "960": -400000 } },
+    journals: [journal("2025-06-01", [bankLine("02-1100-0022001-001", 30000), line("951RL", "Ana Whitcombe: funds introduced", -30000)])],
+    chart,
+    shareholderCurrentAccounts: (code) => code !== "951RL",
+    profitInRetainedEarnings: true,
+  });
+  const current = sheet.currentLiabilities.lines.find((l) => l.name === "Shareholder current accounts");
+  assert.equal(current.closing, 600000, "the company's loan alone");
+  assert.equal(sheet.equity.lines.find((l) => l.code === "951RL").closing, 30000, "the rental's funds are equity");
+  assert.equal(sheet.netAssets, 430000);
+  assert.equal(sheet.imbalance, 0);
+});
+
 const SHAREHOLDER_OPENING = {
   asAt: "2025-04-01",
   accounts: { "02-1100-0022001-001": 1000000, "910": -600000, "960": -400000 },

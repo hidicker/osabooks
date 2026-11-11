@@ -152,9 +152,26 @@ test("a shareholder's current account is a liability for a company, and equity o
   assert.equal(company.imbalance, 0);
 
   const owner = ir10Summary({ ...YEAR, openingBalances, journals, currentAccountsAsLiabilities: false });
-  assert.equal(box(owner, 47), 0);
-  assert.equal(box(owner, 51), 800000, "the current account is the owner's equity");
-  assert.equal(box(owner, 58), 400000, "and still reported");
+  // The drawings, an equity account, are the owner's equity. The loan the
+  // chart calls a liability stays owed, as the balance sheet sets it out.
+  assert.equal(box(owner, 47), 600000);
+  assert.equal(box(owner, 51), 200000, "the drawings are the owner's equity");
+  assert.equal(box(owner, 58), 400000, "and the current account is still reported");
+});
+
+test("a trust's beneficiary accounts, liabilities in its chart, are liabilities on the form", () => {
+  const chart = [...CHART, { code: "921", name: "Current account: Ana Whitcombe", type: "Current Liability" }];
+  const trust = ir10Summary({
+    ...YEAR,
+    chart,
+    openingBalances: { asAt: "2025-04-01", accounts: { BNK: 500000, "960": -500000 } },
+    journals: [jn("2026-03-31", [ln("960", 150000), ln("921", -150000)])],
+    currentAccountsAsLiabilities: false,
+  });
+  assert.equal(box(trust, 47), 150000, "owed to the beneficiary until it is paid");
+  assert.equal(box(trust, 50), 150000);
+  assert.equal(box(trust, 51), 350000, "and not part of the trust's equity");
+  assert.equal(box(trust, 58), 150000);
 });
 
 test("fixed assets go to the box for their class, with their depreciation", () => {

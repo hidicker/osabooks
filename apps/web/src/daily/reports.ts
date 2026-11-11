@@ -1440,6 +1440,27 @@ function companyBooks(): boolean {
 }
 
 /**
+ * Which accounts the balance sheet gathers as shareholder current accounts:
+ * New Zealand's way of setting a company's out. On All entities of books that
+ * hold a company beside something its owners own directly, only the company's:
+ * a rental's funds introduced and drawings are its owners' equity.
+ */
+function currentAccountsGathered(): boolean | ((code: string) => boolean) {
+  if (!companyBooks() || booksCountry().id !== "nz") return false;
+  const model = state.ledger.entities ?? emptyEntityModel();
+  if (reportingEntity() !== undefined || model.entities.length < 2) return true;
+  const notACompanys = new Set(
+    state.chart
+      .filter((a) => {
+        const owner = model.entities.find((e) => e.id === model.accounts[accountEntityKey(a)]);
+        return owner !== undefined && !isCompanyEntity(owner);
+      })
+      .map((a) => a.code),
+  );
+  return notACompanys.size === 0 ? true : (code) => !notACompanys.has(code);
+}
+
+/**
  * The chosen entity's part of the books, for a return that is one entity's:
  * each journal kept to the lines posted to its accounts or its own bank
  * accounts, and the opening balances likewise. Everything when no entity is
@@ -1729,7 +1750,7 @@ export function balanceSheetOn(date: string): ReturnType<typeof computeBalanceSh
     ...(opening ? { openingBalances: opening } : {}),
     journals,
     chart: state.chart,
-    shareholderCurrentAccounts: company && booksCountry().id === "nz",
+    shareholderCurrentAccounts: currentAccountsGathered(),
     profitInRetainedEarnings: company,
   });
 }
@@ -1743,14 +1764,15 @@ function balanceSheetFor(year: number) {
   // as one current liability, and the year's profit inside retained earnings.
   const company = companyBooks();
   // Shareholder current accounts are New Zealand's way of setting a company's out.
-  const currentAccounts = company && booksCountry().id === "nz";
+  const gathered = currentAccountsGathered();
+  const currentAccounts = gathered !== false;
   const sheetAt = (date: string) =>
     computeBalanceSheet({
       asAt: date,
       ...(opening ? { openingBalances: opening } : {}),
       journals,
       chart: state.chart,
-      shareholderCurrentAccounts: currentAccounts,
+      shareholderCurrentAccounts: gathered,
       profitInRetainedEarnings: company,
     });
   // The same day a year earlier, as a column of its own; the opening and
@@ -6319,7 +6341,7 @@ function accountantPackage(year: number): { name: string; data: Uint8Array }[] {
       ...(opening ? { openingBalances: opening } : {}),
       journals: reportPostings(),
       chart: state.chart,
-      shareholderCurrentAccounts: company && booksCountry().id === "nz",
+      shareholderCurrentAccounts: currentAccountsGathered(),
       profitInRetainedEarnings: company,
     });
     const sheetRows: (string | number)[][] = [[`Balance sheet as at ${to}`], ["Section", "Account", "Opening", "Movement", "Closing"]];
