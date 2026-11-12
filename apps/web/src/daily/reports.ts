@@ -2208,19 +2208,32 @@ function trialBalanceFor(year: number) {
   const balance = trialBalance(journals);
   // Each account's postings in the period, and its closing balance beside
   // them: the first prove the period, the second agree with the balance sheet.
-  type Row = { accountCode: string; accountName: string; lines: number; moved: number; closing: number };
+  type Row = { accountCode: string; accountName: string; lines: number; moved: number; closing: number; drill: string };
   const rows = new Map<string, Row>();
+  // A bank account linked to a chart account is that account: 1000 Checking,
+  // not the id the file or feed gave it. Unlinked, it keeps its own name.
+  const linked = new Map(
+    state.chart
+      .filter((a) => (a.ledgerAccount ?? "").trim() !== "" && a.code.trim() !== "")
+      .map((a) => [(a.ledgerAccount ?? "").trim(), a] as const),
+  );
+  const named = (r: { accountCode: string; accountName: string }): { accountCode: string; accountName: string } => {
+    const chart = r.accountCode.trim() === "" ? linked.get(r.accountName.trim()) : undefined;
+    return chart === undefined ? r : { accountCode: chart.code.trim(), accountName: chart.name };
+  };
   const keyOf = (code: string, name: string): string => code.trim() || name;
   for (const r of balance.rows) {
-    const key = keyOf(r.accountCode, r.accountName);
-    const held = rows.get(key) ?? { accountCode: r.accountCode, accountName: r.accountName, lines: 0, moved: 0, closing: 0 };
+    const { accountCode, accountName } = named(r);
+    const key = keyOf(accountCode, accountName);
+    const held = rows.get(key) ?? { accountCode, accountName, lines: 0, moved: 0, closing: 0, drill: r.accountCode || r.accountName };
     held.lines += r.lines;
     held.moved += r.balance;
     rows.set(key, held);
   }
   for (const r of closingTrialBalance(view, from, to)) {
-    const key = keyOf(r.accountCode, r.accountName);
-    const held = rows.get(key) ?? { accountCode: r.accountCode, accountName: r.accountName, lines: 0, moved: 0, closing: 0 };
+    const { accountCode, accountName } = named(r);
+    const key = keyOf(accountCode, accountName);
+    const held = rows.get(key) ?? { accountCode, accountName, lines: 0, moved: 0, closing: 0, drill: r.accountCode || r.accountName };
     held.closing += r.balance;
     rows.set(key, held);
   }
@@ -2228,7 +2241,7 @@ function trialBalanceFor(year: number) {
     for (const account of state.chart) {
       const code = account.code.trim();
       if (code === "" || rows.has(code) || account.inactive === true) continue;
-      rows.set(code, { accountCode: code, accountName: account.name, lines: 0, moved: 0, closing: 0 });
+      rows.set(code, { accountCode: code, accountName: account.name, lines: 0, moved: 0, closing: 0, drill: code });
     }
   }
   const listed = [...rows.values()].sort((a, b) => Math.abs(b.moved) - Math.abs(a.moved) || Math.abs(b.closing) - Math.abs(a.closing));
@@ -2431,7 +2444,7 @@ function renderJournal(body: HTMLElement, year: number): void {
       tr.append(code);
     }
     tr.append(
-      ledgerNameCell(row.accountName, tr, columns, () => accountLedger(row.accountCode || row.accountName, view, from, to, row.closing, periodAccount(row.accountCode), true), display.money),
+      ledgerNameCell(row.accountName, tr, columns, () => accountLedger(row.drill, view, from, to, row.closing, periodAccount(row.accountCode), true), display.money),
     );
     for (const [text, cls] of [
       [row.lines === 0 ? "" : String(row.lines), "report-amount"],
