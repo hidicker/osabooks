@@ -68,6 +68,8 @@ Books kept online connect the same way through a remote connector: the AI page s
 | [Hosting it online yourself](docs/self-hosting.md) | Books online on your own Supabase project and web host, step by step, for a person on their own or working with their own AI assistant |
 | [Coming next](docs/coming-next.md) | Features still to be built |
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/hidicker/osabooks)
+
 ## Status
 
 In use on real books. Import, coding, GST, invoices, fixed assets, reporting and return preparation are built and tested. A full year has been reconciled against a practitioner's signed accounts: the profit and loss, balance sheet and IR10 agree with the filed figures to the dollar, and every GST return difference is explained. Rental properties and personal books are handled the same way: each property its own entity with its owners and GST registration, rental schedules as a practitioner sets them out, and each owner's IR3 from the same books.
