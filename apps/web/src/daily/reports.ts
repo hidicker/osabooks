@@ -2502,6 +2502,16 @@ function renderDepreciation(body: HTMLElement, year: number): void {
   const heading = document.createElement("h3");
   heading.textContent = `Depreciation schedule, FY${year}`;
   body.append(heading);
+  // A year still running: the books post its depreciation month by month, so the
+  // profit and loss, balance sheet and trial balance hold less than this schedule's full year.
+  if (taxYearEnd(year) > localToday()) {
+    body.append(
+      note(
+        "This year is not over. The schedule shows the whole year; the books post its depreciation month by month, " +
+          "up to today, so the profit and loss, balance sheet and trial balance hold less until the year has run.",
+      ),
+    );
+  }
   body.append(
     note(
       booksCountry().id === "au"
