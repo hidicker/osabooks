@@ -2462,6 +2462,25 @@ function openChartImport(fileName: string, text: string): void {
       state.chart = chart;
       state.ledger = { ...state.ledger, chart };
       state.persistent = await savePart(state.ledger, "chart");
+      // An account that took the file's name keeps the GST treatment it had under the old one:
+      // treatments are held by label, and a label left behind still names the account on reports.
+      const file = state.rules as RuleFileShape | undefined;
+      const held = file?.codeTreatments;
+      if (held !== undefined && plan.renamed.length > 0) {
+        const moved = { ...held };
+        for (const { before: was, after } of plan.renamed) {
+          const code = was.code.trim();
+          for (const key of Object.keys(held)) {
+            if (code === "" || splitAccountLabel(key).code !== code) continue;
+            const fresh = accountLabel(code, after.name, /^NBs+/i.test(key));
+            if (fresh === key) continue;
+            if (moved[fresh] === undefined) moved[fresh] = held[key] as never;
+            delete moved[key];
+          }
+        }
+        state.rules = { ...file, codeTreatments: moved } as typeof state.rules;
+        await persistRules();
+      }
       await record(
         "chartImport",
         `${fileName}: ${plan.added.length} accounts added, ${plan.changed.length} changed` +
