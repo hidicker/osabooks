@@ -69,9 +69,18 @@ export function disposalJournals(options: DisposalJournalsOptions): PostedJourna
       // loss among the current assets and left it out of the IR10.
       const own = (pattern: RegExp, not?: RegExp): Account | undefined =>
         accountLike(chart, pattern, not, assetAccount?.code);
-      const recovered = own(/depreciation recovered/i);
-      const gain = own(/capital gain/i);
-      const loss = own(/loss on (the )?(sale|disposal)/i, /capital gain/i);
+      // New Zealand's chart names three accounts; another country's names a
+      // gain and a loss on sale. Where the chart names none of them and has no
+      // account at New Zealand's code either, the outcome goes to its one
+      // Other Income account: an account the chart does not hold has no type,
+      // and its figure was left off the profit and loss.
+      const holds = (code: string): boolean => chart.some((a) => a.code.trim() === code);
+      const otherIncome = chart.filter((a) => /other income/i.test(a.type));
+      const spare = otherIncome.length === 1 ? otherIncome[0] : undefined;
+      const gainOnSale = own(/capital gain|gain on (the )?(sale|disposal)/i);
+      const recovered = own(/depreciation recovered/i) ?? (holds("300") ? undefined : gainOnSale ?? spare);
+      const gain = gainOnSale ?? (holds("301") ? undefined : spare);
+      const loss = own(/loss on (the )?(sale|disposal)/i, /capital gain/i) ?? (holds("470") ? undefined : gainOnSale ?? spare);
 
       const disposal = disposalOf({
         cost: row.asset.cost,

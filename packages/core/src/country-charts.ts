@@ -17,6 +17,7 @@ const AU_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 200,Sales,Revenue,GST on Income,Income from normal business activity
 260,Other Revenue,Revenue,GST on Income,
 270,Interest Income,Revenue,Input Taxed,Interest from the bank
+300,Gain on sale of assets,Other Income,BAS Excluded,What an asset sold for above its book value
 310,Cost of Goods Sold,Direct Costs,GST on Expenses,
 400,Advertising,Expense,GST on Expenses,
 404,Bank Fees,Expense,GST Free Expenses,
@@ -32,6 +33,7 @@ const AU_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 445,Light Power Heating,Expense,GST on Expenses,
 449,Motor Vehicle Expenses,Expense,GST on Expenses,
 461,Printing & Stationery,Expense,GST on Expenses,
+468,Loss on sale of assets,Expense,BAS Excluded,What an asset sold for below its book value
 469,Rent,Expense,GST on Expenses,
 473,Repairs and Maintenance,Expense,GST on Expenses,
 477,Wages and Salaries,Expense,BAS Excluded,
@@ -58,6 +60,7 @@ const US_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 4100,Rent received,Revenue,Tax Exempt,Schedule E line 3
 4200,Other income,Revenue,Tax Exempt,"Refunds, rebates and anything else received outside normal sales"
 4900,Interest income,Revenue,Tax Exempt,
+4950,Gain on sale of assets,Other Income,Tax Exempt,What an asset sold for above its book value
 5000,Cost of goods sold,Direct Costs,Tax Exempt,Schedule C line 4
 6000,Advertising,Expense,Tax Exempt,
 6010,Car and truck expenses,Expense,Tax Exempt,
@@ -84,6 +87,7 @@ const US_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 6210,Bank fees,Expense,Tax Exempt,Account and wire fees charged by the bank
 6220,Merchant fees,Expense,Tax Exempt,Card processing and payment platform fees
 6230,Dues and subscriptions,Expense,Tax Exempt,"Software, memberships and publications"
+6890,Loss on sale of assets,Expense,Tax Exempt,What an asset sold for below its book value
 6900,Other expenses,Expense,Tax Exempt,
 1200,Accounts receivable,Current Asset,Tax Exempt,
 1300,Inventory,Inventory,Tax Exempt,Goods held for resale

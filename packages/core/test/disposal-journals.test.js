@@ -28,6 +28,22 @@ const run = (over = {}) =>
     transactions: [txn("2025-06-01")], chart: CHART, ...over,
   });
 
+test("in a chart with no account for the outcome, a loss goes to its Other Income account, not to an account it does not hold", () => {
+  // A chart from another system: nothing named for a gain or loss on sale, no
+  // 300, 301 or 470, one Other Income account.
+  const chart = [...CHART, account("4900", "Other Income", "Other Income")];
+  const [journal] = run({ chart, proceeds: { "FA-0036": 100000 } });
+  const codes = journal.lines.map((l) => l.accountCode);
+  assert.ok(!codes.includes("470") && !codes.includes("300") && !codes.includes("301"), codes.join(" "));
+  assert.ok(codes.includes("4900"), "the loss is on the profit and loss");
+  assert.equal(journal.lines.reduce((s, l) => s + l.amount, 0), 0);
+
+  // A chart that names them uses them.
+  const named = [...CHART, account("4950", "Gain on sale of assets", "Other Income"), account("6890", "Loss on sale of assets", "Expense")];
+  const [sold] = run({ chart: named, proceeds: { "FA-0036": 100000 } });
+  assert.ok(sold.lines.some((l) => l.accountCode === "6890" && l.amount > 0), "a loss is a debit to the loss account");
+});
+
 test("nothing is posted for an asset whose proceeds are unknown", () => {
   // The register says it was sold; it does not say for how much. Scrapped for
   // nothing and sold for book value are different entries, and guessing
