@@ -2,6 +2,14 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { outsidePaymentJournals, taxSummary } from "../dist/index.js";
 
+// A refund is a sale with a negative total, paid back at the counter.
+const refundReceipt = {
+  number: "SR-0002", kind: "sales", contact: "Walk-in customer", reference: "", issued: "2026-02-03", due: null,
+  total: -54125, tax: -4125, paid: -54125, outstanding: 0, currency: "USD", status: "Paid", receipt: true,
+  lines: [{ description: "Refund", accountCode: "4000", taxType: "8.25%", gross: -54125, tax: -4125, net: -50000 }],
+  paidOutside: [{ date: "2026-02-03", amount: 54125, accountCode: "1000", note: "Sales receipt" }],
+};
+
 const invoice = (paidOutside) => ({
   number: "INV-9",
   kind: "sales",
@@ -55,4 +63,15 @@ test("part of a debt written off claims the GST in that part", () => {
 test("a payment received outside the bank is still a payment", () => {
   const [journal] = outsidePaymentJournals(invoice([{ date: "2026-09-30", amount: 11500, accountCode: "880" }]), options);
   assert.equal(taxSummary([journal], { basis: "payments" }).box5, 11500);
+});
+
+test("a refund paid back at the counter takes the money out of the bank and clears the credit", () => {
+  const [journal] = outsidePaymentJournals(refundReceipt, { control: { code: "1200", name: "Accounts receivable" } });
+  assert.equal(journal.lines.reduce((s, l) => s + l.amount, 0), 0);
+  assert.equal(journal.lines.find((l) => l.accountCode === "1000").amount, -54125, "money out of checking");
+  assert.equal(journal.lines.find((l) => l.accountCode === "1200").amount, 54125, "the credit the refund settles");
+
+  const sale = { ...refundReceipt, total: 54125, tax: 4125, paid: 54125, number: "SR-0001" };
+  const [paid] = outsidePaymentJournals(sale, { control: { code: "1200", name: "Accounts receivable" } });
+  assert.equal(paid.lines.find((l) => l.accountCode === "1000").amount, 54125, "the sale it reverses took the money in");
 });

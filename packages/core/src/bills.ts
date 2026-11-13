@@ -326,8 +326,10 @@ export function outsidePaymentJournals(
   return (invoice.paidOutside ?? []).map((payment, index) => {
     if (payment.writeOff === true && !purchase) return writtenOff(invoice, payment, index, resolve, options);
     const amount = Math.abs(payment.amount);
-    // Signed as a bank line would be: money out of the business is negative.
-    const moved = purchase ? -amount : amount;
+    // Signed as a bank line would be: money out of the business is negative. A
+    // credit, a refund to a customer or a refund from a supplier, goes the other
+    // way from the document it settles.
+    const moved = (purchase ? -amount : amount) * (invoice.total < 0 ? -1 : 1);
     const from = resolve(payment.accountCode);
     const lines: PostedLine[] = [
       {
