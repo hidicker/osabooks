@@ -18,6 +18,7 @@ import {
   invoiceBalanceMap,
   record,
   invoicesInPlay,
+  booksStartKnown,
   proposalOpen,
   proposalState,
   stockAccounts,
@@ -76,7 +77,7 @@ import type {
   Transaction,
 } from "@nzosa/core";
 import { loadInvoices } from "../migrate/file-intake.js";
-import { booksCountry, booksCurrency, booksMoney, documentOptions, noSalesTax, gstPercent, sayTax, taxTypeLabel } from "../country.js";
+import { booksCountry, booksCurrency, booksLocale, booksMoney, documentOptions, noSalesTax, gstPercent, sayTax, taxTypeLabel } from "../country.js";
 
 /**
  * Writing an invoice by hand.
@@ -530,11 +531,30 @@ export function renderInvoiceEditor(): void {
   const issued = document.createElement("input");
   issued.type = "date";
   issued.value = draft.issued;
-  field(
+  const issuedField = field(
     asBill ? "Bill date" : asReceipt ? "Sold on" : "Issued",
     issued,
     asBill ? sayTax("The date on the bill: when the cost and its GST fall.") : asReceipt ? "And paid for, the same day." : undefined,
   );
+  // A document dated before the books start is not posted: what was owing then
+  // belongs in the opening balances. Said as the date is chosen, not found later
+  // as an invoice that shows as owing and is in no report.
+  const beforeStart = document.createElement("small");
+  beforeStart.className = "invoice-before-start";
+  issuedField.append(beforeStart);
+  const sayBeforeStart = (): void => {
+    const start = booksStartKnown();
+    const early = start !== undefined && issued.value !== "" && issued.value < start;
+    beforeStart.hidden = !early;
+    if (!early) return;
+    const day = new Date(`${start}T00:00:00`).toLocaleDateString(booksLocale(), { day: "numeric", month: "long", year: "numeric" });
+    beforeStart.textContent =
+      `Before these books start, on ${day}. It is not posted: what was ${asBill ? "owed to suppliers" : "owed to you"} on that day ` +
+      `goes in the opening balances, under ${asBill ? "accounts payable" : "accounts receivable"}. Until it is there, it shows as owing here but is in no report.`;
+  };
+  issued.addEventListener("input", sayBeforeStart);
+  issued.addEventListener("change", sayBeforeStart);
+  sayBeforeStart();
 
   const due = document.createElement("input");
   due.type = "date";

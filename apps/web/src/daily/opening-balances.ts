@@ -1369,7 +1369,11 @@ export async function loadOpeningBalances(file: File): Promise<boolean> {
     return banks.get(wanted);
   };
 
-  const built = openingBalancesFrom(parsed, chosen, { bankAccountFor });
+  // The year's result goes to the chart's own retained earnings: 3900 in a US
+  // chart, not 960, which an account the chart does not hold would put nowhere.
+  const retained = state.chart.find((x) => /retained earnings/i.test(x.type)) ?? state.chart.find((x) => /equity/i.test(x.type) && /retained/i.test(x.name));
+  const retainedEarningsCode = retained?.code.trim() || undefined;
+  const built = openingBalancesFrom(parsed, chosen, { bankAccountFor, ...(retainedEarningsCode !== undefined ? { retainedEarningsCode } : {}) });
   const accounts = built.balances.accounts;
   // Without an Account Class column, which accounts are revenue and expenses
   // was worked out from their types: said, with any type not recognised, which
@@ -1422,7 +1426,7 @@ export async function loadOpeningBalances(file: File): Promise<boolean> {
   // Capture all columns present in the file into byDate
   const byDate: Record<IsoDate, Record<string, Cents>> = {};
   for (const d of parsed.dates) {
-    const builtForDate = openingBalancesFrom(parsed, d, { bankAccountFor });
+    const builtForDate = openingBalancesFrom(parsed, d, { bankAccountFor, ...(retainedEarningsCode !== undefined ? { retainedEarningsCode } : {}) });
     if (Object.keys(builtForDate.balances.accounts).length > 0) {
       byDate[d] = builtForDate.balances.accounts;
     }

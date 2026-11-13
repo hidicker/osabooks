@@ -20,6 +20,7 @@ const AU_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 300,Gain on sale of assets,Other Income,BAS Excluded,What an asset sold for above its book value
 310,Cost of Goods Sold,Direct Costs,GST on Expenses,
 400,Advertising,Expense,GST on Expenses,
+402,Bad Debts,Expense,BAS Excluded,Invoices written off as never to be paid
 404,Bank Fees,Expense,GST Free Expenses,
 408,Cleaning,Expense,GST on Expenses,
 412,Consulting & Accounting,Expense,GST on Expenses,
@@ -42,6 +43,8 @@ const AU_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 489,Telephone & Internet,Expense,GST on Expenses,
 493,Travel - National,Expense,GST on Expenses,
 610,Accounts Receivable,Current Asset,BAS Excluded,
+620,Prepayments,Current Asset,BAS Excluded,Costs paid ahead for a later period
+630,Inventory,Inventory,BAS Excluded,Stock on hand at cost
 710,Office Equipment,Fixed Asset,GST on Capital,
 711,Less Accumulated Depreciation on Office Equipment,Fixed Asset,BAS Excluded,
 720,Computer Equipment,Fixed Asset,GST on Capital,
@@ -52,6 +55,7 @@ const AU_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 826,Superannuation Payable,Current Liability,BAS Excluded,
 880,Owner A Drawings,Equity,BAS Excluded,
 881,Owner A Funds Introduced,Equity,BAS Excluded,
+900,Loan,Non-current Liability,BAS Excluded,
 960,Retained Earnings,Equity,BAS Excluded,
 `;
 
@@ -86,6 +90,7 @@ const US_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 6200,Cleaning and maintenance,Expense,Tax Exempt,
 6210,Bank fees,Expense,Tax Exempt,Account and wire fees charged by the bank
 6220,Merchant fees,Expense,Tax Exempt,Card processing and payment platform fees
+6240,Bad debts,Expense,Tax Exempt,Invoices written off as never to be paid
 6230,Dues and subscriptions,Expense,Tax Exempt,"Software, memberships and publications"
 6890,Loss on sale of assets,Expense,Tax Exempt,What an asset sold for below its book value
 6900,Other expenses,Expense,Tax Exempt,
@@ -132,10 +137,18 @@ const KR_CHART_CSV = `*Code,*Name,*Type,*Tax Code,Description
 831,지급수수료 Fees and commissions,Expense,10% VAT on Expenses,
 931,이자비용 Interest expense,Expense,No VAT,
 108,외상매출금 Accounts receivable,Current Asset,No VAT,
+133,선급비용 Prepaid expenses,Current Asset,No VAT,
+146,상품 Inventory,Inventory,No VAT,
+212,비품 Equipment,Fixed Asset,No VAT,
+213,감가상각누계액 Accumulated depreciation - equipment,Fixed Asset,No VAT,
 251,외상매입금 Accounts payable,Current Liability,No VAT,
 255,부가세예수금 VAT payable,Current Liability,No VAT,
 331,자본금 Owner's capital,Equity,No VAT,
 338,인출금 Drawings,Equity,No VAT,
+375,이월이익잉여금 Retained earnings,Equity,No VAT,
+914,유형자산처분이익 Gain on sale of assets,Other Income,No VAT,
+970,유형자산처분손실 Loss on sale of assets,Expense,No VAT,
+835,대손상각비 Bad debts,Expense,No VAT,
 `;
 
 /** The starter chart for a country: New Zealand's where the country has none. */

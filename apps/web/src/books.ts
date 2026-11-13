@@ -2882,7 +2882,8 @@ export function manualJournalGstAccount(label: string): { code: string; name: st
 
 function prepaymentsAccount(): { code: string; name: string } {
   const account =
-    state.chart.find((a) => /prepayment/i.test(a.name)) ?? state.chart.find((a) => a.code === "620");
+    // "Prepaid expenses" in a US or Korean chart: missed, prepayments went to a 620 the chart does not hold.
+    state.chart.find((a) => /prepayment|prepaid/i.test(a.name) && /asset/i.test(a.type)) ?? state.chart.find((a) => a.code === "620");
   return { code: account?.code ?? "620", name: account?.name ?? "Prepayments" };
 }
 
