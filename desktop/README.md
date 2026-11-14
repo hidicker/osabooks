@@ -40,6 +40,36 @@ Nothing set, nothing signed. `sign.cjs` says how it is used.
 The **Windows installer** workflow builds it from source on GitHub and attaches
 it to a draft release as `OsaBooks-Setup.exe`, so the address
 `.../releases/latest/download/OsaBooks-Setup.exe` always gives the newest.
+The tag gives the program its version: `v2026.11.14` is 2026.1114.0, and a
+second release that day, `v2026.11.14-2`, is 2026.1114.2.
+
+## Updates
+
+An installed copy keeps itself up to date from the releases named under
+`updates` in `edition.json` (`updates.cjs`). It asks GitHub for the newest
+published release a little after starting and every six hours, downloads a
+newer one in the background, and offers to restart; otherwise it installs when
+the program closes. Help, **Check for updates** asks straight away. The
+request to GitHub is all that leaves the computer, and the books are never
+part of it. Each release carries `latest.yml` (what installed copies read) and
+the installer's `.blockmap` (so they download only what changed); a draft or a
+pre-release is never offered. An edition with no `updates` is updated by hand.
+
+To try an update end to end without publishing anything, build two installers
+pointed at a folder on this computer, install the older and let it find the
+newer:
+
+```
+$env:OSABOOKS_UPDATE_URL = "http://127.0.0.1:8765/"
+$env:OSABOOKS_RELEASE_TAG = "v2026.11.14-3"; npm run installer
+Copy-Item release\OsaBooks-Setup.exe $env:TEMP\OsaBooks-old.exe  # the older one, to install
+$env:OSABOOKS_RELEASE_TAG = "v2026.11.14-4"; npm run installer
+python -m http.server 8765 --bind 127.0.0.1 --directory release  # serves the newer one
+```
+
+Install `OsaBooks-old.exe` as below and start it: within a minute it downloads the
+newer and asks to restart. Clear `OSABOOKS_UPDATE_URL` afterwards, or the next
+installer looks on this computer for its updates.
 
 ## Testing an installer
 

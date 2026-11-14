@@ -4,5 +4,6 @@
   "port": 3215,
   "folder": "OsaBooks",
   "installerName": "OsaBooks-Setup",
-  "guides": "https://nbparagliding.nz/osabooks/home/"
+  "guides": "https://nbparagliding.nz/osabooks/home/",
+  "updates": { "owner": "hidicker", "repo": "osabooks" }
 }

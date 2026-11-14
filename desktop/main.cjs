@@ -18,6 +18,7 @@ const { existsSync, mkdirSync } = require("node:fs");
 const { join } = require("node:path");
 const { pathToFileURL } = require("node:url");
 const edition = require("./edition.json");
+const { startUpdates } = require("./updates.cjs");
 
 // Fixed, because the browser keeps a few settings per address.
 const PORT = edition.port;
@@ -98,6 +99,7 @@ if (!app.requestSingleInstanceLock()) {
   });
 
   app.whenReady().then(async () => {
+    const updates = startUpdates(edition, () => window);
     Menu.setApplicationMenu(
       Menu.buildFromTemplate([
         { label: edition.name, submenu: [{ role: "reload" }, { role: "togglefullscreen" }, { type: "separator" }, { role: "quit" }] },
@@ -108,6 +110,11 @@ if (!app.requestSingleInstanceLock()) {
           submenu: [
             { label: "Open the books folder", click: () => void shell.openPath(booksFolder()) },
             { label: "Guides", click: () => void shell.openExternal(edition.guides) },
+            ...(updates.checkNow !== null
+              ? [{ type: "separator" }, { label: "Check for updates", click: updates.checkNow }]
+              : []),
+            { type: "separator" },
+            { label: `${edition.name} ${app.getVersion()}`, enabled: false },
           ],
         },
       ]),

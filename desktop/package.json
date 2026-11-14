@@ -9,10 +9,13 @@
   "scripts": {
     "stage": "node stage.mjs",
     "start": "npm run stage && electron .",
-    "installer": "npm run stage && electron-builder --config build-config.cjs --win --x64"
+    "installer": "npm run stage && electron-builder --config build-config.cjs --win --x64 --publish never"
   },
   "devDependencies": {
     "electron": "39.8.10",
     "electron-builder": "^26.0.0"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.10"
   }
 }

@@ -45,6 +45,8 @@ jobs:
         env:
           # Set by the maintainer once there is a certificate (see desktop/sign.cjs).
           OSABOOKS_SIGN_COMMAND: ${{ secrets.OSABOOKS_SIGN_COMMAND }}
+          # The program's version comes from the tag (see desktop/build-config.cjs).
+          OSABOOKS_RELEASE_TAG: ${{ inputs.tag }}
 
       - name: A draft release with the installer
         shell: bash
@@ -52,8 +54,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
         run: |
+          # latest.yml is what installed copies read to find a newer version;
+          # the blockmap lets them download only what changed.
           gh release create "$TAG" desktop/release/OsaBooks-Setup.exe \
+            desktop/release/OsaBooks-Setup.exe.blockmap \
+            desktop/release/latest.yml \
             --repo "$GITHUB_REPOSITORY" \
             --draft \
             --title "OsaBooks $TAG" \
-            --notes "The Windows installer. It is not signed yet, so Windows says the publisher is unknown: choose More info, then Run anyway. Your books are kept in a folder called OsaBooks in your user folder, and upgrades and uninstalling never touch them."
+            --notes "The Windows installer. It is not signed yet, so Windows says the publisher is unknown: choose More info, then Run anyway. Your books are kept in a folder called OsaBooks in your user folder, and upgrades and uninstalling never touch them. Installed, OsaBooks keeps itself up to date from these releases."
