@@ -139,9 +139,9 @@ if (!app.requestSingleInstanceLock()) {
     if (window === null && running !== null) openWindow();
   });
   app.on("will-quit", () => {
-    // The server lets go of the books as the program ends.
+    // The server lets go of the books (its lock) and stops as the program ends.
     try {
-      if (running && typeof running.close === "function") running.close();
+      if (running && typeof running.stop === "function") running.stop();
     } catch {
       // Leaving anyway.
     }

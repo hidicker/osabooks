@@ -68,6 +68,12 @@ interface Email {
 
 /** A name safe in a From line: no quotes, angle brackets or line breaks. */
 const cleanName = (name: string): string => name.replace(/["<>\r\n]/g, "").trim().slice(0, 80);
+/**
+ * A header value on one line. The subject is the business's own wording and
+ * the addresses come from its contacts: a line break in any of them would
+ * start a header of somebody's choosing (a Bcc), so each is flattened.
+ */
+const oneLine = (text: string): string => text.replace(/[\r\n\u0085\u2028\u2029]+/g, " ").trim();
 const fileName = (customer: string): string => `reminder-${customer.replace(/[^A-Za-z0-9]+/g, "-").replace(/^-|-$/g, "") || "statement"}.html`;
 
 async function sendByResend(email: Email): Promise<void> {
@@ -76,9 +82,9 @@ async function sendByResend(email: Email): Promise<void> {
     headers: { authorization: `Bearer ${RESEND_API_KEY}`, "content-type": "application/json" },
     body: JSON.stringify({
       from: `${cleanName(email.fromName)} via OsaBooks <${FROM}>`,
-      to: [email.to],
-      reply_to: email.replyTo,
-      subject: email.subject,
+      to: [oneLine(email.to)],
+      reply_to: oneLine(email.replyTo),
+      subject: oneLine(email.subject),
       text: email.text,
       attachments: [{ filename: fileName(email.customer), content: btoa(unescape(encodeURIComponent(email.html))) }],
     }),
@@ -89,9 +95,9 @@ async function sendByResend(email: Email): Promise<void> {
 async function sendBySmtp(client: SMTPClient, email: Email): Promise<void> {
   await client.send({
     from: `${cleanName(email.fromName)} via OsaBooks <${FROM}>`,
-    to: email.to,
-    replyTo: email.replyTo,
-    subject: email.subject,
+    to: oneLine(email.to),
+    replyTo: oneLine(email.replyTo),
+    subject: oneLine(email.subject),
     content: email.text,
     attachments: [{ filename: fileName(email.customer), content: email.html, encoding: "text", contentType: "text/html" }],
   });

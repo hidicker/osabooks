@@ -45,6 +45,8 @@ jobs:
         env:
           # Set by the maintainer once there is a certificate (see desktop/sign.cjs).
           OSABOOKS_SIGN_COMMAND: ${{ secrets.OSABOOKS_SIGN_COMMAND }}
+          # The certificate's name, so installed copies check updates are signed by it.
+          OSABOOKS_PUBLISHER_NAME: ${{ vars.OSABOOKS_PUBLISHER_NAME }}
           # The program's version comes from the tag (see desktop/build-config.cjs).
           OSABOOKS_RELEASE_TAG: ${{ inputs.tag }}
 

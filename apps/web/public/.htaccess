@@ -33,6 +33,16 @@
 # these folders, but a listing invites a look and grows its own surprises.
 Options -Indexes
 
+# Hidden files (.htaccess, anything from git or an editor) and leftover
+# copies (.bak, .orig, .swp, ~) are never served, whatever ends up in a folder.
+# Let's Encrypt's checks live in a folder called .well-known and are files
+# with ordinary names, so they still work.
+<IfModule mod_authz_core.c>
+  <FilesMatch "(^\.|\.(bak|orig|old|swp|tmp)$|~$)">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+
 # Hosts that do not serve these types leave the browser guessing, and a bundle
 # served as text/plain does not run at all.
 <IfModule mod_mime.c>

@@ -42,6 +42,13 @@ module.exports = {
     signAndEditExecutable: true,
     signExecutable: signing,
     ...(signing ? { sign: require.resolve("./sign.cjs") } : {}),
+    // The name on the signing certificate. Written into the installed copy, so
+    // its updater refuses an update not signed by the same publisher; without
+    // it an update is checked only against the checksum beside it. Set
+    // OSABOOKS_PUBLISHER_NAME with OSABOOKS_SIGN_COMMAND once there is a certificate.
+    ...(signing && (process.env["OSABOOKS_PUBLISHER_NAME"] ?? "").trim() !== ""
+      ? { publisherName: [process.env["OSABOOKS_PUBLISHER_NAME"].trim()] }
+      : {}),
   },
   nsis: {
     oneClick: false,

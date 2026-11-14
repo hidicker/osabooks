@@ -1180,7 +1180,12 @@ export function ledgerFromParts(
 
     if (part === "decisions") {
       const decisions = (held.data ?? {}) as Record<string, unknown>;
-      for (const [key, value] of Object.entries(decisions)) ledger[key] = value;
+      // A key that would reach the object's own machinery rather than a
+      // setting ("__proto__" in a crafted backup) is never copied.
+      for (const [key, value] of Object.entries(decisions)) {
+        if (key === "__proto__" || key === "constructor" || key === "prototype") continue;
+        ledger[key] = value;
+      }
       continue;
     }
     if (part === "transactions") {

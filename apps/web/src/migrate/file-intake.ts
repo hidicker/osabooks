@@ -148,6 +148,12 @@ async function unzipped(files: File[], say: (line: string) => void): Promise<Fil
       out.push(file);
       continue;
     }
+    // The same limit as a file dropped on its own, checked before anything is
+    // unpacked; each file inside is limited again as it is unpacked.
+    if (file.size > 50 * 1024 * 1024) {
+      say(`Skipped "${file.name}": file is over 50MB.`);
+      continue;
+    }
     const bytes = new Uint8Array(await file.arrayBuffer());
     if (!isZip(bytes)) {
       say(`${file.name} — not a zip file that can be opened, so nothing was done with it.`);

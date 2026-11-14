@@ -33,7 +33,8 @@ program is (name, port, where its books go); `main.cjs` is the program itself.
 Unsigned, Windows says the publisher is unknown: **More info**, then **Run
 anyway**. To sign, set `OSABOOKS_SIGN_COMMAND` to a command that signs `{file}`
 in place, such as your certificate seller's signing tool, before building.
-Nothing set, nothing signed. `sign.cjs` says how it is used.
+Nothing set, nothing signed. `sign.cjs` says how it is used. Set `OSABOOKS_PUBLISHER_NAME` to the name on the certificate as well, and
+installed copies refuse an update not signed by that publisher.
 
 ## A release
 

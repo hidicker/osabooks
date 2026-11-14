@@ -27,8 +27,14 @@ const FREE = 0xffffffff;
 
 /** The stream called `Workbook` (or `Book`) from the compound file. */
 function workbookStream(bytes: Uint8Array): Uint8Array | null {
-  const sectorSize = 1 << u16(bytes, 30);
-  const miniSectorSize = 1 << u16(bytes, 32);
+  // Sizes come from the file, so each is checked before anything is made from
+  // it: a sector is 512 or 4096 bytes and a mini sector 64, as the format says,
+  // and no stream is bigger than the file holding it.
+  const sectorShift = u16(bytes, 30);
+  const miniShift = u16(bytes, 32);
+  if ((sectorShift !== 9 && sectorShift !== 12) || miniShift !== 6) return null;
+  const sectorSize = 1 << sectorShift;
+  const miniSectorSize = 1 << miniShift;
   const directoryStart = u32(bytes, 48);
   const miniCutoff = u32(bytes, 56);
   const miniFatStart = u32(bytes, 60);
@@ -62,7 +68,8 @@ function workbookStream(bytes: Uint8Array): Uint8Array | null {
     }
     return out;
   };
-  const read = (start: number, size: number): Uint8Array => {
+  const read = (start: number, wanted: number): Uint8Array => {
+    const size = Math.min(wanted, bytes.length);
     const out = new Uint8Array(size);
     let filled = 0;
     for (const s of chain(start, fat)) {
@@ -91,10 +98,11 @@ function workbookStream(bytes: Uint8Array): Uint8Array | null {
       const mini = read(root.start, root.size);
       const miniFat: number[] = [];
       for (const s of chain(miniFatStart, fat)) for (let i = 0; i < sectorSize / 4; i += 1) miniFat.push(u32(bytes, sector(s) + i * 4));
-      const out = new Uint8Array(size);
+      const out = new Uint8Array(Math.min(size, mini.length));
       let filled = 0;
       for (const s of chain(start, miniFat)) {
-        const take = Math.min(miniSectorSize, size - filled);
+        const take = Math.min(miniSectorSize, out.length - filled);
+        if (take <= 0) break;
         out.set(mini.subarray(s * miniSectorSize, s * miniSectorSize + take), filled);
         filled += take;
       }
@@ -137,7 +145,8 @@ function sharedStrings(chunks: readonly Uint8Array[]): string[] {
     return chunks[c]?.[at++] ?? 0;
   };
   const skip = (n: number): void => {
-    for (let i = 0; i < n; i += 1) byte();
+    // Never past the end: a count read from the file can say four billion.
+    for (let i = 0; i < n && c < chunks.length; i += 1) byte();
   };
   for (let s = 0; s < total && c < chunks.length; s += 1) {
     const count = byte() | (byte() << 8);

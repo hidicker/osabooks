@@ -210,6 +210,16 @@ function listOps(
  * For the tests, and for anything that must know what the server now holds.
  * The value given is not changed.
  */
+/**
+ * A key set as a plain own property, whatever it is called. `obj[key] = v`
+ * with the key "__proto__" would change the object's prototype instead, where
+ * the database (jsonb) keeps it as an ordinary key: the two would disagree,
+ * and a crafted change could reach the object's machinery.
+ */
+function setOwn(target: Record<string, unknown>, key: string, item: unknown): void {
+  Object.defineProperty(target, key, { value: item, writable: true, enumerable: true, configurable: true });
+}
+
 export function applyPartOps(value: unknown, ops: readonly PartOp[]): unknown {
   let out: unknown = cloneJson(value);
   for (const op of ops) {
@@ -219,10 +229,12 @@ export function applyPartOps(value: unknown, ops: readonly PartOp[]): unknown {
       const [key, sub] = op.set;
       const item = cloneJson(op.value);
       if (sub === undefined) {
-        root[key] = item;
+        setOwn(root, key, item);
       } else {
-        if (!plainObject(root[key])) root[key] = {};
-        (root[key] as Record<string, unknown>)[sub] = item;
+        const own = Object.prototype.hasOwnProperty.call(root, key) ? root[key] : undefined;
+        const inner: Record<string, unknown> = plainObject(own) ? own : {};
+        if (inner !== own) setOwn(root, key, inner);
+        setOwn(inner, sub, item);
       }
       continue;
     }
@@ -240,7 +252,8 @@ export function applyPartOps(value: unknown, ops: readonly PartOp[]): unknown {
     } else {
       const root: Record<string, unknown> = plainObject(out) ? out : {};
       out = root;
-      root[key] = spliced(Array.isArray(root[key]) ? (root[key] as unknown[]) : [], op.at, op.remove, insert);
+      const own = Object.prototype.hasOwnProperty.call(root, key) ? root[key] : undefined;
+      setOwn(root, key, spliced(Array.isArray(own) ? (own as unknown[]) : [], op.at, op.remove, insert));
     }
   }
   return out;

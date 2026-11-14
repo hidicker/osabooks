@@ -65,6 +65,13 @@ const htaccessContent = `# OsaBooks Online Demo Security Configuration
 # Prevent directory listing
 Options -Indexes
 
+# Hidden files and leftover copies are never served.
+<IfModule mod_authz_core.c>
+  <FilesMatch "(^\\.|\\.(bak|orig|old|swp|tmp)$|~$)">
+    Require all denied
+  </FilesMatch>
+</IfModule>
+
 # A file that is not here is answered here, at once. Without this the site's
 # own WordPress took over every missing file and spent two seconds rendering a
 # page for it -- and the app looks for a handful of optional files on its first

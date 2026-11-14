@@ -145,3 +145,16 @@ test("random changes always rebuild the new value", () => {
     roundTrip(list, changed);
   }
 });
+
+test("a key called __proto__ is kept as an ordinary key, as the database keeps it, and changes no prototype", () => {
+  const out = applyPartOps({ a: 1 }, [
+    { set: ["__proto__", undefined], value: { polluted: true } },
+    { set: ["x", "__proto__"], value: { polluted: true } },
+    { splice: ["constructor"], at: 0, remove: 0, insert: [1] },
+  ]);
+  assert.equal(Object.getPrototypeOf(out), Object.prototype);
+  assert.equal(out.polluted, undefined);
+  assert.deepEqual(Object.keys(out), ["a", "__proto__", "x", "constructor"]);
+  assert.deepEqual(JSON.parse(JSON.stringify(out)), JSON.parse('{"a":1,"__proto__":{"polluted":true},"x":{"__proto__":{"polluted":true}},"constructor":[1]}'));
+  assert.equal({}.polluted, undefined);
+});

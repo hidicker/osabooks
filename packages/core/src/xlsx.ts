@@ -155,6 +155,11 @@ async function inflate(entry: ZipEntry): Promise<string> {
   return utf8(await inflateBytes(entry));
 }
 
+/** The most one file in a spreadsheet may unpack to. */
+const MAX_UNPACKED = 200 * 1024 * 1024;
+/** Excel's last column, XFD. A reference past it is not a real cell. */
+const MAX_COLUMN = 16_384;
+
 async function inflateBytes(entry: ZipEntry): Promise<Uint8Array> {
   if (entry.compression === 0) return entry.data;
   if (entry.compression !== 8) {
@@ -172,10 +177,20 @@ async function inflateBytes(entry: ZipEntry): Promise<Uint8Array> {
   const stream = source.pipeThrough(new DecompressionStream("deflate-raw"));
   const chunks: Uint8Array[] = [];
   const reader = stream.getReader();
+  // A small file can unpack to gigabytes (a zip bomb). Nothing an accounting
+  // export holds comes near this, so past it the file is refused.
+  let unpacked = 0;
   for (;;) {
     const { done, value } = await reader.read();
     if (done) break;
-    if (value) chunks.push(value);
+    if (value) {
+      unpacked += value.length;
+      if (unpacked > MAX_UNPACKED) {
+        await reader.cancel();
+        throw new Error(`${entry.name} unpacks to more than ${MAX_UNPACKED / 1024 / 1024} MB, too big to be an export.`);
+      }
+      chunks.push(value);
+    }
   }
   const total = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
   const merged = new Uint8Array(total);
@@ -194,6 +209,7 @@ function columnOf(reference: string): number {
     const code = character.charCodeAt(0);
     if (code < 65 || code > 90) break;
     value = value * 26 + (code - 64);
+    if (value > MAX_COLUMN) return MAX_COLUMN + 1;
   }
   return value;
 }
@@ -340,7 +356,8 @@ function readSheet(
         }
       }
 
-      if (value !== undefined && value !== "") cells.set(columnOf(reference), value);
+      const column = columnOf(reference);
+      if (value !== undefined && value !== "" && column <= MAX_COLUMN) cells.set(column, value);
     }
 
     if (cells.size > 0) rows.set(rowNumber, cells);
