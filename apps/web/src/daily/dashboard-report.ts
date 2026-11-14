@@ -1,12 +1,13 @@
 import { emptyEntityModel, groupProfitAndLoss, isCreditNote, isEstimate, isPosted, localToday } from "@nzosa/core";
 import type { Cents, Invoice } from "@nzosa/core";
-import { banks, entityBankAccounts, invoiceBalanceMap, invoicesInPlay } from "../books.js";
+import { banks, entityBankAccounts, invoicesInPlay } from "../books.js";
 import { columnsWithRate, lineChart, monthlyColumns, rankedBars, ringChart, stackedColumns } from "../charts.js";
 import type { RingSlice } from "../charts.js";
 import { booksMoney } from "../country.js";
 import { state } from "../state.js";
 import { amountCell, nameCell, note } from "../ui.js";
 import { agedFor, agedTotal } from "./aged-report.js";
+import { accountingLines } from "../fx-books.js";
 import { reportRange } from "./report-period.js";
 import { balanceSheetOn, currentReport, monthsOfYear, reportLookups } from "./reports.js";
 
@@ -124,7 +125,9 @@ function cashBetween(from: string, to: string): { received: Cents; spent: Cents 
   const transfers = state.ledger.transfers ?? {};
   let received = 0;
   let spent = 0;
-  for (const t of state.ledger.transactions) {
+  // In the books' currency, as the ledger posts them: a USD account's lines
+  // added as dollars to New Zealand dollars made a figure in neither.
+  for (const t of accountingLines()) {
     if (t.date < from || t.date > to || !ids.has(t.account) || transfers[t.id] !== undefined) continue;
     if (t.amount > 0) received += t.amount;
     else spent -= t.amount;
@@ -336,10 +339,16 @@ function tiles(items: readonly { label: string; value: string; note: string; ton
   return row;
 }
 
-/** Sales invoices dated in the year, by where they stand today. */
+/**
+ * Sales invoices dated in the year, by where they stood on the dashboard's
+ * day: owing then is what the aged receivables say was owing then, so an
+ * earlier year shows its year end, not today.
+ */
 function invoiceRing(from: string, asAt: string): HTMLElement {
-  const balances = new Map<Invoice, Cents>();
-  for (const b of invoiceBalanceMap().values()) balances.set(b.invoice, b.remaining);
+  const owingThen = new Map<string, { owing: Cents; daysOverdue: number }>();
+  for (const contact of agedFor("sales", asAt).contacts) {
+    for (const item of contact.items) owingThen.set(item.invoice.number, { owing: item.owing, daysOverdue: item.daysOverdue });
+  }
   const counts = { paid: [0, 0], owing: [0, 0], overdue: [0, 0], draft: [0, 0], voided: [0, 0] } as Record<string, [number, number]>;
   const add = (key: string, value: Cents): void => {
     const held = counts[key] as [number, number];
@@ -353,10 +362,11 @@ function invoiceRing(from: string, asAt: string): HTMLElement {
     if (status === "voided" || status === "deleted") add("voided", invoice.total);
     else if (!isPosted(invoice)) add("draft", invoice.total);
     else {
-      const remaining = balances.get(invoice) ?? invoice.outstanding;
-      if (remaining <= 0) add("paid", invoice.total);
-      else if ((invoice.due ?? invoice.issued) < asAt) add("overdue", remaining);
-      else add("owing", remaining);
+      // Not on the aged list for that day: settled by then.
+      const then = owingThen.get(invoice.number);
+      if (then === undefined || then.owing <= 0) add("paid", invoice.total);
+      else if (then.daysOverdue > 0) add("overdue", then.owing);
+      else add("owing", then.owing);
     }
   }
   const slice = (key: string, label: string, series: RingSlice["series"]): RingSlice => {
