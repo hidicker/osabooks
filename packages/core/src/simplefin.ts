@@ -68,6 +68,17 @@ function decodeBase64(text: string): string | null {
   }
 }
 
+/**
+ * The SimpleFIN Bridge's own addresses (bridge.simplefin.org,
+ * beta-bridge.simplefin.org). A token or Access URL pointing anywhere else is
+ * refused, so a crafted one cannot make this computer send requests, with a
+ * password in them, to an address of somebody else's choosing.
+ */
+export function isSimpleFinHost(hostname: string): boolean {
+  const host = hostname.toLowerCase();
+  return host === "simplefin.org" || host.endsWith(".simplefin.org");
+}
+
 /** Where a Setup Token is claimed: the address it encodes, if it is one. */
 export function simpleFinClaimUrl(token: string): string | null {
   const decoded = decodeBase64(token);
@@ -78,7 +89,7 @@ export function simpleFinClaimUrl(token: string): string | null {
   } catch {
     return null;
   }
-  if (url.protocol !== "https:" || !/\/claim\/[^/]+$/.test(url.pathname)) return null;
+  if (url.protocol !== "https:" || !/\/claim\/[^/]+$/.test(url.pathname) || !isSimpleFinHost(url.hostname)) return null;
   return url.toString();
 }
 
@@ -90,7 +101,7 @@ export function simpleFinAccess(accessUrl: string): { base: string; username: st
   } catch {
     return null;
   }
-  if (url.protocol !== "https:" || url.username === "" || url.password === "") return null;
+  if (url.protocol !== "https:" || url.username === "" || url.password === "" || !isSimpleFinHost(url.hostname)) return null;
   const username = decodeURIComponent(url.username);
   const password = decodeURIComponent(url.password);
   url.username = "";

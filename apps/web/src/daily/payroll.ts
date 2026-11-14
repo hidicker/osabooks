@@ -1402,8 +1402,8 @@ function renderPayRunsList(container: HTMLElement): void {
 
     head.innerHTML = `
       <div class="payroll-run-title-group">
-        <h4>Pay Date: <strong>${run.payDate}</strong></h4>
-        <span class="payroll-period-text">Period: ${run.periodStart} &rarr; ${run.periodEnd}</span>
+        <h4>Pay Date: <strong>${escapeHtml(run.payDate)}</strong></h4>
+        <span class="payroll-period-text">Period: ${escapeHtml(run.periodStart)} &rarr; ${escapeHtml(run.periodEnd)}</span>
         ${postedBadge}
       </div>
       <div class="payroll-run-totals-summary">

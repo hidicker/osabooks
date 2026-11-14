@@ -39,10 +39,19 @@ test("a malformed % escape is a 400", async () => {
   assert.equal(response.status, 400);
 });
 
-test("pages say they may not be framed", async () => {
+test("pages may not be framed, and run only the app's own scripts", async () => {
   const response = await fetch(`${base}/`);
   assert.equal(response.headers.get("x-frame-options"), "DENY");
-  assert.equal(response.headers.get("content-security-policy"), "frame-ancestors 'none'");
+  const policy = response.headers.get("content-security-policy");
+  assert.match(policy, /frame-ancestors 'none'/);
+  assert.match(policy, /default-src 'self'/);
+  assert.match(policy, /object-src 'none'/);
+  // The page's inline script, allowed by its hash and nothing looser.
+  assert.match(policy, /script-src 'self' 'sha256-[A-Za-z0-9+/=]+'(;|$)/);
+  assert.doesNotMatch(policy, /script-src[^;]*unsafe/);
+  // JSON answers keep the short policy: they are not pages.
+  const api = await fetch(`${base}/api/status`);
+  assert.equal(api.headers.get("content-security-policy"), "frame-ancestors 'none'");
 });
 
 test("the bank fetches refuse a cross-site request, and allow one with no Sec-Fetch-Site", async () => {

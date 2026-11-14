@@ -44,6 +44,9 @@ async function startOwnServer() {
   mkdirSync(books, { recursive: true });
   // The server serves the built app from its own dist folder.
   process.env["OSABOOKS_DIST"] = join(folder, "dist");
+  // Tells the server it is inside this program, for what only works outside
+  // it (the morning run, which Windows would start as this program).
+  process.env["OSABOOKS_DESKTOP"] = "1";
   const { startServer } = await import(pathToFileURL(join(folder, "server.js")).href);
   running = await startServer({ port: PORT, ledgerRoot: books, ledgerId: "my-books" });
 }

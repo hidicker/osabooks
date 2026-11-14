@@ -550,9 +550,16 @@ export function renderInvoiceEditor(): void {
     beforeStart.hidden = !early;
     if (!early) return;
     const day = new Date(`${start}T00:00:00`).toLocaleDateString(booksLocale(), { day: "numeric", month: "long", year: "numeric" });
+    // With the opening aged list loaded, an early document is shown only where
+    // that list has it as owing: one entered since is kept in the file, not shown.
+    const agedList = (state.ledger.openingDocuments ?? []).some((list) => list.kind === (asBill ? "purchase" : "sales"));
+    const aged = asBill ? "aged payables" : "aged receivables";
     beforeStart.textContent =
       `Before these books start, on ${day}. It is not posted: what was ${asBill ? "owed to suppliers" : "owed to you"} on that day ` +
-      `goes in the opening balances, under ${asBill ? "accounts payable" : "accounts receivable"}. Until it is there, it shows as owing here but is in no report.`;
+      `goes in the opening balances, under ${asBill ? "accounts payable" : "accounts receivable"}. ` +
+      (agedList
+        ? `These books have the opening ${aged}, so it is kept but not shown here unless that list has it as still owing.`
+        : "Until it is there, it shows as owing here but is in no report.");
   };
   issued.addEventListener("input", sayBeforeStart);
   issued.addEventListener("change", sayBeforeStart);
@@ -1699,7 +1706,7 @@ export function renderInvoices(): void {
     body.append(
       note(
         `${settledBefore} dated before these books start ${settledBefore === 1 ? "is" : "are"} not shown: ` +
-          "the opening aged receivables say they were paid before then.",
+          `the opening aged list does not have ${settledBefore === 1 ? "it" : "them"} as still owing.`,
       ),
     );
   }

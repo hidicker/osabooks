@@ -149,7 +149,10 @@ export async function openAttachment(file: Attachment): Promise<void> {
     return;
   }
   const url = URL.createObjectURL(blob);
-  const shown = /^image\/|^application\/pdf$|^text\/plain$/.test(file.type);
+  // Shown here only as types that cannot carry script: photos, PDFs and plain
+  // text. An SVG is an image that can, and a file's type is whatever the books
+  // say it is, so anything else is saved rather than shown.
+  const shown = /^image\/(png|jpeg|gif|webp)$|^application\/pdf$|^text\/plain$/.test(file.type);
   if (!shown) {
     const link = document.createElement("a");
     link.href = url;
@@ -163,7 +166,12 @@ export async function openAttachment(file: Attachment): Promise<void> {
   const view = file.type.startsWith("image/") ? document.createElement("img") : document.createElement("iframe");
   view.className = file.type.startsWith("image/") ? "attachment-image" : "payslip-frame";
   if (view instanceof HTMLImageElement) view.alt = file.name;
-  else view.title = file.name;
+  else {
+    view.title = file.name;
+    // Plain text needs nothing, so it gets nothing. A PDF needs the browser's
+    // own viewer, which a sandboxed frame turns off.
+    if (file.type === "text/plain") view.setAttribute("sandbox", "");
+  }
   view.src = url;
   const actions = document.createElement("div");
   actions.className = "ask-on-page-actions";

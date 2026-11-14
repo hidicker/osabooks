@@ -77,3 +77,12 @@ test("the Bridge's errors in its own words, and windows it will answer", () => {
   const windows = simpleFinWindows(0, 150 * 86_400);
   assert.deepEqual(windows.map((w) => [w.start / 86_400, w.end / 86_400]), [[0, 45], [45, 90], [90, 135], [135, 150]]);
 });
+
+test("only the SimpleFIN Bridge's own addresses are used, for a token or an Access URL", () => {
+  assert.equal(simpleFinClaimUrl(btoa("https://evil.example/simplefin/claim/abc")), null);
+  assert.equal(simpleFinClaimUrl(btoa("https://simplefin.org.evil.example/claim/abc")), null);
+  assert.equal(simpleFinClaimUrl(btoa("https://10.0.0.5/claim/abc")), null);
+  assert.equal(simpleFinAccess("https://u:p@192.168.1.1/simplefin"), null);
+  assert.equal(simpleFinAccess("https://u:p@notsimplefin.org/simplefin"), null);
+  assert.equal(simpleFinAccess("https://u:p@bridge.simplefin.org/simplefin").base, "https://bridge.simplefin.org/simplefin");
+});

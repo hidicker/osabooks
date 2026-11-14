@@ -52,9 +52,11 @@ export function morningChoice(): HTMLElement {
       : "";
     if (aiRoute() === "folder") {
       const response = await fetch("api/nightly/schedule").catch(() => null);
-      const status = (response?.ok ? await response.json() : null) as { supported?: boolean; scheduled?: boolean } | null;
+      const status = (response?.ok ? await response.json() : null) as { supported?: boolean; program?: boolean; scheduled?: boolean } | null;
       const where =
-        status?.supported !== true
+        status?.program === true
+          ? "The morning run is not available in the Windows program. The bank feed and suggestions work as usual while OsaBooks is open."
+          : status?.supported !== true
           ? "The morning run is set up automatically on Windows only. Elsewhere, run node apps/web/nightly.js from a scheduler."
           : status.scheduled === true
             ? "Set up on this computer: it runs at 6am, or when the computer is next on if it was asleep."
@@ -69,7 +71,7 @@ export function morningChoice(): HTMLElement {
         set.addEventListener("click", () => void schedule(true).then(describe));
         said.append(" ", set);
       }
-      if (status?.supported === true && status.scheduled === true && state.ledger.nightly !== true) {
+      if (status?.scheduled === true && (status.program === true || (status.supported === true && state.ledger.nightly !== true))) {
         const off = document.createElement("button");
         off.type = "button";
         off.textContent = "Remove it from this computer";
@@ -97,7 +99,10 @@ export function morningChoice(): HTMLElement {
     void save(state.ledger).then(async (persistent) => {
       state.persistent = persistent;
       await record("nightly", tick.checked ? "Ready every morning: on" : "Ready every morning: off", before, tick.checked);
-      if (tick.checked) await schedule(true);
+      if (tick.checked) {
+        const status = await fetch("api/nightly/schedule").then((r) => r.json()).catch(() => null) as { program?: boolean } | null;
+        if (status?.program !== true) await schedule(true);
+      }
       await describe();
     });
   });

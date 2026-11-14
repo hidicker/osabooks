@@ -221,6 +221,33 @@ const NO_FRAMING = {
   "x-content-type-options": "nosniff",
 };
 
+/**
+ * A page's content security policy: the same as the website's
+ * (apps/web/public/.htaccess), so a page served here, or in the Windows
+ * program, runs only the app's own scripts. The inline scripts the page itself
+ * carries are allowed by their hashes, worked out from the file being served,
+ * so the policy cannot fall out of step with the page.
+ */
+function pagePolicy(html) {
+  const hashes = [];
+  for (const match of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
+    hashes.push(`'sha256-${createHash("sha256").update(match[1], "utf8").digest("base64")}'`);
+  }
+  return [
+    "default-src 'self'",
+    `script-src 'self'${hashes.length > 0 ? " " + hashes.join(" ") : ""}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "frame-src 'self' blob:",
+    "font-src 'self'",
+    "connect-src 'self' https://*.supabase.co https://www.openaccountants.com https://api.frankfurter.dev",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
 function send(response, status, body, type = "application/json; charset=utf-8") {
   response.writeHead(status, {
     "content-type": type,
@@ -288,6 +315,17 @@ function sendFile(response, urlPath) {
   }
   if (!existsSync(file) || !statSync(file).isFile()) {
     send(response, 404, { error: "not found" });
+    return;
+  }
+  if (extname(file) === ".html") {
+    const html = readFileSync(file, "utf8");
+    response.writeHead(200, {
+      "content-type": TYPES[".html"] ?? "text/html; charset=utf-8",
+      "cache-control": "no-store",
+      ...NO_FRAMING,
+      "content-security-policy": pagePolicy(html),
+    });
+    response.end(html);
     return;
   }
   response.writeHead(200, {
@@ -765,9 +803,13 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
       }
 
       // Whether the morning run is set up on this computer, and setting it up.
+      // Not from the Windows program: its executable is the program itself,
+      // which a scheduled task would only open, and it carries no way to build
+      // the run. A task already made there can still be removed.
       if (path === "/api/nightly/schedule" && request.method === "GET") {
-        const supported = process.platform === "win32";
-        send(response, 200, { supported, scheduled: supported && morningTaskExists(), at: "06:00" });
+        const program = process.env.OSABOOKS_DESKTOP === "1";
+        const supported = process.platform === "win32" && !program;
+        send(response, 200, { supported, program, scheduled: process.platform === "win32" && morningTaskExists(), at: "06:00" });
         return;
       }
 
@@ -781,6 +823,10 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
           return;
         }
         const body = await readJson(request);
+        if (body.on === true && process.env.OSABOOKS_DESKTOP === "1") {
+          send(response, 400, { error: "The morning run is not available in the Windows program." });
+          return;
+        }
         try {
           if (body.on === true) scheduleMorning(ledgerRoot);
           else if (morningTaskExists()) unscheduleMorning();
