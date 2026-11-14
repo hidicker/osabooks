@@ -96,7 +96,8 @@ test("a payday posts as a balanced journal, a line for each employee's wages and
   assert.deepEqual(payAccountsUsed(days).sort(), ["deductions", "employerTaxes", "federal", "futa", "medicare", "netPay", "socialSecurity", "stateIncome", "stateUnemployment", "wages"].sort());
   const journal = payrollRegisterJournal(days[0], accounts, "Gusto");
   assert.ok(journal);
-  assert.equal(journal.id, "payroll-register-2026-01-15");
+  // The date, and a mark of who was paid what: two runs on one day are two journals.
+  assert.match(journal.id, /^payroll-register-2026-01-15-[0-9a-f]+$/);
   assert.equal(journal.lines.reduce((s, l) => s + l.amount, 0), 0);
   const line = (code) => journal.lines.filter((l) => l.code.endsWith(code)).reduce((s, l) => s + l.amount, 0);
   assert.equal(line("6180"), 630_000);
@@ -187,4 +188,24 @@ test("a service that lists withholding as negatives is read as amounts taken", (
   assert.equal(days[0].totals.federal, 14_000);
   assert.equal(days[0].totals.socialEmployee, 9_300);
   assert.equal(days[0].outBy, 0);
+});
+
+test("a payday is the same as one in the books by who was paid what, not by its date alone", async () => {
+  const { paydayFingerprint, journalPaydayFingerprint, payrollRegisterId } = await import("../dist/index.js");
+  const read = (rows) => registerPaydays(readPayrollRegister(SIMPLE(rows)))[0];
+  const regular = read(["01/15/2026,Pat Lee,1000.00,100.00,62.00,14.50,823.50", "01/15/2026,Sam Cho,500.00,40.00,31.00,7.25,421.75"]);
+  const bonus = read(["01/15/2026,Pat Lee,2000.00,440.00,124.00,29.00,1407.00"]);
+  const accounts = {
+    wages: "Wages - 6000", federal: "Federal - 2110", socialSecurity: "SS - 2120", medicare: "Medicare - 2130",
+    netPay: "Wages payable - 2100", employerTaxes: "Payroll taxes - 6010",
+  };
+  const posted = payrollRegisterJournal(regular, accounts);
+  assert.equal(journalPaydayFingerprint(posted), paydayFingerprint(regular), "the regular run, once posted, reads as itself");
+  assert.notEqual(paydayFingerprint(bonus), paydayFingerprint(regular), "a bonus run the same day is another payday");
+  // Order of rows does not matter.
+  const swapped = read(["01/15/2026,Sam Cho,500.00,40.00,31.00,7.25,421.75", "01/15/2026,Pat Lee,1000.00,100.00,62.00,14.50,823.50"]);
+  assert.equal(paydayFingerprint(swapped), paydayFingerprint(regular));
+  // Two paydays on one date get two ids.
+  assert.notEqual(payrollRegisterId(regular.date, regular), payrollRegisterId(bonus.date, bonus));
+  assert.match(payrollRegisterId(regular.date, regular), /^payroll-register-2026-01-15-[0-9a-f]+$/);
 });

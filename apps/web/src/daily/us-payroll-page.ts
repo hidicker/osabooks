@@ -3,7 +3,7 @@ import { asCsvText, saveManualJournals, usPayRunJournals } from "../books.js";
 import { booksMoney } from "../country.js";
 import { $, state } from "../state.js";
 import { save } from "../store.js";
-import { note, noteBriefly, tellOnPage, wideTable } from "../ui.js";
+import { askOnPage, note, noteBriefly, tellOnPage, wideTable } from "../ui.js";
 import { settleAccounts } from "./us-payroll-accounts.js";
 import { usPayRunSections } from "./us-payroll-runs.js";
 import {
@@ -13,7 +13,9 @@ import {
   employeeTaxes,
   employerTaxes,
   findPayAccounts,
+  journalPaydayFingerprint,
   payAccountsUsed,
+  paydayFingerprint,
   payrollRegisterId,
   payrollRegisterJournal,
   payrollService,
@@ -85,8 +87,18 @@ function payrollJournals(): ManualJournal[] {
   ];
 }
 
-function alreadyIn(date: string): boolean {
-  return payrollJournals().some((j) => j.date === date || j.id === payrollRegisterId(date));
+/**
+ * A payday already in the books: a payroll that day paying the same people the
+ * same gross and net pay. Another payroll the same day (a bonus run) is not it.
+ */
+function alreadyIn(day: RegisterPayday): boolean {
+  const mark = paydayFingerprint(day);
+  return payrollJournals().some((j) => j.date === day.date && (journalPaydayFingerprint(j) === mark || j.id === payrollRegisterId(day.date, day)));
+}
+
+/** Another payroll is in the books for this day, paying something else: a separate run, or a corrected register. */
+function anotherThatDay(day: RegisterPayday): boolean {
+  return !alreadyIn(day) && payrollJournals().some((j) => j.date === day.date);
 }
 
 function fileSection(body: HTMLElement): void {
@@ -190,7 +202,8 @@ function accountsSection(body: HTMLElement, used: readonly PayAccount[]): void {
 function status(day: RegisterPayday): string {
   if (day.problems.length > 0) return day.problems[0] ?? "";
   if (day.outBy !== 0) return `Out by ${money(day.outBy)}: gross less taxes and deductions is not the net pay`;
-  if (alreadyIn(day.date)) return "Already in the books";
+  if (alreadyIn(day)) return "Already in the books";
+  if (anotherThatDay(day)) return "Ready: another payroll for this day is in the books";
   return "Ready";
 }
 
@@ -214,7 +227,7 @@ function paydaysSection(body: HTMLElement, days: readonly RegisterPayday[]): voi
     rows.append(tr);
   }
   body.append(wideTable(t));
-  const ready = days.filter((d) => status(d) === "Ready");
+  const ready = days.filter((d) => status(d).startsWith("Ready"));
   const actions = document.createElement("div");
   actions.className = "page-actions";
   const post = document.createElement("button");
@@ -241,6 +254,18 @@ function paydaysSection(body: HTMLElement, days: readonly RegisterPayday[]): voi
 
 async function postPaydays(days: readonly RegisterPayday[]): Promise<void> {
   if (loaded === null || days.length === 0) return;
+  // A second payroll the same day is right for a separate run (a bonus) and
+  // wrong for a corrected copy of one already in, which would pay it twice.
+  const second = days.filter(anotherThatDay);
+  if (
+    second.length > 0 &&
+    !(await askOnPage(
+      `${second.map((d) => d.date).join(", ")}: another payroll for ${second.length === 1 ? "this day is" : "these days is"} in the books already. Post ${second.length === 1 ? "this one" : "these"} as well, as a separate run? A corrected copy of a payroll already in would pay it twice: delete the one in the books first (Manual journals) instead.`,
+      "Post as a separate run",
+    ))
+  ) {
+    return;
+  }
   const chartBefore = state.chart.length;
   const accounts = settleAccounts(payAccountsUsed(days), chosen);
   // Accounts added to the chart are saved with it: the journals alone would

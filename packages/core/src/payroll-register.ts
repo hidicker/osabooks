@@ -421,9 +421,45 @@ export function payAccountsUsed(days: readonly RegisterPayday[]): PayAccount[] {
   return PAY_ACCOUNTS.filter(({ from }) => days.some((d) => from.some((a) => d.totals[a] !== 0))).map((a) => a.id);
 }
 
-/** The id a payday's journal is kept under, so importing the same register again finds it. */
-export function payrollRegisterId(date: IsoDate): string {
-  return `payroll-register-${date}`;
+/**
+ * Who was paid what on a payday: each employee's gross and net pay, in name
+ * order. Two registers of one payday read the same; a second run on the same
+ * day (a bonus run) reads differently, so it is not taken for the first.
+ */
+export function paydayFingerprint(day: Pick<RegisterPayday, "pays">): string {
+  return day.pays
+    .map((p) => `${p.employee}:${p.amounts.gross}:${p.amounts.net}`)
+    .sort()
+    .join("|");
+}
+
+/** The same, read back from a payday's journal in the books: its lines marked with an employee. */
+export function journalPaydayFingerprint(journal: Pick<ManualJournal, "lines">): string {
+  const by = new Map<string, { gross: Cents; net: Cents }>();
+  for (const line of journal.lines) {
+    if (line.employee === undefined || (line.pay !== "gross" && line.pay !== "net")) continue;
+    const one = by.get(line.employee) ?? { gross: 0, net: 0 };
+    // Wages are a debit, net pay owed a credit.
+    if (line.pay === "gross") one.gross += line.amount;
+    else one.net -= line.amount;
+    by.set(line.employee, one);
+  }
+  return [...by.entries()]
+    .map(([employee, { gross, net }]) => `${employee}:${gross}:${net}`)
+    .sort()
+    .join("|");
+}
+
+/**
+ * The id a payday's journal is kept under: its date, and with the payday,
+ * a short mark of who was paid what, so two runs on one day are two
+ * journals. Without the payday, the date alone (as journals were first kept).
+ */
+export function payrollRegisterId(date: IsoDate, day?: Pick<RegisterPayday, "pays">): string {
+  if (day === undefined) return `payroll-register-${date}`;
+  let hash = 5381;
+  for (const ch of paydayFingerprint(day)) hash = ((hash * 33) ^ ch.charCodeAt(0)) >>> 0;
+  return `payroll-register-${date}-${hash.toString(16)}`;
 }
 
 const EMPLOYEE_LINES: readonly [PayAmount, PayAccount, string, 1 | -1][] = [
@@ -480,7 +516,7 @@ export function payrollRegisterJournal(
   if (lines.reduce((s, l) => s + l.amount, 0) !== 0) return null;
   const people = day.pays.length;
   return {
-    id: payrollRegisterId(day.date),
+    id: payrollRegisterId(day.date, day),
     date: day.date,
     narration: `Payroll paid ${day.date}, ${people} ${people === 1 ? "employee" : "employees"}, from ${service}'s payroll register`,
     source: `${service} payroll register`,
