@@ -40,3 +40,19 @@ Nothing set, nothing signed. `sign.cjs` says how it is used.
 The **Windows installer** workflow builds it from source on GitHub and attaches
 it to a draft release as `OsaBooks-Setup.exe`, so the address
 `.../releases/latest/download/OsaBooks-Setup.exe` always gives the newest.
+
+## Testing an installer
+
+Test it installed, outside this repository: run from inside the checkout, the
+program can find packages in the repository's own `node_modules` that an
+installed copy does not have, and seem to work when it would not. In
+PowerShell:
+
+```
+Start-Process release\OsaBooks-Setup.exe -ArgumentList '/S', "/D=$env:TEMP\osabooks-test" -Wait
+Start-Process "$env:TEMP\osabooks-test\OsaBooks.exe"   # it should open and show your books
+# then, after closing it:
+Start-Process "$env:TEMP\osabooks-test\Uninstall OsaBooks.exe" -ArgumentList '/S' -Wait
+```
+
+Uninstalling leaves the books in `OsaBooks` in the user folder, as it should.
