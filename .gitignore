@@ -89,3 +89,7 @@ packages/mcp/*.mcpb
 
 # Local dev-server settings for the Claude desktop app: each person's own.
 .claude/launch.json
+
+# Desktop program build output
+desktop/stage/
+desktop/release/

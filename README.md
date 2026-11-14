@@ -14,6 +14,8 @@ Point it at your bank exports and, if you have them, the exports from Xero or Qu
 
 ## Running it
 
+**On Windows, the easy way:** download [OsaBooks-Setup.exe](https://github.com/hidicker/osabooks/releases/latest/download/OsaBooks-Setup.exe) from the [latest release](https://github.com/hidicker/osabooks/releases/latest) and double-click it. No Node.js needed; OsaBooks opens in a window of its own and keeps your books in a folder called `OsaBooks` in your user folder. It is not signed yet, so Windows asks you to choose **More info**, then **Run anyway**. How it is built is in [`desktop/`](desktop/README.md). Otherwise:
+
 1. **Install Node.js** — [nodejs.org](https://nodejs.org/), choose the **LTS** build, and accept every default.
 2. **Download & Run**:
    - Click the green **Code** button at the top of this GitHub page, select **Download ZIP**, and extract it anywhere on your computer.

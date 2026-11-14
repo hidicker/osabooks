@@ -1,0 +1,59 @@
+name: Windows installer
+
+# Builds the Windows installer from the source in this repository and attaches
+# it to a draft release, for the maintainer to look over and publish. Run by
+# hand; it deploys nothing.
+#
+# The release's file is always called OsaBooks-Setup.exe, so the link
+# https://github.com/hidicker/osabooks/releases/latest/download/OsaBooks-Setup.exe
+# always gives the newest one.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag, for example v2026.11.14
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: desktop-installer
+  cancel-in-progress: false
+
+jobs:
+  installer:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: The app and its core
+        run: npm ci
+
+      - name: The installer
+        working-directory: desktop
+        run: |
+          npm ci --ignore-scripts
+          npm run installer
+        env:
+          # Set by the maintainer once there is a certificate (see desktop/sign.cjs).
+          OSABOOKS_SIGN_COMMAND: ${{ secrets.OSABOOKS_SIGN_COMMAND }}
+
+      - name: A draft release with the installer
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$TAG" desktop/release/OsaBooks-Setup.exe \
+            --repo "$GITHUB_REPOSITORY" \
+            --draft \
+            --title "OsaBooks $TAG" \
+            --notes "The Windows installer. It is not signed yet, so Windows says the publisher is unknown: choose More info, then Run anyway. Your books are kept in a folder called OsaBooks in your user folder, and upgrades and uninstalling never touch them."

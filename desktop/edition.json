@@ -1,0 +1,8 @@
+{
+  "name": "OsaBooks",
+  "appId": "nz.osabooks.app",
+  "port": 3215,
+  "folder": "OsaBooks",
+  "installerName": "OsaBooks-Setup",
+  "guides": "https://nbparagliding.nz/osabooks/home/"
+}
