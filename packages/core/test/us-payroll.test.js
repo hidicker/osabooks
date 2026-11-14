@@ -273,3 +273,40 @@ test("the employer's own unemployment wage base is its state's, not every state'
   assert.equal(suiWageBase("TX", employer), 900_000);
   assert.equal(suiWageBase("ZZ", { state: "WA" }), undefined, "a state not known here, without a figure");
 });
+
+test("every pay run, whatever its people, states and figures, posts a journal that balances", () => {
+  // A fixed sequence of "random" numbers, so a failure can be run again.
+  let seed = 20261115;
+  const next = () => ((seed = (seed * 1103515245 + 12345) % 2 ** 31) / 2 ** 31);
+  const pick = (list) => list[Math.floor(next() * list.length)];
+  const accounts = {
+    wages: "Wages - 6000", employerTaxes: "Payroll taxes - 6010", netPay: "Wages payable - 2100", federal: "Federal - 2110",
+    socialSecurity: "SS - 2120", medicare: "Medicare - 2130", futa: "FUTA - 2140", stateIncome: "State - 2150",
+    stateUnemployment: "SUI - 2160", otherTaxes: "Other - 2170", deductions: "Deductions - 2180",
+  };
+  for (let run = 0; run < 200; run += 1) {
+    const employer = { state: pick(["CA", "TX", "FL", "NY", "PA", "WA"]), suiRate: Math.round(next() * 60) / 10 };
+    const lines = [];
+    for (let e = 0; e < 1 + Math.floor(next() * 5); e += 1) {
+      const employee = {
+        id: `e${e}`,
+        name: `E${e}`,
+        payFrequency: pick(["weekly", "biweekly", "semimonthly", "monthly"]),
+        w4: { status: pick(["single", "married", "head"]), ...(next() < 0.3 ? { step2: true } : {}), ...(next() < 0.2 ? { extra: 2_500 } : {}) },
+        state: pick([undefined, "CA", "NY", "PA", "TX"]),
+        ...(next() < 0.3 ? { it2104: { status: "single", allowances: 1, nyc: next() < 0.5 } } : {}),
+        ...(next() < 0.2 ? { localRate: 1.5 } : {}),
+      };
+      const gross = Math.round(next() * 2_000_000) + 1_000;
+      const before = Math.round(next() * 25_000_000);
+      const entered = next() < 0.2 ? { stateIncome: Math.round(next() * 10_000) } : {};
+      lines.push(usPayLine(employee, gross, "2026-06-30", before, employer, entered));
+    }
+    const day = usPayRunAsPayday({ id: `r${run}`, payDate: "2026-06-30", periodStart: "2026-06-01", periodEnd: "2026-06-30", lines }, (id) => id);
+    assert.equal(day.outBy, 0, `run ${run} adds up`);
+    const journal = payrollRegisterJournal(day, accounts, "OsaBooks");
+    assert.ok(journal !== null, `run ${run} posts`);
+    assert.equal(journal.lines.reduce((s, l) => s + l.amount, 0), 0, `run ${run} balances`);
+    assert.ok(journal.lines.every((l) => Number.isInteger(l.amount)), `run ${run} in whole cents`);
+  }
+});
