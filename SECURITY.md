@@ -77,8 +77,9 @@ What follows is checked in each security review; the last was on 14 November 202
   can only read the books and leave suggestions through the connector, which
   wait until somebody in the books accepts them.
 - The site sends a strict content security policy (scripts only from the site
-  itself; data only to the site, its database, the OpenAccountants guides and
-  the exchange-rate service), HSTS, and refuses to be framed. The online demo
+  itself; data only to the site, its database, the OpenAccountants guides, the
+  exchange-rate service, and the AI companies a visitor's own key is sent to),
+  HSTS, and refuses to be framed. The online demo
   sends the same headers, and keeps its sample books in browser storage of its
   own, apart from the hosted app's.
 

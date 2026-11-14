@@ -252,7 +252,9 @@ function pagePolicy(html) {
     "img-src 'self' data: blob:",
     "frame-src 'self' blob:",
     "font-src 'self'",
-    `connect-src 'self' https://*.supabase.co https://www.openaccountants.com https://api.frankfurter.dev${extraConnect()}`,
+    // The AI providers too: a visitor's own key asks them from the page
+    // (ai-demo.ts), and test/page-policy.test.js checks nothing fetched is missing.
+    `connect-src 'self' https://*.supabase.co https://www.openaccountants.com https://api.frankfurter.dev https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com https://openrouter.ai https://jevtypesafeai.com${extraConnect()}`,
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'self'",
