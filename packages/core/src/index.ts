@@ -321,6 +321,8 @@ export {
   emailForContact,
   cleanDocumentLink,
   isCreditNote,
+  looksLikeCreditTypedAsSale,
+  negatedDocument,
   isPosted,
   isEstimate,
   linesWithoutAccount,

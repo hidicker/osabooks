@@ -650,6 +650,28 @@ export function isCreditNote(invoice: Invoice): boolean {
 }
 
 /**
+ * A sales invoice whose free-text status calls it a credit, typed with
+ * positive amounts: saved as it is, it would post as a sale. Only a negative
+ * total makes a credit note.
+ */
+export function looksLikeCreditTypedAsSale(invoice: Invoice): boolean {
+  return invoice.kind === "sales" && invoice.total > 0 && /\bcredit\b(?!\s*card)/i.test(invoice.status);
+}
+
+/** The same document with every amount turned round: a sale into a credit, or back. */
+export function negatedDocument(invoice: Invoice): Invoice {
+  return {
+    ...invoice,
+    total: -invoice.total,
+    tax: -invoice.tax,
+    paid: -invoice.paid,
+    outstanding: -invoice.outstanding,
+    ...(invoice.broughtForward !== undefined ? { broughtForward: -invoice.broughtForward } : {}),
+    lines: invoice.lines.map((l) => ({ ...l, net: -l.net, tax: -l.tax, gross: -l.gross })),
+  };
+}
+
+/**
  * Statuses under which an invoice is not in the books.
  *
  * Xero posts an invoice when it is approved, and not before: a draft, or one

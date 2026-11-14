@@ -47,6 +47,8 @@ import {
   isPosted,
   isEstimate,
   linesWithoutAccount,
+  looksLikeCreditTypedAsSale,
+  negatedDocument,
   matchInvoices,
   nextInvoiceNumber,
   splitAccountLabel,
@@ -1174,7 +1176,20 @@ export function renderInvoiceEditor(): void {
       void saveWithJob(receipt);
       return;
     }
-    void saveWithJob(build(asBill ? statusChoice.value : statusText.value.trim()));
+    const built = build(asBill ? statusChoice.value : statusText.value.trim());
+    if (!looksLikeCreditTypedAsSale(built)) {
+      void saveWithJob(built);
+      return;
+    }
+    // The status says credit but the amounts say sale: as typed it would post
+    // as income. A credit note is the same document with negative amounts.
+    void askOnPage(
+      `The status says "${built.status}", but the amounts are positive, so this would be saved as a sale of ${formatAmount(built.total)}. Save it as a credit note for ${formatAmount(built.total)} instead?`,
+      "Save as a credit note",
+      "Go back",
+    ).then((yes) => {
+      if (yes) void saveWithJob(negatedDocument(built));
+    });
   });
 
   // Approving is what puts a bill in the books, so it is its own button
