@@ -211,11 +211,86 @@ export function twoFactorSettings(): HTMLElement | null {
         );
       }
     }
+    if (mine.length > 0) {
+      const everywhere = await allMyBooks();
+      if (everywhere !== null) inside.append(everywhere);
+    }
     if (mine.length === 0 || signedInWithCode()) inside.append(setUp(mine.length === 0, draw));
   };
 
   void draw();
   return fold;
+}
+
+/**
+ * Required in every set of books this person owns, with one switch, and in
+ * books they start afterwards. Each set of books can still be changed on its
+ * own (its Settings). Null when they own none.
+ */
+async function allMyBooks(): Promise<HTMLElement | null> {
+  const box = document.createElement("div");
+  box.className = "two-factor-everywhere";
+  const draw = async (): Promise<void> => {
+    box.textContent = "";
+    const rows = await rpc<{ on_for_new_books: boolean; owned: number; required: number; people_without: number }[]>("two_factor_everywhere", {});
+    const state = rows?.[0];
+    if (state === undefined || state.owned === 0) {
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    const all = state.on_for_new_books && state.required === state.owned;
+    const heading = document.createElement("h4");
+    heading.textContent = "Everybody in your books";
+    box.append(
+      heading,
+      note(
+        all
+          ? `Required in all ${state.owned} sets of books you own, and in any you start: everybody in them, your accountant included, signs in with a code.`
+          : `Required in ${state.required} of the ${state.owned} sets of books you own. Requiring it in all of them asks everybody in them, your accountant included, for a code, and keeps it on for books you start later.`,
+      ),
+    );
+    if (!all && state.people_without > 0) {
+      box.append(
+        note(
+          `${state.people_without} ${state.people_without === 1 ? "person in your books has" : "people in your books have"} not set up an authenticator, and could not open those books until they do.`,
+        ),
+      );
+    }
+    const button = document.createElement("button");
+    button.type = "button";
+    button.textContent = all ? "Stop requiring it in all my books" : "Require it in all my books";
+    const answer = document.createElement("p");
+    answer.className = "cloud-said";
+    button.addEventListener("click", () => {
+      const turningOn = !all;
+      if (turningOn && !signedInWithCode()) {
+        said(answer, "Sign out and in again with the code from your authenticator app first.", true);
+        return;
+      }
+      void askOnPage(
+        turningOn
+          ? `Require two-factor sign-in in all ${state.owned} sets of books you own, and in any you start?` +
+              (state.people_without > 0 ? ` ${state.people_without} ${state.people_without === 1 ? "person" : "people"} without an authenticator could not open them until they set one up.` : "")
+          : `Stop requiring it in all ${state.owned} sets of books you own? Anybody who set up an authenticator for themselves is still asked for their code.`,
+        turningOn ? "Require it" : "Stop requiring it",
+      ).then((yes) => {
+        if (!yes) return;
+        button.disabled = true;
+        void rpc<number>("set_two_factor_everywhere", { p_on: turningOn }).then(async (changed) => {
+          if (changed === null) {
+            button.disabled = false;
+            said(answer, "It was not changed. Sign in with your code and try again.", true);
+            return;
+          }
+          await draw();
+        });
+      });
+    });
+    box.append(button, answer);
+  };
+  await draw();
+  return box;
 }
 
 /**
