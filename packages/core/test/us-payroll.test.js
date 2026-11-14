@@ -115,7 +115,8 @@ test("pay runs post as balanced journals and give the W-2 figures", () => {
     lines: [usPayLine(dana, 350_000, payDate, before, employer)],
   });
   const runs = [run("r1", "2026-01-15", 0), run("r2", "2026-01-31", 350_000)];
-  assert.equal(grossBefore(runs, "e1", "2026-01-31"), 350_000);
+  // Before r2 itself: the earlier run only.
+  assert.equal(grossBefore(runs, "e1", "2026-01-31", "r2"), 350_000);
   const accounts = {
     wages: "Wages - 6180", employerTaxes: "Payroll taxes - 6185", netPay: "Wages payable - 2100", federal: "Federal - 2110",
     socialSecurity: "SS - 2120", medicare: "Medicare - 2130", futa: "FUTA - 2140", stateIncome: "CA PIT - 2150",
@@ -207,4 +208,50 @@ test("Pennsylvania: 3.07% flat, 0.07% employee UC on all wages, UC on the first 
   assert.equal(line.localIncome, 6_000, "the 1.5% earned income tax");
   assert.equal(line.stateUnemployment, 7_644, "3.822% of the $2,000 left under $10,000");
   assert.equal(line.net, 400_000 - line.federal - line.socialSecurity - line.medicare - 12_280 - 280 - 6_000);
+});
+
+test("a second run on the same pay date counts the first, so the year's limits hold", () => {
+  const pat = { id: "p1", name: "Pat", payFrequency: "monthly", w4: { status: "single" } };
+  const tx = { state: "TX" };
+  const regular = usPayLine(pat, 600_000, "2026-01-31", grossBefore([], "p1", "2026-01-31"), tx);
+  const runs = [{ id: "regular", payDate: "2026-01-31", periodStart: "2026-01-01", periodEnd: "2026-01-31", lines: [regular] }];
+  // A bonus run the same day, not saved yet: the regular run is before it.
+  assert.equal(grossBefore(runs, "p1", "2026-01-31"), 600_000);
+  const bonus = usPayLine(pat, 600_000, "2026-01-31", grossBefore(runs, "p1", "2026-01-31"), tx);
+  assert.equal(regular.futa + bonus.futa, 4_200, "FUTA on the first $7,000 only");
+  assert.equal(regular.stateUnemployment + bonus.stateUnemployment, 24_300, "Texas SUI on the first $9,000 only");
+  // Saved after it, the bonus run counts the regular one, and not the other way round.
+  runs.push({ id: "bonus", payDate: "2026-01-31", periodStart: "2026-01-01", periodEnd: "2026-01-31", lines: [bonus] });
+  assert.equal(grossBefore(runs, "p1", "2026-01-31", "regular"), 0);
+  assert.equal(grossBefore(runs, "p1", "2026-01-31", "bonus"), 600_000);
+  // A later date counts both; another employee and another year count nothing.
+  assert.equal(grossBefore(runs, "p1", "2026-02-28"), 1_200_000);
+  assert.equal(grossBefore(runs, "someone-else", "2026-02-28"), 0);
+  assert.equal(grossBefore(runs, "p1", "2027-01-31"), 0);
+});
+
+test("whatever the runs and their order, an employee's year never passes a wage base", () => {
+  const pat = { id: "p1", name: "Pat", payFrequency: "weekly", w4: { status: "single" } };
+  const tx = { state: "TX" };
+  // A run a week, with a bonus run on some of the same days, 2026.
+  const runs = [];
+  let day = new Date(Date.UTC(2026, 0, 2));
+  for (let week = 0; week < 52; week += 1) {
+    const payDate = day.toISOString().slice(0, 10);
+    for (const gross of week % 5 === 0 ? [500_000, 1_500_000] : [500_000]) {
+      const line = usPayLine(pat, gross, payDate, grossBefore(runs, "p1", payDate), tx);
+      runs.push({ id: `r${runs.length}`, payDate, periodStart: payDate, periodEnd: payDate, lines: [line] });
+    }
+    day.setUTCDate(day.getUTCDate() + 7);
+  }
+  const sum = (k) => runs.reduce((s, r) => s + r.lines[0][k], 0);
+  const gross = sum("gross");
+  assert.ok(gross > 18_450_000 * 2, "enough pay to pass every base");
+  assert.equal(sum("futa"), Math.round(700_000 * 0.006), "FUTA: 0.6% of $7,000");
+  assert.equal(sum("stateUnemployment"), Math.round(900_000 * 0.027), "Texas SUI: 2.7% of $9,000");
+  // Social Security, 6.2% of the 2026 base at most (each line rounds on its own).
+  assert.ok(Math.abs(sum("socialSecurity") - Math.round(18_450_000 * 0.062)) <= runs.length, "Social Security stops at the wage base");
+  // Additional Medicare: 0.9% of everything over $200,000.
+  const extra = sum("medicare") - sum("employerMedicare");
+  assert.ok(Math.abs(extra - Math.round((gross - 20_000_000) * 0.009)) <= runs.length, "Additional Medicare from $200,000");
 });

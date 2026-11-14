@@ -490,14 +490,27 @@ export function stateWithholdingWorked(state: string): boolean {
   return US_STATE_PAYROLL[state]?.income !== undefined;
 }
 
-/** Gross paid to an employee this calendar year before a pay date, from the runs. */
+/**
+ * Gross paid to an employee this calendar year before a paycheck, from the
+ * runs: for the year's wage bases (Social Security, FUTA, the state's
+ * unemployment, Additional Medicare, New York PFL).
+ *
+ * Runs on an earlier day count, and so do runs on the same day saved before
+ * this one: a bonus run paid the same day as the regular one counts the
+ * regular run's wages, or each would work the year's limits alone and tax
+ * past them. For a run not saved yet, every run saved for its day is before
+ * it; for a saved run (`exceptRun`), those saved ahead of it in the list.
+ */
 export function grossBefore(runs: readonly UsPayRun[], employeeId: string, payDate: IsoDate, exceptRun?: string): Cents {
   const year = payDate.slice(0, 4);
+  const at = exceptRun === undefined ? -1 : runs.findIndex((run) => run.id === exceptRun);
+  const sameDayUpTo = at < 0 ? runs.length : at;
   let sum = 0;
-  for (const run of runs) {
-    if (run.id === exceptRun || !run.payDate.startsWith(year) || run.payDate >= payDate) continue;
+  runs.forEach((run, index) => {
+    if (run.id === exceptRun || !run.payDate.startsWith(year) || run.payDate > payDate) return;
+    if (run.payDate === payDate && index >= sameDayUpTo) return;
     for (const line of run.lines) if (line.employeeId === employeeId) sum += line.gross;
-  }
+  });
   return sum;
 }
 
