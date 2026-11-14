@@ -230,6 +230,18 @@ export function postManualJournal(
  * stay on the record. Pointing back by id is what lets the list say which
  * journal reversed which.
  */
+/**
+ * The journals still standing: not deleted, not a reversal, and not reversed
+ * by another. For anything that reads what a journal says rather than what it
+ * posts (the W-2 figures, whether a payday is already in): the ledger counts a
+ * journal and its reversal both, and they cancel, but a reversal does not carry
+ * the original's markings, so read alone the original would still count.
+ */
+export function standingJournals<J extends Pick<ManualJournal, "id" | "reverses" | "deleted">>(journals: readonly J[]): J[] {
+  const reversed = new Set(journals.filter((j) => j.deleted === undefined && j.reverses !== undefined).map((j) => j.reverses));
+  return journals.filter((j) => j.deleted === undefined && j.reverses === undefined && !reversed.has(j.id));
+}
+
 export function reversalOf(journal: ManualJournal, date: IsoDate, id: string): ManualJournal {
   return {
     id,

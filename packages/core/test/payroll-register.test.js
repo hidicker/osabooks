@@ -209,3 +209,20 @@ test("a payday is the same as one in the books by who was paid what, not by its 
   assert.notEqual(payrollRegisterId(regular.date, regular), payrollRegisterId(bonus.date, bonus));
   assert.match(payrollRegisterId(regular.date, regular), /^payroll-register-2026-01-15-[0-9a-f]+$/);
 });
+
+test("a reversed payroll journal, and its reversal, are no longer payroll standing in the books", async () => {
+  const { standingJournals, reversalOf } = await import("../dist/index.js");
+  const days = registerPaydays(readPayrollRegister(SIMPLE(["01/15/2026,Pat Lee,1000.00,100.00,62.00,14.50,823.50"])));
+  const accounts = {
+    wages: "Wages - 6000", federal: "Federal - 2110", socialSecurity: "SS - 2120", medicare: "Medicare - 2130",
+    netPay: "Wages payable - 2100", employerTaxes: "Payroll taxes - 6010",
+  };
+  const posted = payrollRegisterJournal(days[0], accounts);
+  const reversal = reversalOf(posted, "2026-01-20", "m1");
+  const deleted = { ...payrollRegisterJournal(days[0], accounts), id: "gone", deleted: { at: "2026-01-21", by: "me" } };
+  const other = { ...payrollRegisterJournal(days[0], accounts), id: "other" };
+  const standing = standingJournals([posted, reversal, deleted, other]);
+  assert.deepEqual(standing.map((j) => j.id), ["other"]);
+  assert.equal(w2Figures(standing, 2026)[0].gross, 100_000, "the W-2 figures count the payroll still in the books, once");
+  assert.equal(w2Figures([posted, reversal], 2026)[0].gross, 100_000, "read without it, the reversed one would still count");
+});

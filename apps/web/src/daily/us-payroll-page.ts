@@ -21,6 +21,7 @@ import {
   payrollService,
   readPayrollRegister,
   registerPaydays,
+  standingJournals,
   w2Figures,
 } from "@nzosa/core";
 import type { Account, ManualJournal, PayAccount, RegisterPayday, RegisterRead, RegisterRole } from "@nzosa/core";
@@ -79,9 +80,11 @@ const label = (a: Account): string => `${a.name} - ${a.code}`;
 
 /** The payroll journals already in the books, by date. */
 function payrollJournals(): ManualJournal[] {
+  // Only those still standing: a payroll journal that was reversed counts for
+  // nothing, in the W-2 figures and in what is already in.
   return [
-    ...(state.ledger.manualJournals ?? []).filter(
-      (j) => j.deleted === undefined && j.reverses === undefined && (/^payroll/i.test(j.id) || /payroll register/i.test(j.source ?? "")),
+    ...standingJournals(state.ledger.manualJournals ?? []).filter(
+      (j) => /^payroll/i.test(j.id) || /payroll register/i.test(j.source ?? ""),
     ),
     ...usPayRunJournals(),
   ];
