@@ -2070,9 +2070,20 @@ main:has(#page-check:not([hidden])) { max-width: none; }
    the books' (who can see them, backup), which follow the list. */
 details.two-factor { margin: 0.4rem 0 1rem; font-size: 0.9rem; }
 details.two-factor > summary { cursor: pointer; font-weight: 600; }
-.open-books-settings { margin-top: 1.6rem; padding-top: 1rem;
-  border-top: 1px solid rgba(128,128,128,0.28); }
-.open-books-settings > h2 { font-size: 1.15rem; margin: 0 0 0.4rem; }
+/* Panels of a page (the Books page): each part on a faint background of its
+   own, tinted from the theme so they hold in dark mode too, so where one part
+   ends and the next begins shows at a glance. */
+.page-section { border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.9rem 1.1rem 1rem; margin: 0 0 1rem; }
+.page-section > h2 { font-size: 1.05rem; margin: 0 0 0.6rem; }
+.page-section > :last-child { margin-bottom: 0; }
+.page-section h3 { font-size: 0.95rem; margin: 1rem 0 0.4rem; }
+.page-section details > summary { cursor: pointer; font-weight: 600; }
+.page-section.tone-account { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); }
+.page-section.tone-books { background: var(--surface); box-shadow: inset 3px 0 0 var(--accent); }
+.page-section.tone-open { background: color-mix(in srgb, var(--in) 8%, var(--surface)); }
+.page-section.tone-keep { background: var(--surface-2); }
+.page-section.tone-extra { background: color-mix(in srgb, var(--review) 7%, var(--surface)); }
 
 /* Migration (on trial) ----------------------------------------------------- */
 .migration-card { border: 1px solid rgba(128,128,128,0.28); border-radius: 6px;

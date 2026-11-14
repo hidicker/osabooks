@@ -38,6 +38,23 @@ export function note(text: string): HTMLElement {
   return p;
 }
 
+/** The tints a page's panels take, so neighbouring ones read as separate. */
+export type SectionTone = "account" | "books" | "open" | "keep" | "extra";
+
+/**
+ * A panel of a page: a heading over everything that belongs together, on a
+ * faint background of its own, so where one part ends and the next begins
+ * shows at a glance. What goes in it is appended to the returned element.
+ */
+export function pageSection(title: string, tone: SectionTone): HTMLElement {
+  const section = document.createElement("section");
+  section.className = `page-section tone-${tone}`;
+  const heading = document.createElement("h2");
+  heading.textContent = title;
+  section.append(heading);
+  return section;
+}
+
 /**
  * Ask on the page, and wait for the answer: true for the first button.
  *

@@ -12,7 +12,7 @@ import {
   switchLedger,
   writesToFolder,
 } from "../store.js";
-import { askNameAndChoiceOnPage, askOnPage, askTextOnPage, note, tellOnPage } from "../ui.js";
+import { askNameAndChoiceOnPage, askOnPage, askTextOnPage, note, pageSection, tellOnPage } from "../ui.js";
 import { countryChoices, defaultCountry, rememberNewBooksCountry } from "../new-books-country.js";
 import { backupTools } from "../backup.js";
 import { renderCloudBooks } from "./cloud-books.js";
@@ -219,11 +219,14 @@ export async function renderBooks(): Promise<void> {
         "These books are held in this browser only. Download a backup to keep a copy or " +
         "move them to another computer.";
     }
-    body.append(
+    const here = pageSection("The books in this browser", "books");
+    here.append(
       note("This browser holds one set of books. Clearing it cannot be undone."),
       clearHereControl(),
     );
-    backupTools(body, "the books in this browser", false);
+    const kept = pageSection("Backups", "keep");
+    backupTools(kept, "the books in this browser", false);
+    body.append(here, kept);
     return;
   }
 
@@ -357,7 +360,9 @@ export async function renderBooks(): Promise<void> {
   }
 
   table.append(head, tbody);
-  body.append(table);
+  const sets = pageSection("Your sets of books", "books");
+  sets.append(table);
+  body.append(sets);
 
   // Starting a new set of books used to live in the menu's dropdown, which is
   // where you would look for it only if you already knew it was there.
@@ -366,13 +371,15 @@ export async function renderBooks(): Promise<void> {
   make.className = "books-new";
   make.textContent = "New set of books…";
   make.addEventListener("click", () => void chooseLedger("\u0000new"));
-  body.append(make);
+  sets.append(make);
 
-  backupTools(body, books.find((b) => b.id === open)?.name ?? "", false);
+  const kept = pageSection("Backups", "keep");
+  body.append(kept);
+  backupTools(kept, books.find((b) => b.id === open)?.name ?? "", false);
 
   // Named, since the table above lists several sets and this list is of one.
   const openName = books.find((b) => b.id === open)?.name ?? "";
-  await renderArchives(body, openName);
+  await renderArchives(kept, openName);
 }
 
 /**

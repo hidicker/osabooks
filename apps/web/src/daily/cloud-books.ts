@@ -19,7 +19,7 @@ import { booksWaitingForCode, codeAskedFor, twoFactorSettings } from "./two-fact
 import { myRoles, rpc } from "../cloud.js";
 import { state } from "../state.js";
 import { copyToCloudBook, openCloudBook, openCloudBookId } from "../store.js";
-import { askOnPage, askTextOnPage, note } from "../ui.js";
+import { askOnPage, askTextOnPage, note, pageSection } from "../ui.js";
 
 /**
  * Books kept on a server, and the way in to them.
@@ -257,6 +257,7 @@ async function deletedSets(body: HTMLElement): Promise<void> {
   const gone = await rpc<{ id: string; name: string; deleted_at: string }[]>("deleted_books", {});
   if (gone === null || gone.length === 0) return;
   const fold = document.createElement("details");
+  fold.open = true;
   const summary = document.createElement("summary");
   summary.textContent = `Deleted sets (${gone.length})`;
   fold.append(summary);
@@ -304,37 +305,46 @@ async function booksList(body: HTMLElement, email: string): Promise<void> {
     });
   });
   who.append(" ", out);
-  body.append(who);
+  // The person's own things (who is signed in, their two-factor) in one panel;
+  // the books they can open in the next.
+  const account = pageSection("Your account", "account");
+  account.append(who);
+  body.append(account);
 
   // Signed in, but this account has an authenticator and has not given its
   // code: nothing opens until it does, so the code is all this page asks for.
   // The list would otherwise read "no books yet", which is not true.
   const askFor = await codeAskedFor();
   if (askFor !== null) {
-    body.append(askFor);
+    account.append(askFor);
     const waiting = await booksWaitingForCode();
-    if (waiting !== null) body.append(waiting);
+    if (waiting !== null) account.append(waiting);
     return;
   }
 
   // This account's own two-factor sign-in, under who is signed in: it is the
   // person's setting, for all their books.
   const twoFactor = twoFactorSettings();
-  if (twoFactor !== null) body.append(twoFactor);
+  if (twoFactor !== null) {
+    if (twoFactor instanceof HTMLDetailsElement) twoFactor.open = true;
+    account.append(twoFactor);
+  }
 
+  const mine = pageSection("Your books on the server", "books");
+  body.append(mine);
   const said = document.createElement("p");
   said.className = "cloud-said";
   say(said, "Looking…");
-  body.append(said);
+  mine.append(said);
 
-  await renderInvitations(body);
+  await renderInvitations(mine);
 
   const [books, roles] = await Promise.all([listBooks(), myRoles()]);
   const open = openCloudBookId();
   said.textContent = "";
 
   if (books.length === 0) {
-    body.append(
+    mine.append(
       note(
         "No books on the server yet. Start one below; only you can see it unless you invite others.",
       ),
@@ -455,7 +465,7 @@ async function booksList(body: HTMLElement, email: string): Promise<void> {
       tbody.append(row);
     }
     table.append(head, tbody);
-    body.append(table);
+    mine.append(table);
   }
 
   // Starting a set of books, right under the list it adds to; also how
@@ -507,28 +517,28 @@ async function booksList(body: HTMLElement, email: string): Promise<void> {
     });
   });
   add.append(name, country, make);
-  body.append(add);
+  mine.append(add);
 
   // Books whose owner requires two-factor, when this account has not set it up.
   const waiting = await booksWaitingForCode();
-  if (waiting !== null) body.append(waiting);
+  if (waiting !== null) mine.append(waiting);
 
-  await deletedSets(body);
+  await deletedSets(mine);
 
   // Everything after this is about the books open now, not the account.
   const openNow = books.find((book) => book.id === open);
   if (openNow !== undefined) {
-    const section = document.createElement("section");
-    section.className = "open-books-settings";
-    const title = document.createElement("h2");
-    title.textContent = `Settings for ${openNow.name}`;
-    section.append(title);
+    const section = pageSection(`Settings for ${openNow.name}`, "open");
     body.append(section);
     renderMembers(section, openNow);
-    backupTools(section, openNow.name, true);
+    const kept = pageSection(`Backups of ${openNow.name}`, "keep");
+    body.append(kept);
+    backupTools(kept, openNow.name, true);
   } else {
-    browserBackup(body);
-    saveToServer(body);
+    const here = pageSection("The books in this browser", "keep");
+    body.append(here);
+    browserBackup(here);
+    saveToServer(here);
   }
 }
 
@@ -660,6 +670,13 @@ function saveToServer(body: HTMLElement): void {
  * all here. It is also how books come up from a copy on somebody's own
  * computer: restore its backup into a new set on the server.
  */
+/** Keeping books in your own Supabase project: its own panel, folded until wanted. */
+function ownProjectSection(): HTMLElement {
+  const section = pageSection("Your own Supabase project", "extra");
+  section.append(ownProjectPanel());
+  return section;
+}
+
 function browserBackup(body: HTMLElement): void {
   backupTools(body, "the books in this browser", false);
   body.append(
@@ -687,12 +704,13 @@ export function renderCloudBooks(body: HTMLElement): boolean {
       "Nothing is shared until you accept it.";
   }
 
-  body.append(heading("Books on the server"));
   const session = currentSession();
   if (session === null) {
-    signInForm(body);
-    browserBackup(body);
-    body.append(ownProjectPanel());
-  } else void booksList(body, session.email).then(() => body.append(ownProjectPanel()));
+    const signIn = pageSection("Sign in to your books on the server", "account");
+    signInForm(signIn);
+    const here = pageSection("The books in this browser", "keep");
+    browserBackup(here);
+    body.append(signIn, here, ownProjectSection());
+  } else void booksList(body, session.email).then(() => body.append(ownProjectSection()));
   return true;
 }
