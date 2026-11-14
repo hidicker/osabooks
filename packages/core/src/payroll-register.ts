@@ -267,9 +267,14 @@ export function employeeTaxes(amounts: Record<PayAmount, Cents>): Cents {
 
 /**
  * The register's rows gathered by check date. A row with no date, or whose
- * name says it is a total, is left out; so is a row with no money in it.
- * Amounts are read as positive whichever way the service signs them, since a
- * register lists withholding as amounts taken, not as negatives to add.
+ * name says it is a total, is left out; so is a row with no money in it, and
+ * a payday whose rows cancel out (a check and its void on the same day).
+ *
+ * Each column is read the way its service signs it. Most list every amount as
+ * a positive; some list withholding as negatives, amounts taken. A column
+ * whose amounts are mostly negative is turned round, and every other sign is
+ * kept as it is: a void or a correction comes as a row of negatives, and is
+ * a check taken back, not another one.
  */
 export function registerPaydays(read: RegisterRead): RegisterPayday[] {
   const role = (r: RegisterRole) => read.columns.filter((c) => c.role === r);
@@ -282,6 +287,21 @@ export function registerPaydays(read: RegisterRead): RegisterPayday[] {
     const last = role("lastName")[0];
     return [first, last].map((c) => (c === undefined ? "" : (fields[c.index] ?? "").trim())).filter((s) => s !== "").join(" ");
   };
+  const amountOf = (text: string): Cents | null => parseAmount(text.replace(/^\$|(?<=-)\$/g, ""), "USD");
+  // Which way each money column runs: -1 where most of its amounts are negative.
+  const way = new Map<number, 1 | -1>();
+  for (const column of read.columns) {
+    if (!(PAY_AMOUNTS as readonly string[]).includes(column.role)) continue;
+    let negative = 0;
+    let positive = 0;
+    for (const row of read.rows) {
+      const cents = amountOf((row.fields[column.index] ?? "").trim());
+      if (cents === null || cents === 0) continue;
+      if (cents < 0) negative += 1;
+      else positive += 1;
+    }
+    way.set(column.index, negative > positive ? -1 : 1);
+  }
   const byDate = new Map<IsoDate, RegisterPayday>();
   for (const row of read.rows) {
     const name = nameOf(row.fields);
@@ -296,13 +316,13 @@ export function registerPaydays(read: RegisterRead): RegisterPayday[] {
       if (!(PAY_AMOUNTS as readonly string[]).includes(column.role)) continue;
       const text = (row.fields[column.index] ?? "").trim();
       if (text === "" || text === "-") continue;
-      const cents = parseAmount(text.replace(/^\$|(?<=-)\$/g, ""), "USD");
+      const cents = amountOf(text);
       if (cents === null) {
         problems.push(`Line ${row.line}: "${text}" under ${column.heading} is not an amount.`);
         continue;
       }
       if (cents !== 0) any = true;
-      amounts[column.role as PayAmount] += Math.abs(cents);
+      amounts[column.role as PayAmount] += cents * (way.get(column.index) ?? 1);
     }
     if (!any && problems.length === 0) continue;
     const day = byDate.get(date) ?? { date, pays: [], totals: zero(), outBy: 0, problems: [] };
@@ -314,8 +334,15 @@ export function registerPaydays(read: RegisterRead): RegisterPayday[] {
     for (const a of PAY_AMOUNTS) day.totals[a] += amounts[a];
     byDate.set(date, day);
   }
-  const days = [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
-  for (const day of days) day.outBy = payOutBy(day.totals);
+  const days = [...byDate.values()]
+    // A payday whose rows cancel out holds no pay to post.
+    .filter((day) => day.problems.length > 0 || PAY_AMOUNTS.some((a) => day.totals[a] !== 0))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  for (const day of days) {
+    // An employee whose check was voided the same day was paid nothing.
+    day.pays = day.pays.filter((p) => PAY_AMOUNTS.some((a) => p.amounts[a] !== 0));
+    day.outBy = payOutBy(day.totals);
+  }
   return days;
 }
 
@@ -507,12 +534,13 @@ export function w2Figures(journals: readonly ManualJournal[], year: number): W2F
         paydays: 0,
         days: new Set<string>(),
       };
-      const amount = Math.abs(line.amount);
-      if (line.pay === "gross") one.gross += amount;
-      else if (line.pay === "federal") one.federal += amount;
-      else if (line.pay === "socialEmployee") one.socialSecurity += amount;
-      else if (line.pay === "medicareEmployee") one.medicare += amount;
-      else if (line.pay === "stateIncome") one.stateIncome += amount;
+      // Signed as posted, so a voided check takes its figures back: wages are
+      // a debit, withholding a credit.
+      if (line.pay === "gross") one.gross += line.amount;
+      else if (line.pay === "federal") one.federal -= line.amount;
+      else if (line.pay === "socialEmployee") one.socialSecurity -= line.amount;
+      else if (line.pay === "medicareEmployee") one.medicare -= line.amount;
+      else if (line.pay === "stateIncome") one.stateIncome -= line.amount;
       one.days.add(journal.date);
       by.set(line.employee, one);
     }

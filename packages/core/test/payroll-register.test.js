@@ -133,3 +133,58 @@ test("the service is named from the file", () => {
   assert.equal(payrollService("register.csv", "Paychex Flex Payroll Journal"), "Paychex");
   assert.equal(payrollService("register.csv"), "the payroll service");
 });
+
+const SIMPLE = (rows) =>
+  ["Check Date,Employee,Gross Pay,Federal Income Tax,Social Security,Medicare,Net Pay", ...rows].join("\r\n");
+
+test("a check and its void on the same day add nothing", () => {
+  const days = registerPaydays(
+    readPayrollRegister(
+      SIMPLE([
+        "01/15/2026,Pat Lee,1000.00,100.00,62.00,14.50,823.50",
+        "01/15/2026,Pat Lee,-1000.00,-100.00,-62.00,-14.50,-823.50",
+        "01/15/2026,Sam Cho,500.00,40.00,31.00,7.25,421.75",
+      ]),
+    ),
+  );
+  assert.equal(days.length, 1);
+  assert.equal(days[0].totals.gross, 50_000, "Sam's pay only");
+  assert.equal(days[0].totals.net, 42_175);
+  assert.equal(days[0].outBy, 0);
+});
+
+test("a void on a later day takes the check back, in the journal and the W-2 figures", () => {
+  const days = registerPaydays(
+    readPayrollRegister(
+      SIMPLE([
+        "01/15/2026,Pat Lee,1000.00,100.00,62.00,14.50,823.50",
+        "01/31/2026,Pat Lee,-1000.00,-100.00,-62.00,-14.50,-823.50",
+      ]),
+    ),
+  );
+  assert.deepEqual(days.map((d) => [d.date, d.totals.gross]), [["2026-01-15", 100_000], ["2026-01-31", -100_000]]);
+  const accounts = {
+    wages: "Wages - 6000", federal: "Federal - 2110", socialSecurity: "SS - 2120", medicare: "Medicare - 2130",
+    netPay: "Wages payable - 2100", employerTaxes: "Payroll taxes - 6010",
+  };
+  const journals = days.map((d) => payrollRegisterJournal(d, accounts));
+  assert.ok(journals.every((j) => j !== null && j.lines.reduce((s, l) => s + l.amount, 0) === 0), "each balances");
+  const wages = journals.flatMap((j) => j.lines).filter((l) => l.code === "Wages - 6000").reduce((s, l) => s + l.amount, 0);
+  assert.equal(wages, 0, "wages back to nothing");
+  const [pat] = w2Figures(journals, 2026);
+  assert.deepEqual([pat.gross, pat.federal, pat.socialSecurity, pat.medicare], [0, 0, 0, 0]);
+});
+
+test("a service that lists withholding as negatives is read as amounts taken", () => {
+  const days = registerPaydays(
+    readPayrollRegister(
+      SIMPLE([
+        "01/15/2026,Pat Lee,1000.00,-100.00,-62.00,-14.50,823.50",
+        "01/15/2026,Sam Cho,500.00,-40.00,-31.00,-7.25,421.75",
+      ]),
+    ),
+  );
+  assert.equal(days[0].totals.federal, 14_000);
+  assert.equal(days[0].totals.socialEmployee, 9_300);
+  assert.equal(days[0].outBy, 0);
+});
