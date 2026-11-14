@@ -212,10 +212,13 @@ function releaseLock(folder) {
  * Pages are never shown inside another site's frame: a page framing this one
  * could otherwise lay its own buttons over the app's and have a click land on
  * "Clear" or "Archive". Both headers, for browsers that read only the older.
+ * And what is sent is taken as the type it is said to be: an attachment sent
+ * as a download is never guessed into a page or a script.
  */
 const NO_FRAMING = {
   "x-frame-options": "DENY",
   "content-security-policy": "frame-ancestors 'none'",
+  "x-content-type-options": "nosniff",
 };
 
 function send(response, status, body, type = "application/json; charset=utf-8") {
@@ -692,15 +695,16 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
         return;
       }
 
-      // Two GETs that are not only reads: each fetches from the bank (or
-      // Wise) and writes the feed file. Origin is not sent on a plain GET, so
-      // the browser's own word for where it came from is checked instead. A
-      // request with no such header -- an older browser, the command line --
-      // is let through, as before.
-      if (
-        (path === "/api/feed/transactions" || path === "/api/wise/statement" || path === "/api/simplefin/transactions") &&
-        request.headers["sec-fetch-site"] === "cross-site"
-      ) {
+      // Origin is not sent on a plain GET, so for reads the browser's own word
+      // for where a request came from is checked: no read of the books, an
+      // attachment or anything else under /api/ answers another site's page,
+      // and the GETs that fetch from a bank and write the feed file cannot be
+      // set off by one. Only this app's own pages (same-origin) or something
+      // typed in or run from the command line (no header) get through.
+      // "same-site" is refused too: a program on another port of this
+      // computer is the same site to a browser.
+      const fetchSite = request.headers["sec-fetch-site"];
+      if (fetchSite === "cross-site" || fetchSite === "same-site") {
         send(response, 403, { error: "that request did not come from this app" });
         return;
       }

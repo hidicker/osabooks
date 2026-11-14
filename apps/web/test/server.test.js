@@ -71,3 +71,21 @@ test("a key file beside the books moves to OsaBooks's own folder, not left to be
     rmSync(books, { recursive: true, force: true });
   }
 });
+
+test("no read under /api/ answers another site's page, and attachments are never sniffed", async () => {
+  const put = await fetch(`${base}/api/attachments/att-0000test`, { method: "PUT", body: "<script>alert(1)</script>" });
+  assert.equal(put.status, 200);
+  for (const path of ["/api/ledger", "/api/attachments/att-0000test", "/api/status"]) {
+    for (const site of ["cross-site", "same-site"]) {
+      const refused = await fetch(`${base}${path}`, { headers: { "sec-fetch-site": site } });
+      assert.equal(refused.status, 403, `${path} from ${site}`);
+    }
+    const own = await fetch(`${base}${path}`, { headers: { "sec-fetch-site": "same-origin" } });
+    assert.equal(own.status, 200, `${path} from the app itself`);
+    const typed = await fetch(`${base}${path}`);
+    assert.equal(typed.status, 200, `${path} with no header`);
+  }
+  const file = await fetch(`${base}/api/attachments/att-0000test`);
+  assert.equal(file.headers.get("x-content-type-options"), "nosniff");
+  assert.equal(file.headers.get("content-type"), "application/octet-stream");
+});

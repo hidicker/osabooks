@@ -12,7 +12,7 @@
     "installer": "npm run stage && electron-builder --config build-config.cjs --win --x64 --publish never"
   },
   "devDependencies": {
-    "electron": "39.8.10",
+    "electron": "44.11.3",
     "electron-builder": "^26.0.0"
   },
   "dependencies": {
