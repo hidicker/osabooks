@@ -12,12 +12,12 @@ const root = join(here, "..");
 const web = join(root, "apps", "web");
 const out = join(here, "stage", "server");
 
-// The app itself, and the core it and the server both use.
-execFileSync(process.execPath, [join(web, "build.js")], { cwd: web, stdio: "inherit" });
+// The core first, which the app and the server both use; then the app.
 execFileSync(process.execPath, [join(root, "node_modules", "typescript", "bin", "tsc"), "--build", join(root, "packages", "core")], {
   cwd: root,
   stdio: "inherit",
 });
+execFileSync(process.execPath, [join(web, "build.js")], { cwd: web, stdio: "inherit" });
 
 rmSync(join(here, "stage"), { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
