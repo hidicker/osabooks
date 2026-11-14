@@ -348,5 +348,7 @@ Your books are in your database and are not touched by an update.
   browser, a file, or a chat, rotate it in the dashboard.
 - **Revoking** is always yours: disconnect in OsaBooks, and also revoke the token
   at Akahu, Wise or the AI provider if you want to be certain.
-- **Backups:** Supabase's free tier keeps daily backups for a short time; the
-  app's **Download a backup** on the Books page gives you a copy you hold.
+- **Backups:** Supabase's free plan keeps no automatic backups (paid plans keep
+  daily ones). Press **Download a backup** on the Books page regularly for a
+  copy you hold, or export the whole project with the Supabase CLI
+  (`supabase db dump`) on a schedule of your own.
