@@ -47,6 +47,9 @@ async function startOwnServer() {
   // Tells the server it is inside this program, for what only works outside
   // it (the morning run, which Windows would start as this program).
   process.env["OSABOOKS_DESKTOP"] = "1";
+  // Services this edition's pages call besides the app's own (its page policy
+  // allows them): none for OsaBooks, the filing service for a Pro edition.
+  process.env["OSABOOKS_CONNECT"] = (edition.connect ?? []).join(" ");
   const { startServer } = await import(pathToFileURL(join(folder, "server.js")).href);
   running = await startServer({ port: PORT, ledgerRoot: books, ledgerId: "my-books" });
 }

@@ -1,4 +1,5 @@
 import { answerConnectRequest, connectRequest, currentSession, signIn, signInWithGoogle, signedIn } from "./cloud.js";
+import { codeAskedFor } from "./daily/two-factor-ui.js";
 
 /**
  * An outside AI app asking to connect: the screen Supabase's OAuth server
@@ -26,6 +27,25 @@ export async function connectInterrupts(): Promise<boolean> {
   return true;
 }
 
+/**
+ * Where the browser is sent back to: an http(s) address and nothing else. The
+ * address comes from the app that asked to connect, and a javascript: one
+ * would run on this site.
+ */
+function goBack(card: HTMLElement, address: string): void {
+  let url: URL | null = null;
+  try {
+    url = new URL(address);
+  } catch {
+    url = null;
+  }
+  if (url === null || (url.protocol !== "https:" && url.protocol !== "http:")) {
+    card.append(el("p", "The app gave an address to return to that OsaBooks will not open. Go back to your AI app and connect again."));
+    return;
+  }
+  location.assign(url.toString());
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, text = "", className = ""): HTMLElementTagNameMap[K] {
   const made = document.createElement(tag);
   if (text !== "") made.textContent = text;
@@ -43,6 +63,14 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
     signInHere(card, () => void draw(screen, id));
     return;
   }
+  // Somebody with an authenticator gives its code before connecting: the
+  // connection carries the sign-in it was made with, and books that need the
+  // code refuse a connection made without it. A right code reloads this page.
+  const askCode = await codeAskedFor();
+  if (askCode !== null) {
+    card.append(askCode);
+    return;
+  }
 
   const asked = await connectRequest(id);
   if (asked === null) {
@@ -53,7 +81,7 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
   }
   // Allowed before: straight back.
   if (asked.authorization_id === undefined && asked.redirect_url !== undefined) {
-    location.assign(asked.redirect_url);
+    goBack(card, asked.redirect_url);
     return;
   }
 
@@ -91,7 +119,7 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
       said.textContent = "That did not go through. Go back to your AI app and connect again.";
       return;
     }
-    location.assign(back);
+    goBack(card, back);
   };
   allow.addEventListener("click", () => void decide("approve"));
   deny.addEventListener("click", () => void decide("deny"));

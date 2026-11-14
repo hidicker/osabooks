@@ -152,7 +152,9 @@ export async function openAttachment(file: Attachment): Promise<void> {
   // Shown here only as types that cannot carry script: photos, PDFs and plain
   // text. An SVG is an image that can, and a file's type is whatever the books
   // say it is, so anything else is saved rather than shown.
-  const shown = /^image\/(png|jpeg|gif|webp)$|^application\/pdf$|^text\/plain$/.test(file.type);
+  // A PDF is shown only when it starts as one: its type is only what the books say.
+  const isPdf = file.type === "application/pdf" && new TextDecoder().decode(await blob.slice(0, 5).arrayBuffer()) === "%PDF-";
+  const shown = /^image\/(png|jpeg|gif|webp)$|^text\/plain$/.test(file.type) || isPdf;
   if (!shown) {
     const link = document.createElement("a");
     link.href = url;

@@ -228,6 +228,18 @@ const NO_FRAMING = {
  * carries are allowed by their hashes, worked out from the file being served,
  * so the policy cannot fall out of step with the page.
  */
+/**
+ * Addresses an edition's pages may also connect to, from OSABOOKS_CONNECT
+ * (set by the Windows program from edition.json): https origins only, each
+ * checked, so a stray value cannot widen the policy to everything.
+ */
+function extraConnect() {
+  const origins = (process.env.OSABOOKS_CONNECT ?? "")
+    .split(/\s+/)
+    .filter((origin) => /^https:\/\/[a-z0-9.-]+(:\d+)?$/i.test(origin));
+  return origins.length > 0 ? " " + origins.join(" ") : "";
+}
+
 function pagePolicy(html) {
   const hashes = [];
   for (const match of html.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/gi)) {
@@ -240,7 +252,7 @@ function pagePolicy(html) {
     "img-src 'self' data: blob:",
     "frame-src 'self' blob:",
     "font-src 'self'",
-    "connect-src 'self' https://*.supabase.co https://www.openaccountants.com https://api.frankfurter.dev",
+    `connect-src 'self' https://*.supabase.co https://www.openaccountants.com https://api.frankfurter.dev${extraConnect()}`,
     "object-src 'none'",
     "base-uri 'none'",
     "form-action 'self'",
