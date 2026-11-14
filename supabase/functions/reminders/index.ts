@@ -17,7 +17,7 @@
  * is the check instead.
  */
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts";
-import { remindersRun } from "./run.js";
+import { remindersRun, sendReminders } from "./run.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -116,29 +116,30 @@ async function runBook(book: string): Promise<string> {
   const held = (parts["reminders"]?.data ?? {}) as Held;
   const sent = { ...(held.sent ?? {}) };
   const result = remindersRun({ parts, sent });
-  const log = [...(held.log ?? [])];
-  let count = 0;
   const useResend = RESEND_API_KEY !== "";
   if (!useResend && (SMTP_HOST === "" || SMTP_USER === "")) throw new Error("no mail service set up");
   const client = useResend
     ? null
     : new SMTPClient({ connection: { hostname: SMTP_HOST, port: 465, tls: true, auth: { username: SMTP_USER, password: SMTP_PASSWORD } } });
-  try {
-    for (const email of result.emails.slice(0, PER_BOOK)) {
-      const at = new Date().toISOString();
-      try {
-        if (client === null) await sendByResend(email);
-        else await sendBySmtp(client, email);
-        Object.assign(sent, email.stages);
-        log.unshift({ at, to: email.to, customer: email.customer, invoices: Object.keys(email.stages) });
-        count += 1;
-      } catch (error) {
-        log.unshift({ at, to: email.to, customer: email.customer, invoices: Object.keys(email.stages), failed: (error as Error).message });
-      }
+  // Each email recorded as soon as it has gone, so a run that stops part way
+  // never leaves an email sent and unrecorded to go again tomorrow.
+  const done = await (async () => {
+    try {
+      return await sendReminders(
+        result.emails.slice(0, PER_BOOK),
+        { sent, log: [...(held.log ?? [])] },
+        (email: Email) => (client === null ? sendByResend(email) : sendBySmtp(client, email)),
+        async (now: { sent: Record<string, number>; log: NonNullable<Held["log"]> }) => {
+          await rpc("reminders_put", { book, value: { ...held, sent: now.sent, log: now.log.slice(0, LOG_LENGTH) } });
+        },
+      );
+    } finally {
+      await client?.close();
     }
-  } finally {
-    await client?.close();
-  }
+  })();
+  const log: NonNullable<Held["log"]> = done.log;
+  const count: number = done.count;
+  Object.assign(sent, done.sent);
   const skipped = [
     ...result.skipped,
     ...result.emails.slice(PER_BOOK).map((e: Email) => ({ customer: e.customer, why: `more than ${PER_BOOK} in one morning; sent tomorrow` })),

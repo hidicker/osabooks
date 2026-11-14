@@ -17,6 +17,10 @@ import {
 } from "@nzosa/core";
 import type { ReminderDue, RemindersToday } from "@nzosa/core";
 
+// The reminders function sends through this, from the same bundle (run.js):
+// each email recorded as it goes (packages/core/src/reminder-sending.ts).
+export { sendReminders } from "@nzosa/core";
+
 /**
  * The reminders due today, worked out from a set of books with the page's own
  * code, so a reminder sent by itself says what the Reminder button would.
