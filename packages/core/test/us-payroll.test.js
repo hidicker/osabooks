@@ -264,3 +264,12 @@ test("an employee who has left is on the run covering their last day, and off th
   assert.equal(onPayRun(left, "2026-03-11"), false, "a period starting after they left");
   assert.equal(onPayRun({ ...left, ended: undefined }, "2027-01-01"), true, "still employed");
 });
+
+test("the employer's own unemployment wage base is its state's, not every state's", async () => {
+  const { suiWageBase } = await import("../dist/index.js");
+  const employer = { state: "WA", suiWageBase: 7_250_000 };
+  assert.equal(suiWageBase("WA", employer), 7_250_000, "the employer's state: its figure");
+  assert.equal(suiWageBase("CA", employer), 700_000, "an employee in California: California's $7,000");
+  assert.equal(suiWageBase("TX", employer), 900_000);
+  assert.equal(suiWageBase("ZZ", { state: "WA" }), undefined, "a state not known here, without a figure");
+});

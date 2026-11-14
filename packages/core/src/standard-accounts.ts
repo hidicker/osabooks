@@ -247,6 +247,15 @@ const NZ_STRUCTURE: StructureCodes = {
 
 const STRUCTURE: Readonly<Record<string, StructureCodes>> = {
   au: { companyOnly: new Set(), ownerEquity: new Set(["880", "881"]), partnerCode: threeDigit, partners: 9 },
+  // Korean equity is numbered in the 300s (331 capital, 338 drawings, 375
+  // retained earnings); 900s are non-operating income and costs. Partner N's
+  // capital 34N, share of profit 35N, private share 36N, drawings 39N.
+  kr: {
+    companyOnly: new Set(),
+    ownerEquity: new Set(["331", "338"]),
+    partnerCode: (n, part) => `${["34", "35", "36", "39"][part] ?? "39"}${n}`,
+    partners: 9,
+  },
   // 3110 to 3840: clear of owner contributions (3000) and retained earnings (3900).
   us: {
     companyOnly: new Set(),

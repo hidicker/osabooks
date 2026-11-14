@@ -12,7 +12,7 @@ on:
       function:
         description: Which function to deploy
         type: choice
-        options: [akahu, wise, gemini, gemini-demo, nightly, signup-alert, mcp, all]
+        options: [akahu, wise, gemini, gemini-demo, nightly, signup-alert, mcp, reminders, stripe, invite, all]
         default: akahu
 
 concurrency:
@@ -54,11 +54,14 @@ jobs:
             echo "The SUPABASE_ACCESS_TOKEN secret is not set." >&2
             exit 1
           fi
-          if [ "$CHOSEN" = "all" ]; then names="akahu wise gemini gemini-demo nightly signup-alert mcp"; else names="$CHOSEN"; fi
+          if [ "$CHOSEN" = "all" ]; then names="akahu wise gemini gemini-demo nightly signup-alert mcp reminders stripe invite"; else names="$CHOSEN"; fi
           for name in $names; do
             echo "Deploying $name"
-            # The morning run and the sign-up alert are called by the database, which has no user to sign in as.
+            # Called with no Supabase sign-in, each checking its caller itself: the morning run,
+            # reminders and the sign-up alert by the database, the connector by its own OAuth,
+            # the demo by visitors who are not signed in. Deployed otherwise, the gateway would
+            # turn them all away (gemini-demo was missing here, and would have been).
             flags=""
-            if [ "$name" = "nightly" ] || [ "$name" = "signup-alert" ] || [ "$name" = "mcp" ]; then flags="--no-verify-jwt"; fi
+            case "$name" in nightly|signup-alert|mcp|reminders|gemini-demo) flags="--no-verify-jwt" ;; esac
             npx --yes supabase functions deploy "$name" $flags --use-api --project-ref "$PROJECT_REF" --yes
           done

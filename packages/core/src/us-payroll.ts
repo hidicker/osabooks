@@ -492,7 +492,10 @@ export function employeeState(employee: UsEmployee, employer: UsEmployer): strin
 
 /** The unemployment wage base used for a state: the employer's figure where given. */
 export function suiWageBase(state: string, employer: UsEmployer): Cents | undefined {
-  return employer.suiWageBase ?? US_STATE_PAYROLL[state]?.suiWageBase;
+  // The figure the employer gives is for its own state; an employee working
+  // in another state is taxed on that state's base.
+  const own = employer.state.toUpperCase() === state.toUpperCase() ? employer.suiWageBase : undefined;
+  return own ?? US_STATE_PAYROLL[state.toUpperCase()]?.suiWageBase;
 }
 
 /** Whether a state's income tax withholding is worked out here. */

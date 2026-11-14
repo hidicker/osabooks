@@ -170,3 +170,14 @@ test("a partnership abroad: the country's own owner accounts go, and partners ta
   assert.ok(codes(au).includes("951") && codes(au).includes("982"));
   assert.equal(new Set(codes(au)).size, au.length, "no code twice");
 });
+
+test("a Korean partnership has an account each for its partners, in the equity range, and no single owner's", async () => {
+  const { standardAccounts } = await import("../dist/index.js");
+  const chart = standardAccounts("business", { country: "kr", structure: "partnership", partners: ["Ji-woo", "Min"], gstRegistered: true });
+  const equity = chart.filter((a) => /equity/i.test(a.type)).map((a) => a.code);
+  assert.ok(!equity.includes("331") && !equity.includes("338"), "the single owner's capital and drawings go");
+  for (const code of ["341", "351", "361", "391", "342", "352", "362", "392"]) assert.ok(equity.includes(code), `partner account ${code}`);
+  assert.ok(chart.every((a) => !/^9[5-8]\d$/.test(a.code) || !/equity/i.test(a.type)), "none among the non-operating 900s");
+  const codes = chart.map((a) => a.code);
+  assert.equal(new Set(codes).size, codes.length, "no code twice");
+});
