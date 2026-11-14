@@ -9,8 +9,11 @@ itself.
 ## Reporting a problem
 
 Please report anything that could expose somebody's books, keys or tokens
-privately to the copyright holder (hidicker on GitHub), not in a public issue.
-Say what you found, how to reproduce it, and what it could reach. You will hear
+privately, not in a public issue: use **Report a vulnerability** on this
+repository's Security tab
+([direct link](https://github.com/hidicker/osabooks/security/advisories/new)),
+which only the maintainer sees. Say what you found, how to reproduce it, and
+what it could reach. You will hear
 back, and a fix is released before anything is said publicly.
 
 ## How OsaBooks protects your data
