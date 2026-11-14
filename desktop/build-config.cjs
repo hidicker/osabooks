@@ -11,6 +11,7 @@ module.exports = {
   copyright: "Copyright (C) 2026 hidicker",
   directories: { output: "release" },
   files: ["main.cjs", "edition.json", "package.json"],
+  // The server, bundled into single files by stage.mjs, and the built app.
   extraResources: [{ from: "stage/server", to: "server" }],
   win: {
     icon: "build/icon.png",

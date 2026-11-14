@@ -1,11 +1,11 @@
 // Gather what the desktop program serves into desktop/stage/server: the built
-// app, the local server, the core, and esbuild (which the server imports).
+// app, and the local server bundled with the core into one file.
 // Run by `npm start` and `npm run installer`, from the desktop folder, after
 // `npm install` at the top of the repository.
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, "..");
@@ -21,23 +21,38 @@ execFileSync(process.execPath, [join(web, "build.js")], { cwd: web, stdio: "inhe
 
 rmSync(join(here, "stage"), { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
-writeFileSync(join(out, "package.json"), '{\n  "private": true,\n  "type": "module"\n}\n');
-for (const file of ["server.js", "ledger-folder.js", "nightly.js"]) cpSync(join(web, file), join(out, file));
+writeFileSync(join(out, "package.json"), JSON.stringify({ private: true, type: "module" }, null, 2) + "\n");
 cpSync(join(web, "dist"), join(out, "dist"), { recursive: true });
 
-const modules = join(out, "node_modules");
-mkdirSync(join(modules, "@nzosa", "core"), { recursive: true });
-cpSync(join(root, "packages", "core", "dist"), join(modules, "@nzosa", "core", "dist"), { recursive: true });
-cpSync(join(root, "packages", "core", "package.json"), join(modules, "@nzosa", "core", "package.json"));
-
-// esbuild and its platform binary: only this platform's, which is what the
-// installer being built here is for.
-cpSync(join(root, "node_modules", "esbuild"), join(modules, "esbuild"), { recursive: true });
-const platform = `${process.platform}-${process.arch}`;
-const native = join(root, "node_modules", "@esbuild", platform);
-if (!existsSync(native)) throw new Error(`No esbuild binary for ${platform} in node_modules/@esbuild.`);
-mkdirSync(join(modules, "@esbuild"), { recursive: true });
-cpSync(native, join(modules, "@esbuild", platform), { recursive: true });
+// The server, with the core inside it, as one file each: an installed program
+// has no node_modules to look things up in (and the installer would leave a
+// node_modules folder out). esbuild is only used by the server's developer
+// mode, which rebuilds the app as it is edited, so it is swapped for a stand-in
+// that refuses if anything ever calls it.
+const stub = join(here, "stage", "esbuild-stand-in.mjs");
+writeFileSync(
+  stub,
+  [
+    'const refuse = () => { throw new Error("Rebuilding the app is for development, not the installed program."); };',
+    "export const context = refuse;",
+    "export const build = refuse;",
+    "",
+  ].join("\n"),
+);
+const { build } = await import(pathToFileURL(join(root, "node_modules", "esbuild", "lib", "main.js")).href);
+for (const file of ["server.js", "nightly.js"]) {
+  await build({
+    entryPoints: [join(web, file)],
+    outfile: join(out, file),
+    bundle: true,
+    platform: "node",
+    format: "esm",
+    target: "node22",
+    alias: { esbuild: stub },
+    logLevel: "warning",
+  });
+}
+rmSync(stub);
 
 // Maps and type files are for developers, not the people who install this.
 const prune = (dir) => {
