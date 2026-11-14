@@ -63,6 +63,7 @@ import {
   cleanLogo,
   recodeElsewhere,
   splitAccountLabel,
+  treatmentsAfterRename,
   isGstControlCode,
   isLoanBank,
   localToday,
@@ -2467,17 +2468,7 @@ function openChartImport(fileName: string, text: string): void {
       const file = state.rules as RuleFileShape | undefined;
       const held = file?.codeTreatments;
       if (held !== undefined && plan.renamed.length > 0) {
-        const moved = { ...held };
-        for (const { before: was, after } of plan.renamed) {
-          const code = was.code.trim();
-          for (const key of Object.keys(held)) {
-            if (code === "" || splitAccountLabel(key).code !== code) continue;
-            const fresh = accountLabel(code, after.name, /^NBs+/i.test(key));
-            if (fresh === key) continue;
-            if (moved[fresh] === undefined) moved[fresh] = held[key] as never;
-            delete moved[key];
-          }
-        }
+        const moved = treatmentsAfterRename(held, plan.renamed.map(({ before: was, after }) => ({ code: was.code, name: after.name })));
         state.rules = { ...file, codeTreatments: moved } as typeof state.rules;
         await persistRules();
       }

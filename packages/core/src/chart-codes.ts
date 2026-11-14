@@ -269,6 +269,33 @@ export function splitAccountLabel(label: string): { code: string; name: string }
 }
 
 /**
+ * GST treatments, held by account label, after accounts are renamed (chart
+ * import giving an unused account the file's name): each label of a renamed
+ * code moves to the new name, keeping a house prefix (`NB Sales - 200` becomes
+ * `NB Tandem flights - 200`), so the account keeps its treatment rather than
+ * falling back to the default. A treatment already held under the new label
+ * is kept. A new object; `held` is not changed.
+ */
+export function treatmentsAfterRename<T>(
+  held: Readonly<Record<string, T>>,
+  renamed: readonly { code: string; name: string }[],
+): Record<string, T> {
+  const moved: Record<string, T> = { ...held };
+  for (const { code: given, name } of renamed) {
+    const code = given.trim();
+    if (code === "") continue;
+    for (const key of Object.keys(held)) {
+      if (splitAccountLabel(key).code !== code) continue;
+      const fresh = accountLabel(code, name, /^NB\s+/i.test(key));
+      if (fresh === key) continue;
+      if (moved[fresh] === undefined) moved[fresh] = held[key] as T;
+      delete moved[key];
+    }
+  }
+  return moved;
+}
+
+/**
  * Rules without the GST treatments that name an account the chart now calls
  * something else, where nothing is coded to them.
  *
