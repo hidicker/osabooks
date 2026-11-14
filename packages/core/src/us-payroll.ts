@@ -475,6 +475,16 @@ export function nyEmployeeInsurance(gross: Cents, frequency: UsPayFrequency, bef
   return dbl + pfl;
 }
 
+/**
+ * Whether an employee belongs on a pay run whose period starts on a day: still
+ * employed, or their last day worked falls in it or later. The run that covers
+ * their last day pays their final paycheck; a run starting after it leaves
+ * them off.
+ */
+export function onPayRun(employee: Pick<UsEmployee, "ended">, periodStart: IsoDate): boolean {
+  return employee.ended === undefined || employee.ended >= periodStart;
+}
+
 /** The state an employee's pay is worked for. */
 export function employeeState(employee: UsEmployee, employer: UsEmployer): string {
   return (employee.state ?? employer.state).toUpperCase();

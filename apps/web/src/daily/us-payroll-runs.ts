@@ -9,6 +9,7 @@ import {
   US_PERIODS,
   US_STATE_PAYROLL,
   grossBefore,
+  onPayRun,
   localToday,
   parseAmount,
   payAccountsUsed,
@@ -485,14 +486,21 @@ function firstPeriod(frequency: UsPayFrequency): { periodStart: IsoDate; periodE
 
 function newPayRun(body: HTMLElement, payroll: UsPayroll): void {
   body.append(heading("New pay run"));
-  const active = payroll.employees.filter((e) => e.ended === undefined);
-  if (active.length === 0) {
+  if (payroll.employees.length === 0) {
     body.append(note("Add an employee first."));
     return;
   }
+  const employed = payroll.employees.filter((e) => e.ended === undefined);
   const last = [...payroll.payRuns].sort((a, b) => b.payDate.localeCompare(a.payDate))[0];
-  const frequency = usualFrequency(active);
+  const frequency = usualFrequency(employed.length > 0 ? employed : payroll.employees);
   const dates = last === undefined ? firstPeriod(frequency) : usNextPeriod(last, frequency);
+  // Whoever is employed in the period: somebody who left during it is paid
+  // their final paycheck on it.
+  const active = payroll.employees.filter((e) => onPayRun(e, dates.periodStart));
+  if (active.length === 0) {
+    body.append(note("Nobody is employed in the next pay period. Add an employee, or give a later last day worked."));
+    return;
+  }
   const start = input(dates.periodStart, "", "date");
   const end = input(dates.periodEnd, "", "date");
   const pay = input(dates.payDate, "", "date");

@@ -255,3 +255,12 @@ test("whatever the runs and their order, an employee's year never passes a wage 
   const extra = sum("medicare") - sum("employerMedicare");
   assert.ok(Math.abs(extra - Math.round((gross - 20_000_000) * 0.009)) <= runs.length, "Additional Medicare from $200,000");
 });
+
+test("an employee who has left is on the run covering their last day, and off the ones after", async () => {
+  const { onPayRun } = await import("../dist/index.js");
+  const left = { id: "p1", name: "Pat", payFrequency: "biweekly", w4: { status: "single" }, ended: "2026-03-10" };
+  assert.equal(onPayRun(left, "2026-03-01"), true, "the period with the last day in it: the final paycheck");
+  assert.equal(onPayRun(left, "2026-03-10"), true);
+  assert.equal(onPayRun(left, "2026-03-11"), false, "a period starting after they left");
+  assert.equal(onPayRun({ ...left, ended: undefined }, "2027-01-01"), true, "still employed");
+});
