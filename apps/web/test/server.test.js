@@ -8,6 +8,12 @@ import test from "node:test";
 // the real one on this computer.
 const keys = mkdtempSync(join(tmpdir(), "nzosa-keys-"));
 process.env.OSABOOKS_SECRETS = keys;
+// A page of its own to serve, with an inline script as the real one has, so
+// the tests do not depend on the app having been built first (the deploy runs
+// them before it builds).
+const dist = mkdtempSync(join(tmpdir(), "nzosa-dist-"));
+writeFileSync(join(dist, "index.html"), "<!doctype html><title>t</title><script>window.started = true;</script><script type=\"module\" src=\"app.js\"></script>");
+process.env.OSABOOKS_DIST = dist;
 const { secretFile, startServer } = await import("../server.js");
 
 /**
@@ -23,6 +29,7 @@ test.after(() => {
   running.stop();
   rmSync(root, { recursive: true, force: true });
   rmSync(keys, { recursive: true, force: true });
+  rmSync(dist, { recursive: true, force: true });
 });
 
 test("a body that is not JSON is a 400", async () => {
