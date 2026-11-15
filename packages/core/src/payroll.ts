@@ -629,8 +629,10 @@ export function annualisedForExtraPay(options: {
   history: readonly PayRun[];
 }): Cents {
   const ordinary = (line: PayLine): Cents => line.gross - (line.extraPay ?? 0);
+  // Runs already saved, the same day's included: a bonus paid in a run of
+  // its own on the regular payday counts that day's regular pay.
   const past = options.history
-    .filter((run) => run.payDate < options.payDate)
+    .filter((run) => run.payDate <= options.payDate)
     .flatMap((run) =>
       run.lines.filter((l) => l.employeeId === options.employeeId).map((l) => ({ date: run.payDate, pay: ordinary(l) })),
     )

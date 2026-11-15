@@ -75,6 +75,8 @@ test("a date knows which financial year it falls in", () => {
   assert.equal(financialYearOf("2025-04-01"), 2026, "the first day of the 2026 year");
   assert.equal(financialYearOf("2026-03-31"), 2026, "the last day of it");
   assert.equal(financialYearOf("2026-04-01"), 2027, "and the next one begins");
+  assert.equal(financialYearOf("2026-03-20", { endMonth: 3, endDay: 15 }), 2027, "a year ending mid-month ends on its day");
+  assert.equal(financialYearOf("2026-03-15", { endMonth: 3, endDay: 15 }), 2026);
 });
 
 test("the year boundary follows the year end that was configured", () => {

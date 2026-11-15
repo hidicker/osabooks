@@ -126,7 +126,8 @@ test("W1 and W2 for a quarter, and STP's year to date", () => {
   ];
   assert.deepEqual(auWithholding(runs, "2026-07-01", "2026-09-30"), { w1: 1_000_000, w2: 180_000, superGuarantee: 120_000 });
   assert.deepEqual(stpYearToDate(runs, runs[2]), [{ employeeId: "e1", gross: 1_600_000, payg: 290_000, superGuarantee: 192_000 }]);
-  assert.equal(earnedBeforePay(runs, "e1", "2026-10-31"), 1_000_000);
+  assert.equal(earnedBeforePay(runs, "e1", "2026-10-31", "r3"), 1_000_000);
+  assert.equal(earnedBeforePay(runs, "e1", "2026-10-31"), 1_600_000, "a new run that day counts the run saved for it");
 });
 
 test("full BAS: sales split into taxable, GST-free and input taxed; purchases into capital and not, with GST-free in G14", () => {

@@ -208,3 +208,15 @@ test("a document carries the supplier's contact details, the chosen colour, and 
   const plain = invoiceDocument(invoice({}), supplier, { accent: "red; } body { display: none" });
   assert.ok(plain.includes("--accent: #1f4e79"), "only a colour is taken");
 });
+
+test("a date field holding anything but a date is written as text, not markup", async () => {
+  const { customerStatement, collectionLetter } = await import("../dist/index.js");
+  const html = invoiceDocument(invoice({ issued: "2026-05-01<img src=x onerror=alert(1)>" }), supplier);
+  assert.doesNotMatch(html, /<img src=x/);
+  const lines = [{ number: "INV-1", issued: "2026-05-01", due: "", total: 23000, owing: 23000, reference: "" }];
+  const statement = customerStatement("Kea", lines, "2026-07-01", supplier);
+  assert.doesNotMatch(statement, /NaN/, "a blank due date falls due on the issue date");
+  const letter = collectionLetter("Kea", lines, "2026-07-01", supplier, 1);
+  assert.doesNotMatch(letter, /NaN/);
+  assert.match(letter, />61</, "61 days late, counted from the issue date");
+});

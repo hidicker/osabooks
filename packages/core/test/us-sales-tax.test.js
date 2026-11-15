@@ -66,6 +66,8 @@ test("sales by rate, as a state's return asks for them", () => {
       make("2", seattle, [line("C", 5000)]),
       make("3", null, [line("D", 7000)]),
       make("4", seattle, [line("E", 9900)], "Draft"),
+      make("5", seattle, [line("F", 4400)], "Submitted"),
+      make("6", seattle, [line("G", 3300)], "Awaiting Approval"),
     ],
     [seattle, nyc],
     "2026-01-01",

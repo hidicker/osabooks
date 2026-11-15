@@ -1,5 +1,6 @@
 import type { Cents } from "./money.js";
 import type { Invoice, InvoiceLine } from "./invoices.js";
+import { isPosted } from "./invoices.js";
 
 /**
  * Sales tax as the United States charges it: added on top of the price, at the
@@ -97,7 +98,8 @@ export function salesTaxByRate(
   const rows = new Map<string, SalesTaxByRate>();
   for (const invoice of invoices) {
     if (invoice.kind !== "sales" || invoice.issued < from || invoice.issued > to) continue;
-    if (/^(draft|estimate|voided|deleted)$/i.test(invoice.status)) continue;
+    // Only invoices in the books: not drafts, quotes, ones awaiting approval or voided.
+    if (!isPosted(invoice)) continue;
     const rate = rates.find((r) => r.id === invoice.salesTaxRateId) ?? null;
     const key = rate?.id ?? "";
     const row = rows.get(key) ?? { rate, sales: 0, taxable: 0, tax: 0, invoices: 0 };

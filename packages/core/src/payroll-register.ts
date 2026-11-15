@@ -271,10 +271,11 @@ export function employeeTaxes(amounts: Record<PayAmount, Cents>): Cents {
  * a payday whose rows cancel out (a check and its void on the same day).
  *
  * Each column is read the way its service signs it. Most list every amount as
- * a positive; some list withholding as negatives, amounts taken. A column
- * whose amounts are mostly negative is turned round, and every other sign is
- * kept as it is: a void or a correction comes as a row of negatives, and is
- * a check taken back, not another one.
+ * a positive; some list withholding as negatives, amounts taken. A tax or
+ * deduction column whose amounts mostly carry the other sign to the same row's
+ * pay is turned round, and every other sign is kept as it is: a void or a
+ * correction comes as a row of negatives, and is a check taken back, not
+ * another one -- even in a file holding nothing but voids.
  */
 export function registerPaydays(read: RegisterRead): RegisterPayday[] {
   const role = (r: RegisterRole) => read.columns.filter((c) => c.role === r);
@@ -288,19 +289,35 @@ export function registerPaydays(read: RegisterRead): RegisterPayday[] {
     return [first, last].map((c) => (c === undefined ? "" : (fields[c.index] ?? "").trim())).filter((s) => s !== "").join(" ");
   };
   const amountOf = (text: string): Cents | null => parseAmount(text.replace(/^\$|(?<=-)\$/g, ""), "USD");
-  // Which way each money column runs: -1 where most of its amounts are negative.
+  // Which way each money column runs. Gross pay, reimbursements and net pay are
+  // money paid, and are read as they are signed: a row of negatives there is a
+  // void. Every other column is read against the same row's pay: one whose
+  // amounts mostly carry the other sign to the pay lists what is taken as
+  // negatives, and is turned round. Judged row by row, so a file of voids alone,
+  // all negative, is still read as voids.
+  const payOf = (fields: readonly string[]): number => {
+    for (const r of ["gross", "net"] as const) {
+      for (const c of role(r)) {
+        const cents = amountOf((fields[c.index] ?? "").trim());
+        if (cents !== null && cents !== 0) return Math.sign(cents);
+      }
+    }
+    return 0;
+  };
   const way = new Map<number, 1 | -1>();
   for (const column of read.columns) {
     if (!(PAY_AMOUNTS as readonly string[]).includes(column.role)) continue;
-    let negative = 0;
-    let positive = 0;
+    if (column.role === "gross" || column.role === "reimbursement" || column.role === "net") continue;
+    let opposite = 0;
+    let same = 0;
     for (const row of read.rows) {
       const cents = amountOf((row.fields[column.index] ?? "").trim());
-      if (cents === null || cents === 0) continue;
-      if (cents < 0) negative += 1;
-      else positive += 1;
+      const pay = payOf(row.fields);
+      if (cents === null || cents === 0 || pay === 0) continue;
+      if (Math.sign(cents) === pay) same += 1;
+      else opposite += 1;
     }
-    way.set(column.index, negative > positive ? -1 : 1);
+    way.set(column.index, opposite > same ? -1 : 1);
   }
   const byDate = new Map<IsoDate, RegisterPayday>();
   for (const row of read.rows) {
@@ -427,8 +444,17 @@ export function payAccountsUsed(days: readonly RegisterPayday[]): PayAccount[] {
  * day (a bonus run) reads differently, so it is not taken for the first.
  */
 export function paydayFingerprint(day: Pick<RegisterPayday, "pays">): string {
-  return day.pays
-    .map((p) => `${p.employee}:${p.amounts.gross}:${p.amounts.net}`)
+  const by = new Map<string, { gross: Cents; net: Cents }>();
+  for (const p of day.pays) {
+    const one = by.get(p.employee) ?? { gross: 0, net: 0 };
+    one.gross += p.amounts.gross;
+    one.net += p.amounts.net;
+    by.set(p.employee, one);
+  }
+  // As the journal reads it back: it has no line for an amount of nothing.
+  return [...by.entries()]
+    .filter(([, { gross, net }]) => gross !== 0 || net !== 0)
+    .map(([employee, { gross, net }]) => `${employee}:${gross}:${net}`)
     .sort()
     .join("|");
 }
@@ -555,7 +581,7 @@ export interface W2Figures {
  * deductions, which the register's own W-2 preview gives.
  */
 export function w2Figures(journals: readonly ManualJournal[], year: number): W2Figures[] {
-  const by = new Map<string, W2Figures & { days: Set<string> }>();
+  const by = new Map<string, W2Figures & { days: Map<string, Cents> }>();
   for (const journal of journals) {
     if (journal.deleted !== undefined || !journal.date.startsWith(`${year}-`)) continue;
     for (const line of journal.lines) {
@@ -568,7 +594,7 @@ export function w2Figures(journals: readonly ManualJournal[], year: number): W2F
         medicare: 0,
         stateIncome: 0,
         paydays: 0,
-        days: new Set<string>(),
+        days: new Map<string, Cents>(),
       };
       // Signed as posted, so a voided check takes its figures back: wages are
       // a debit, withholding a credit.
@@ -577,11 +603,18 @@ export function w2Figures(journals: readonly ManualJournal[], year: number): W2F
       else if (line.pay === "socialEmployee") one.socialSecurity -= line.amount;
       else if (line.pay === "medicareEmployee") one.medicare -= line.amount;
       else if (line.pay === "stateIncome") one.stateIncome -= line.amount;
-      one.days.add(journal.date);
+      if (line.pay === "gross") one.days.set(journal.date, (one.days.get(journal.date) ?? 0) + line.amount);
       by.set(line.employee, one);
     }
   }
+  // A payday is a day the employee's wages were paid; a day they were taken
+  // back (a void dated later) takes one away rather than adding one.
+  const paydaysOf = (days: Map<string, Cents>): number => {
+    let count = 0;
+    for (const gross of days.values()) count += Math.sign(gross);
+    return Math.max(0, count);
+  };
   return [...by.values()]
-    .map(({ days, ...rest }) => ({ ...rest, paydays: days.size }))
+    .map(({ days, ...rest }) => ({ ...rest, paydays: paydaysOf(days) }))
     .sort((a, b) => a.employee.localeCompare(b.employee));
 }

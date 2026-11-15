@@ -203,6 +203,13 @@ export interface SettledInvoice {
   taxType: TaxType;
   /** GST-inclusive total of the invoice, for the return's gross box. */
   total: Cents;
+  /**
+   * The part of the invoice's total that carries GST, 0 to 1, when only some
+   * of its lines do. The payment is then tagged in the same shares, as the
+   * return divides it (`settledGst`): the taxed share with `taxType`, the rest
+   * as outside the return. Absent, the whole payment takes `taxType`.
+   */
+  taxable?: number;
 }
 
 /** The GST within an amount, given how the line is treated. */
@@ -273,13 +280,16 @@ export function postTransaction(
   const settles = options.settles;
   if (settles !== undefined) {
     const receivable = settles.kind === "sales";
+    const control = {
+      accountCode: receivable ? (options.receivableCode ?? "610") : (options.payableCode ?? "800"),
+      accountName: receivable ? (options.receivableName ?? "Accounts Receivable") : (options.payableName ?? "Accounts Payable"),
+    };
+    // The part of the payment that carries GST, as the return divides it
+    // (`settledGst`): all of it, none of it, or a share.
+    const share = settles.taxable ?? 1;
+    const taxedBase = (share >= 0.9999 ? transaction.amount : share <= 0.0001 ? 0 : Math.round(transaction.amount * share)) as Cents;
     lines.push({
-      accountCode: receivable
-        ? (options.receivableCode ?? "610")
-        : (options.payableCode ?? "800"),
-      accountName: receivable
-        ? (options.receivableName ?? "Accounts Receivable")
-        : (options.payableName ?? "Accounts Payable"),
+      ...control,
       amount: -transaction.amount,
       // The tag rides on the clearing line so a payments-basis return can find
       // the tax here, where it actually falls due.
@@ -287,10 +297,14 @@ export function postTransaction(
       // The base is the signed gross of the transaction, the same convention a
       // supply line uses -- money out is negative. Flipping it for payables
       // made a settled bill *subtract* from Box 11 rather than adding to it.
-      taxType: settles.taxType,
-      taxBase: transaction.amount,
+      taxType: taxedBase === 0 ? "NONE" : settles.taxType,
+      taxBase: taxedBase === 0 ? transaction.amount : taxedBase,
       description: `Settles ${settles.number}`,
     });
+    if (taxedBase !== 0 && taxedBase !== transaction.amount) {
+      // The rest, outside the return, on a line of no amount of its own.
+      lines.push({ ...control, amount: 0, taxType: "NONE", taxBase: (transaction.amount - taxedBase) as Cents, description: `Settles ${settles.number}, the part without GST` });
+    }
     return {
       transactionId: transaction.id,
       date: transaction.date,

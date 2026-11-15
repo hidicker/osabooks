@@ -180,13 +180,17 @@ function isDiminishing(asset: FixedAsset): boolean {
   return method.startsWith("dv") || method.includes("diminish");
 }
 
-/** A date shifted back by whole months, keeping the day. */
+/**
+ * A date shifted back by whole months, keeping the day -- or the month's last
+ * day where it has fewer (29 February 2024 less a year is 28 February 2023).
+ */
 function monthsBefore(date: IsoDate, months: number): IsoDate {
   const year = Number(date.slice(0, 4));
   const month = Number(date.slice(5, 7)) - 1 - months;
-  const day = date.slice(8, 10);
-  const shifted = new Date(Date.UTC(year, month, 1));
-  return `${shifted.toISOString().slice(0, 8)}${day}` as IsoDate;
+  const day = Number(date.slice(8, 10));
+  const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const shifted = new Date(Date.UTC(year, month, Math.min(day, last)));
+  return shifted.toISOString().slice(0, 10) as IsoDate;
 }
 
 /**

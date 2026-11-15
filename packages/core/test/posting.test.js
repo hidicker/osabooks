@@ -221,6 +221,22 @@ test("the same sale is counted once on each basis, never twice", () => {
   assert.notEqual(onPayments.box5, 230000);
 });
 
+test("a payment on an invoice only partly taxed counts only the taxed share on the payments basis", () => {
+  // 1,150 taxed at 15% and 850 zero rated: 2,000, of which 57.5% carries GST.
+  const settled = postTransaction(bank(200000), [], {
+    settles: { number: "INV-002", kind: "sales", taxType: "OUTPUT2", total: 200000, taxable: 0.575 },
+  });
+  assert.equal(journalImbalance(settled), 0);
+  const onPayments = taxSummary([settled], { basis: "payments" });
+  assert.equal(onPayments.box5, 115000, "the taxed share, as the return divides it");
+  assert.equal(onPayments.box8, 15000, "GST on the taxed share alone, not 3/23 of the whole payment");
+
+  const untaxed = postTransaction(bank(85000), [], {
+    settles: { number: "INV-003", kind: "sales", taxType: "OUTPUT2", total: 85000, taxable: 0 },
+  });
+  assert.equal(taxSummary([untaxed], { basis: "payments" }).box8, 0, "a wholly untaxed invoice has no GST in its payment");
+});
+
 test("depreciation posts a charge against accumulated depreciation", () => {
   const journal = postDepreciation({
     name: "Roasting equipment", expenseCode: "416", expenseName: "Depreciation",

@@ -174,6 +174,22 @@ test("a void on a later day takes the check back, in the journal and the W-2 fig
   assert.equal(wages, 0, "wages back to nothing");
   const [pat] = w2Figures(journals, 2026);
   assert.deepEqual([pat.gross, pat.federal, pat.socialSecurity, pat.medicare], [0, 0, 0, 0]);
+  assert.equal(pat.paydays, 0, "the void's day is not another payday");
+});
+
+test("an employee who was paid nothing that day reads the same in the register and the journal", async () => {
+  const { paydayFingerprint, journalPaydayFingerprint } = await import("../dist/index.js");
+  const day = {
+    pays: [
+      { employee: "Pat Lee", amounts: { gross: 100_000, net: 80_000 } },
+      { employee: "Sam Cho", amounts: { gross: 0, net: 0, deduction: 5_000 } },
+    ],
+  };
+  const journal = { lines: [
+    { code: "W", amount: 100_000, employee: "Pat Lee", pay: "gross" },
+    { code: "N", amount: -80_000, employee: "Pat Lee", pay: "net" },
+  ] };
+  assert.equal(paydayFingerprint(day), journalPaydayFingerprint(journal));
 });
 
 test("a service that lists withholding as negatives is read as amounts taken", () => {
@@ -187,6 +203,35 @@ test("a service that lists withholding as negatives is read as amounts taken", (
   );
   assert.equal(days[0].totals.federal, 14_000);
   assert.equal(days[0].totals.socialEmployee, 9_300);
+  assert.equal(days[0].outBy, 0);
+});
+
+test("a file of voids alone is read as checks taken back", () => {
+  const days = registerPaydays(
+    readPayrollRegister(
+      SIMPLE([
+        "01/31/2026,Pat Lee,-1000.00,-100.00,-62.00,-14.50,-823.50",
+        "01/31/2026,Sam Cho,-500.00,-40.00,-31.00,-7.25,-421.75",
+        "01/31/2026,Ana Ruiz,700.00,60.00,43.40,10.15,586.45",
+      ]),
+    ),
+  );
+  assert.equal(days[0].totals.gross, -80_000, "two checks of 1,500 taken back, one of 700 paid");
+  assert.equal(days[0].totals.federal, -8_000);
+  assert.equal(days[0].outBy, 0);
+});
+
+test("a void in a service that lists withholding as negatives comes back the other way", () => {
+  const days = registerPaydays(
+    readPayrollRegister(
+      SIMPLE([
+        "01/15/2026,Pat Lee,1000.00,-100.00,-62.00,-14.50,823.50",
+        "01/15/2026,Sam Cho,-500.00,40.00,31.00,7.25,-421.75",
+      ]),
+    ),
+  );
+  assert.equal(days[0].totals.gross, 50_000);
+  assert.equal(days[0].totals.federal, 6_000);
   assert.equal(days[0].outBy, 0);
 });
 

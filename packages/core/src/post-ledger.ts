@@ -205,8 +205,12 @@ export function postLedger(options: PostLedgerOptions): PostedJournal[] {
           settles: {
             number: invoice.number,
             kind: invoice.kind,
-            taxType: taxTypeFromRate(invoice.lines[0]?.taxType ?? "", invoice.kind),
+            taxType: taxTypeFromRate(invoice.lines.find((l) => l.tax !== 0)?.taxType ?? invoice.lines[0]?.taxType ?? "", invoice.kind),
             total: invoice.total,
+            // How much of it carries GST, as the return reads it.
+            ...(invoice.total !== 0
+              ? { taxable: Math.min(1, Math.max(0, invoice.lines.filter((l) => l.tax !== 0).reduce((s, l) => s + l.gross, 0) / invoice.total)) }
+              : {}),
           },
         }),
       ];

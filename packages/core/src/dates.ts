@@ -270,10 +270,9 @@ export function financialYear(
  * Lived in the web app, where nothing could test it, and was used nine times.
  */
 export function financialYearOf(date: IsoDate, options: FinancialYearOptions = {}): number {
-  const endMonth = options.endMonth ?? 3;
+  // Against the year's own end, so a year ending mid-month (`endDay`) is kept.
   const year = Number(date.slice(0, 4));
-  const month = Number(date.slice(5, 7));
-  return month > endMonth ? year + 1 : year;
+  return date > financialYear(year, options).to ? year + 1 : year;
 }
 
 /** The day after the previous year's end, which is where the year starts. */

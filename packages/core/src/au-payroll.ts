@@ -295,12 +295,20 @@ export function superDueDate(payDate: IsoDate, firstContribution = false): IsoDa
   return `${year + 1}-01-28`;
 }
 
-/** Qualifying earnings already paid to an employee in the year (or quarter, before 2026-27) before a payday. */
-export function earnedBeforePay(runs: readonly AuPayRun[], employeeId: string, payDate: IsoDate): Cents {
+/**
+ * Qualifying earnings already paid to an employee in the year (or quarter,
+ * before 2026-27) before a new pay run. Runs saved for the same payday count:
+ * a bonus run paid the day of the regular one counts the regular pay, or each
+ * would work the contributions cap alone. For a run already saved
+ * (`exceptRun`), the same day's runs saved ahead of it in the list.
+ */
+export function earnedBeforePay(runs: readonly AuPayRun[], employeeId: string, payDate: IsoDate, exceptRun?: string): Cents {
   const year = auFinancialYear(payDate);
   const quarter = (d: IsoDate): string => `${d.slice(0, 4)}-${Math.ceil(Number(d.slice(5, 7)) / 3)}`;
+  const at = exceptRun === undefined ? -1 : runs.findIndex((r) => r.id === exceptRun);
+  const sameDayUpTo = at < 0 ? runs.length : at;
   return runs
-    .filter((r) => r.payDate < payDate)
+    .filter((r, index) => r.id !== exceptRun && (r.payDate < payDate || (r.payDate === payDate && index < sameDayUpTo)))
     .filter((r) => (payDate >= "2026-07-01" ? auFinancialYear(r.payDate) === year : quarter(r.payDate) === quarter(payDate)))
     .flatMap((r) => r.lines)
     .filter((l) => l.employeeId === employeeId)

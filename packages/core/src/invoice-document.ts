@@ -113,10 +113,18 @@ function asLines(value: string): string {
     .join("<br>");
 }
 
+/** When a line fell due: its due date, or its issue date where it has none (null or blank). */
+function dueOf(line: { due: string | null; issued: string }): string {
+  return line.due === null || line.due.trim() === "" ? line.issued : line.due;
+}
+
 /** A date as the reader writes it: a New Zealander's day first unless said. */
 function written(iso: string, style: "dmy" | "mdy" | "ymd" = "dmy"): string {
-  const [year, month, day] = iso.split("-");
-  if (!(year && month && day)) return iso;
+  // Only the digits of a date are written into the page; anything else in the
+  // field (a backup or a shared set of books can hold anything) is escaped.
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso.trim());
+  if (match === null) return escapeHtml(iso);
+  const [, year, month, day] = match;
   if (style === "mdy") return `${month}/${day}/${year}`;
   if (style === "ymd") return `${year}/${month}/${day}`;
   return `${day}/${month}/${year}`;
@@ -372,7 +380,7 @@ export function customerStatement(
     Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
   const buckets = [0, 0, 0, 0, 0]; // current, 1-30, 31-60, 61-90, older
   const rows = open.map((l) => {
-    const late = days(l.due ?? l.issued, asAt);
+    const late = days(dueOf(l), asAt);
     const at = late <= 0 ? 0 : late <= 30 ? 1 : late <= 60 ? 2 : late <= 90 ? 3 : 4;
     buckets[at] = (buckets[at] ?? 0) + l.owing;
     return (
@@ -474,7 +482,7 @@ export function collectionLetter(
   const date = (iso: string): string => written(iso, options.dateStyle);
   const logo = cleanLogo(supplier.logo);
   const late = lines
-    .filter((l) => l.owing > 0 && (l.due ?? l.issued) < asAt)
+    .filter((l) => l.owing > 0 && (dueOf(l)) < asAt)
     .sort((a, b) => a.issued.localeCompare(b.issued));
   const owing = late.reduce((sum, l) => sum + l.owing, 0);
   const days = (from: string): number =>
@@ -486,7 +494,7 @@ export function collectionLetter(
       `<td>${escapeHtml(l.number)}</td>` +
       `<td>${date(l.issued)}</td>` +
       `<td>${l.due === null ? "" : date(l.due)}</td>` +
-      `<td class="n">${days(l.due ?? l.issued)}</td>` +
+      `<td class="n">${days(dueOf(l))}</td>` +
       `<td class="n">${formatAmount(l.owing)}</td>` +
       "</tr>",
   );
