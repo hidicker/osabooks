@@ -239,8 +239,8 @@ export function renderRecurring(): void {
   const due = generateDue(list, state.ledger.invoices ?? [], today(), numberingFor("sales")).invoices.length;
 
   const details = document.createElement("details");
-  details.className = "entity-billing-details";
-  details.open = list.length > 0 && (due > 0 || said !== "");
+  details.className = "fold-section";
+  details.open = true;
   const summary = document.createElement("summary");
   summary.textContent =
     list.length === 0

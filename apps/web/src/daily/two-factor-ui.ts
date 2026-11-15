@@ -135,13 +135,14 @@ export async function booksWaitingForCode(): Promise<HTMLElement | null> {
 }
 
 /**
- * The account's authenticators: set one up, add a spare, or remove one. Folded
- * away under "Two-factor sign-in" once there is one, open while there is none.
+ * The account's authenticators: set one up, add a spare, or remove one. A
+ * section of its own, "Two-factor sign-in", open to start with.
  */
 export function twoFactorSettings(): HTMLElement | null {
   if (!twoFactorOffered()) return null;
   const fold = document.createElement("details");
-  fold.className = "two-factor";
+  fold.className = "fold-section two-factor";
+  fold.open = true;
   const summary = document.createElement("summary");
   summary.textContent = "Two-factor sign-in";
   fold.append(summary);

@@ -1027,7 +1027,8 @@ function fillFeed(body: HTMLElement, status: FeedStatus | null): void {
 
   // --- how to get the tokens ------------------------------------------------
   const how = document.createElement("details");
-  how.open = !status.configured;
+  how.className = "fold-section";
+  how.open = true;
   const summary = document.createElement("summary");
   summary.textContent = "How to connect your bank";
   how.append(summary);
@@ -1382,10 +1383,11 @@ function renderBalanceEntry(): void {
   };
 
   const details = document.createElement("details");
+  details.className = "fold-section";
   const summary = document.createElement("summary");
   summary.textContent = "Enter statement balances by hand";
   details.append(summary);
-  details.open = draft.rows.some((r) => r.date !== "" || r.closing !== "");
+  details.open = true;
 
   const fields = document.createElement("div");
   fields.className = "agent-fields";

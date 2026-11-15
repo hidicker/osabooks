@@ -21,9 +21,9 @@ import { reportMoney } from "../country.js";
  */
 
 let chosenYear: number | undefined;
-/** Which properties are open, so saving a trip does not fold the page up. */
-const opened = new Set<string>();
-let vehiclesOpen = false;
+/** Which properties somebody closed, so saving a trip does not open them again. */
+const closed = new Set<string>();
+let vehiclesOpen = true;
 
 function money(cents: Cents): string {
   return reportMoney(cents);
@@ -83,6 +83,7 @@ export function vehiclesBox(year: number, rerender: () => void = renderRentalYea
   const status = tripsStatus(year);
   const fleet = state.ledger.tripLog?.vehicles.length ?? 0;
   const box = document.createElement("details");
+  box.className = "fold-section";
   box.open = vehiclesOpen;
   box.addEventListener("toggle", () => {
     vehiclesOpen = box.open;
@@ -144,10 +145,11 @@ export function renderRentalYearEnd(): void {
   for (const entity of rentals) {
     const section = document.createElement("details");
     section.className = "rental-year";
-    section.open = opened.has(entity.id);
+    // Open to start with; one somebody closed stays closed while they work.
+    section.open = !closed.has(entity.id);
     section.addEventListener("toggle", () => {
-      if (section.open) opened.add(entity.id);
-      else opened.delete(entity.id);
+      if (section.open) closed.delete(entity.id);
+      else closed.add(entity.id);
     });
     // The property's name as the heading it is, the owners and the year's net beside it.
     const summary = document.createElement("summary");

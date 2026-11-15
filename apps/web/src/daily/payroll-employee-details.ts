@@ -65,7 +65,8 @@ export function employeeDetailsFields(existing: Employee | undefined): { box: HT
   const d = existing?.details ?? {};
   const split = splitName(existing?.name ?? "");
   const box = document.createElement("details");
-  box.className = "payroll-template";
+  box.className = "fold-section payroll-template";
+  box.open = true;
   const summary = document.createElement("summary");
   summary.textContent = "For Inland Revenue: employee details (new and leaving employees)";
   const grid = document.createElement("div");

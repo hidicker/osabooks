@@ -419,9 +419,8 @@ function card(t: Tenancy, entities: Entity[], asAt: IsoDate): HTMLElement {
   return box;
 }
 
-/** Which properties are open, so saving does not fold the page up. */
-const opened = new Set<string>();
-let openedOnce = false;
+/** Which properties somebody closed, so saving does not open them again. */
+const closed = new Set<string>();
 
 function newTenancy(entityId: string, asAt: IsoDate): Tenancy {
   const rentAccount = incomeAccounts(entityId).find((a) => /rent/i.test(a.name));
@@ -461,15 +460,6 @@ export function renderRentalsPage(): void {
   const year = tripsYear;
   const tenancies = state.ledger.tenancies ?? [];
   const shown = entities.filter((e) => state.entityFilter === "" || e.id === state.entityFilter);
-  // Open to start with: every property with a current tenancy, or the only one.
-  if (!openedOnce) {
-    openedOnce = true;
-    for (const e of shown) {
-      const current = tenancies.some((t) => t.entityId === e.id && (t.end === undefined || t.end >= asAt));
-      if (current || shown.length === 1) opened.add(e.id);
-    }
-  }
-
   for (const entity of shown) {
     const mine = tenancies.filter((t) => t.entityId === entity.id);
     const current = mine.filter((t) => t.end === undefined || t.end >= asAt);
@@ -477,10 +467,11 @@ export function renderRentalsPage(): void {
 
     const section = document.createElement("details");
     section.className = "rental-year";
-    section.open = opened.has(entity.id) || editing?.entityId === entity.id;
+    // Open to start with; one somebody closed stays closed while they work.
+    section.open = !closed.has(entity.id) || editing?.entityId === entity.id;
     section.addEventListener("toggle", () => {
-      if (section.open) opened.add(entity.id);
-      else opened.delete(entity.id);
+      if (section.open) closed.delete(entity.id);
+      else closed.add(entity.id);
     });
     const summary = document.createElement("summary");
     const name = document.createElement("span");
@@ -507,7 +498,7 @@ export function renderRentalsPage(): void {
     add.disabled = editing !== null;
     add.addEventListener("click", () => {
       editing = newTenancy(entity.id, asAt);
-      opened.add(entity.id);
+      closed.delete(entity.id);
       redraw("tenancies");
     });
     actions.append(add);

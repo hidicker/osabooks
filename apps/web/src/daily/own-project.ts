@@ -119,7 +119,8 @@ function step(text: string): HTMLElement {
 /** The panel for the Books page: set up, or say which project is in use. */
 export function ownProjectPanel(): HTMLElement {
   const fold = document.createElement("details");
-  fold.className = "own-project";
+  fold.className = "fold-section own-project";
+  fold.open = true;
   const summary = document.createElement("summary");
   fold.append(summary);
 

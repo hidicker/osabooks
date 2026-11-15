@@ -33,8 +33,8 @@ export function agentReaderPanel(
   const mine = held.get(key) ?? { pasted: "", reading: null };
   held.set(key, mine);
   const box = document.createElement("details");
-  box.className = "agent-reader";
-  box.open = mine.reading !== null;
+  box.className = "fold-section agent-reader";
+  box.open = true;
   const summary = document.createElement("summary");
   summary.textContent = "Read a statement with AI";
   box.append(

@@ -679,7 +679,7 @@
 .ai-review-read { margin: 0.8rem 0 0; }
 .ai-review-read h4 { margin: 0 0 0.35rem; font-size: 0.92rem; }
 .ai-carry h3 { margin: 0 0 0.4rem; font-size: 1rem; }
-.ai-carry h4 { margin: 0.9rem 0 0.35rem; font-size: 0.88rem; }
+.ai-carry h4 { margin: 0.9rem 0 0.35rem; font-size: 0.98rem; }
 .ai-carry p { margin: 0 0 0.45rem; }
 .ai-carry textarea { width: 100%; max-width: 46rem; font: inherit; font-size: 0.8rem;
   padding: 0.45rem 0.6rem; border-radius: 4px; }
@@ -822,7 +822,7 @@
 .variance tr.open td.left { color: #c62828; font-weight: 600; }
 .variance-detail { margin-top: 1.25rem; padding-top: 1rem; border-top: 2px solid rgba(128,128,128,0.3); }
 .variance-detail h3 { margin: 0 0 0.25rem; font-size: 1rem; }
-.variance-detail h4 { margin: 1rem 0 0.35rem; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted, #667); }
+.variance-detail h4 { margin: 1rem 0 0.35rem; font-size: 0.98rem; }
 .variance-detail table { font-size: 0.85rem; }
 .variance-problems { color: #c62828; font-size: 0.85rem; }
 .variance-note { font-size: 0.85rem; margin: 0.2rem 0; }
@@ -1875,7 +1875,7 @@ main:has(#page-check:not([hidden])) { max-width: none; }
 }
 
 .invoice-editor h3 { margin: 0 0 0.8rem; font-size: 1rem; }
-.invoice-editor h4 { margin: 1rem 0 0.5rem; font-size: 0.85rem; color: var(--muted); }
+.invoice-editor h4 { margin: 1rem 0 0.5rem; font-size: 0.98rem; }
 
 .invoice-fields {
   display: grid;
@@ -2084,6 +2084,19 @@ details.two-factor > summary { cursor: pointer; font-weight: 600; }
 .page-section.tone-open { background: color-mix(in srgb, var(--in) 8%, var(--surface)); }
 .page-section.tone-keep { background: var(--surface-2); }
 .page-section.tone-extra { background: color-mix(in srgb, var(--review) 7%, var(--surface)); }
+/* A part of a page that can be folded away, but starts open: on a faint
+   panel of its own, with a heading the size of the page's other section
+   headings rather than a small grey label. Inside a page panel it is a
+   sub-heading of that panel, on a lighter panel of its own. */
+details.fold-section { border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.8rem 1.1rem 0.9rem; margin: 0.8rem 0 1rem;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface)); font-size: inherit; }
+details.fold-section > summary { cursor: pointer; font-size: 1.05rem; font-weight: 600;
+  color: var(--text); text-transform: none; letter-spacing: normal; margin: 0; }
+details.fold-section[open] > summary { margin-bottom: 0.6rem; }
+details.fold-section > :last-child { margin-bottom: 0; }
+.page-section details.fold-section { background: var(--surface); margin: 0.8rem 0 0.4rem; }
+.page-section details.fold-section > summary { font-size: 0.98rem; }
 
 /* Migration (on trial) ----------------------------------------------------- */
 .migration-card { border: 1px solid rgba(128,128,128,0.28); border-radius: 6px;
@@ -2126,7 +2139,7 @@ details.two-factor > summary { cursor: pointer; font-weight: 600; }
 .ai-offer, .ai-panel { border: 1px solid rgba(128,128,128,0.28); border-radius: 6px;
   padding: 0.9rem 1.1rem; margin: 0 0 1rem; max-width: 62rem; }
 .ai-offer h3, .ai-panel h3 { margin: 0 0 0.5rem; font-size: 1rem; }
-.ai-panel h4 { margin: 0.9rem 0 0.35rem; font-size: 0.88rem; }
+.ai-panel h4 { margin: 0.9rem 0 0.35rem; font-size: 0.98rem; }
 .ai-offer p { font-size: 0.86rem; margin: 0.4rem 0; }
 .ai-offer ul { margin: 0.3rem 0 0.6rem; padding-left: 1.2rem; }
 .ai-offer li { font-size: 0.85rem; line-height: 1.5; margin: 0.2rem 0; }
@@ -4147,7 +4160,7 @@ tr.report-behind th { font-weight: 500; opacity: 0.75; }
 .reconcile-diagnostic td:first-child { white-space: nowrap; }
 
 /* Personal year end: the accountant's checklist, a question to a row. */
-.personal-checklist h4 { margin: 0.9rem 0 0.3rem; font-size: 0.85rem; }
+.personal-checklist h4 { margin: 0.9rem 0 0.3rem; font-size: 0.98rem; }
 .checklist-row { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; justify-content: space-between;
   padding: 0.4rem 0; border-bottom: 1px solid var(--border); }
 .checklist-row > div:first-child { flex: 1 1 18rem; font-size: 0.85rem; }

@@ -284,9 +284,9 @@ function renderContact(container: HTMLElement, payroll: PayrollData): void {
 /** Where pay runs post. Nothing posts until the three that must be there are chosen. */
 function renderAccounts(container: HTMLElement, payroll: PayrollData): void {
   const details = document.createElement("details");
-  details.className = "payroll-accounts";
+  details.className = "fold-section payroll-accounts";
   const ready = payrollAccounts() !== null;
-  details.open = !ready;
+  details.open = true;
   const summary = document.createElement("summary");
   summary.textContent = ready
     ? "Pay runs post to the books. The accounts they use"

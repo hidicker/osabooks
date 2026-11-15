@@ -181,8 +181,8 @@ function openWordingEditor(): void {
   for (const [kind, word] of kinds) {
     const now = wordingFor(kind, state.ledger.emailWording);
     const section = document.createElement("details");
-    section.className = "wording-section";
-    section.open = kind === "invoice";
+    section.className = "fold-section wording-section";
+    section.open = true;
     const summary = document.createElement("summary");
     summary.textContent = word;
     const subject = document.createElement("input");

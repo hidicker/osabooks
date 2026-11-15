@@ -265,7 +265,8 @@ export function renderPersonalYearEnd(): void {
   // The accountant's checklist: what the books cannot know, asked.
   const unanswered = checklistOpen(owner, year);
   const checklist = document.createElement("details");
-  checklist.open = unanswered > 0;
+  checklist.className = "fold-section";
+  checklist.open = true;
   const summary = document.createElement("summary");
   summary.textContent =
     unanswered === 0 ? "Year-end checklist: all answered" : `Year-end checklist: ${unanswered} to answer`;

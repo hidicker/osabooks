@@ -98,9 +98,9 @@ export function gstAccountSection(): HTMLElement | null {
   if (ended.length === 0) return null;
 
   const box = document.createElement("details");
-  box.className = "gst-account";
+  box.className = "fold-section gst-account";
   const out = ended.filter((r) => Math.abs(r.booksDifference) > 100 || (r.irDifference !== null && Math.abs(r.irDifference) > 100));
-  box.open = out.length > 0;
+  box.open = true;
   const summary = document.createElement("summary");
   summary.textContent =
     `The GST account, against the returns and Inland Revenue (${[...codes].join(", ")})` +

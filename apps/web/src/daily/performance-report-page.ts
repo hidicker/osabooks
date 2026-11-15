@@ -348,7 +348,8 @@ export function renderPerformancePage(): void {
 
   if (!fromBooks.reconciles) {
     const panel = document.createElement("details");
-    panel.open = inputs.previousFigures === undefined;
+    panel.className = "fold-section";
+    panel.open = true;
     const title = document.createElement("summary");
     title.textContent = `Last year's figures (year ended ${taxYearEndSaid(year - 1)})`;
     panel.append(title);
