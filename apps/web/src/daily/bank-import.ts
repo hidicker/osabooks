@@ -6,7 +6,7 @@ import { morningChoice } from "../nightly-ui.js";
 import type { Morning } from "../nightly.js";
 import { PreviousSystem, previousSystem } from "../modules.js";
 import { redraw, showPage } from "../app.js";
-import { accountsForEditing, asCsvText, bankLabel, ensureDefaultEntity, reclassify } from "../books.js";
+import { accountsForEditing, asCsvText, bankLabel, ensureDefaultEntity, reclassify, settleBankOpeningBalances } from "../books.js";
 import { bankConvertPanel } from "./bank-convert-prompt.js";
 import { balanceMovementSection, openingBalancesFromFeed, renderBalanceChecks } from "../daily/opening-balances.js";
 import type { RuleFileShape } from "../rules-ui.js";
@@ -421,6 +421,8 @@ export async function handleFiles(files: File[]): Promise<void> {
 
   state.ledger = { ...state.ledger, transactions: merged.kept };
   state.entries = merged.entries;
+  // A trial balance loaded before these lines held the bank under its code.
+  settleBankOpeningBalances();
   showWhatNeedsDeciding();
 
   state.persistent = await save(state.ledger);
@@ -549,6 +551,7 @@ export function mergeIncoming(
 
   state.ledger = { ...state.ledger, transactions: merged.kept };
   state.entries = merged.entries;
+  settleBankOpeningBalances();
   return { skippedAsRemoved };
 }
 

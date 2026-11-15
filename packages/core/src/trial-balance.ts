@@ -242,13 +242,14 @@ export function openingBalancesFrom(
       continue;
     }
 
-    // A bank account has no chart code, and this ledger keys it by the account
-    // number rather than by the name the export prints. The caller knows the
-    // mapping; without one the name is used, which at least keeps the figure.
-    const key =
-      account.code !== ""
-        ? account.code
-        : (options.bankAccountFor?.(account.name) ?? account.name.trim());
+    // This ledger keys a bank account by the account its lines are imported
+    // under, not by the name the export prints or the code the chart gives it
+    // (Xero's own demo numbers its bank 090). The caller knows the mapping,
+    // and it comes first, code or none: kept under the code, the opening
+    // balance sat on a line of its own beside the bank's lines. Without a
+    // mapping, the code, or else the name, which at least keeps the figure.
+    const bank = account.code === "" || klass === "" || klass === "asset" ? options.bankAccountFor?.(account.name) : undefined;
+    const key = bank !== undefined && bank !== "" ? bank : account.code !== "" ? account.code : account.name.trim();
 
     accounts[key] = (accounts[key] ?? 0) + cents;
     total += cents;

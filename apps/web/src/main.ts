@@ -34,6 +34,7 @@ import {
   storeConfirmedGst,
   record,
   tidyStaleTreatments,
+  settleBankOpeningBalances,
   persistRules,
   syncExpenseClaims,
 } from "./books.js";
@@ -361,6 +362,9 @@ async function init(): Promise<void> {
     }
 
     setLoadingStatus("Preparing workspace…");
+    // Opening balances held under a bank's chart code, onto the bank's own
+    // lines, before anything draws a report from them.
+    settleBankOpeningBalances();
     renderFormats();
     wireUp();
     render();

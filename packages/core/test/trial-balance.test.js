@@ -101,6 +101,19 @@ test("a bank account is keyed by the account it is, not the name printed", () =>
   assert.equal(built.balances.accounts["BNZ 01 - Trading Account"], undefined);
 });
 
+test("a bank account the chart numbers is still keyed by the account it is", () => {
+  // Xero's demo company numbers its bank 090; kept under the code, the
+  // opening balance sat on a line of its own beside the bank's lines.
+  const numbered = REPORT.replace(",BNZ 01 - Trading Account,", "090,BNZ 01 - Trading Account,");
+  const built = openingBalancesFrom(parseTrialBalance(numbered), "2025-03-31", {
+    bankAccountFor: (name) => (name.includes("BNZ 01") ? "bnz-01-trading-account" : undefined),
+  });
+  assert.equal(built.balances.accounts["bnz-01-trading-account"], 35594);
+  assert.equal(built.balances.accounts["090"], undefined);
+  const unmapped = openingBalancesFrom(parseTrialBalance(numbered), "2025-03-31");
+  assert.equal(unmapped.balances.accounts["090"], 35594, "without a mapping, under its code");
+});
+
 test("without a mapping the bank figure is kept under its printed name", () => {
   // Losing it would silently understate the assets, which is worse than a key
   // somebody has to tidy up.

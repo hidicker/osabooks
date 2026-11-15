@@ -29,7 +29,7 @@ import { aiSuggestionFor } from "./ai.js";
 import { clearStore, emptyLedger, save, saveEvents, savePart, saveRules } from "./store.js";
 import { takeLockedMove } from "./locked-changes.js";
 import { accountingDocument, accountingLines, accountingSplitParts, exchangeAccounts, fxRates, paymentInDocumentCurrency } from "./fx-books.js";
-import { isForeign, realisedFxJournals, revaluationJournals } from "@nzosa/core";
+import { isForeign, realisedFxJournals, revaluationJournals, relabelOpeningBalances } from "@nzosa/core";
 import type { DocumentPayment } from "@nzosa/core";
 import type { StoredLedger } from "./store.js";
 import { resetLockBaseline } from "./lock.js";
@@ -911,6 +911,34 @@ export function ledgerAccountFor(name: string, account?: Account): string | null
   const target = tidy(wanted);
   for (const [id, label] of labels) if (tidy(label) === target) return id;
   return null;
+}
+
+/**
+ * Move opening balances held under a bank's chart code onto the account its
+ * lines are imported under, where the chart's bank row is linked to one.
+ *
+ * A trial balance loaded before the bank lines, or one whose bank has a code
+ * (Xero's demo numbers its bank 090), kept the figure under the code, and the
+ * balance sheet showed the bank twice: the opening balance on one line, the
+ * bank's lines on another. In memory only, so books opened to be read are
+ * settled too; the next save keeps it. Says whether anything moved.
+ */
+export function settleBankOpeningBalances(): boolean {
+  const held = state.ledger.openingBalances;
+  if (held === undefined) return false;
+  const { accounts } = banks();
+  const byCode = new Map<string, string>();
+  for (const row of state.chart) {
+    const code = row.code.trim();
+    if (code === "" || row.type.trim().toLowerCase() !== "bank") continue;
+    const id = ledgerAccountFor(row.name, row);
+    if (id !== null && id !== code && accounts.has(id)) byCode.set(code, id);
+  }
+  if (byCode.size === 0) return false;
+  const { balances, moved } = relabelOpeningBalances(held, (key) => byCode.get(key.trim()));
+  if (moved.length === 0) return false;
+  state.ledger = { ...state.ledger, openingBalances: balances };
+  return true;
 }
 
 /** The sentence that has to be typed before anything is cleared. */
