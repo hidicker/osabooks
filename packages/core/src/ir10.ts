@@ -234,7 +234,8 @@ export function ir10BoxForAccount(
   if (digits === "610" || digits === "611" || t === "accounts receivable") return 30;
   if (t === "bank") return 31;
   if (digits === "820" || t === "gst") return balance > 0 ? 32 : 47;
-  if (digits === "860" || t === "rounding") return balance > 0 ? 32 : 47;
+  // A current liability, signed, as the balance sheet and Xero place it.
+  if (digits === "860" || t === "rounding") return 47;
   if (digits === "620" || digits === "625" || t === "current asset" || t === "prepayment") return 32;
   if (t === "fixed asset" || (t === "" && digits.startsWith("7"))) {
     if (/vehicle|motor/.test(n)) return 33;

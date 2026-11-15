@@ -190,15 +190,12 @@ function sectionFor(type: string, balance: Cents): Section {
     // a year, so it is placed by where it actually sits on the day.
     case "gst":
       return balance > 0 ? "current-asset" : "current-liability";
-    // Rounding sits where it arose, by the same reasoning. Signed accounts are
-    // stated in whole dollars, so a set of components can round down while
-    // their total rounds up -- for instance, payables of 153 and 58,211,
-    // printed with a total of 58,365. Carrying that dollar to equity would make
-    // total liabilities, net assets and retained earnings each read a dollar
-    // away from the statements they came from. Left on the side it came from,
-    // all three tie.
+    // Rounding is a current liability, signed, whichever way it runs: where
+    // Xero's chart and balance sheet put it, so total assets and total
+    // liabilities read as Xero's do. Kept out of equity, so net assets and
+    // retained earnings tie to the statements the books came from.
     case "rounding":
-      return balance > 0 ? "current-asset" : "current-liability";
+      return "current-liability";
     case "tracking":
       return "ignore";
     default:

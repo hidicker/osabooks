@@ -415,3 +415,21 @@ test("a historical adjustment left over from the move is a current liability, as
   assert.equal(sheet.equity.lines.some((l) => l.code === "840"), false, "not in equity");
   assert.equal(sheet.netAssets, 586902);
 });
+
+test("rounding is a current liability, signed, whichever way it runs, as Xero places it", () => {
+  const chart = [
+    { code: "090", name: "Business Bank Account", type: "Bank" },
+    { code: "860", name: "Rounding", type: "Rounding" },
+    { code: "960", name: "Retained Earnings", type: "Retained Earnings" },
+  ];
+  const sheet = computeBalanceSheet({
+    asAt: "2026-03-31",
+    openingBalances: { asAt: "2025-04-01", accounts: { "090": 1000000, "860": 5, "960": -1000005 } },
+    journals: [],
+    chart,
+  });
+  assert.equal(sheet.currentAssets.lines.some((l) => l.code === "860"), false, "not under assets");
+  assert.ok(sheet.currentLiabilities.lines.some((l) => l.code === "860"), "under current liabilities");
+  assert.equal(sheet.totalAssets, 1000000, "assets are the bank alone");
+  assert.equal(sheet.netAssets, 1000005);
+});
