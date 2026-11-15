@@ -27,7 +27,14 @@ export const MIGRATIONS = [
   "20261010090000_delete_books",
   "20261012120000_deleted_books_and_locks",
   "20261021120000_save_part_changes",
+  "20261026090000_attachments",
   "20261027090000_access_until",
+  "20261031120000_outside_apps",
+  "20261108090000_lock_watch",
+  "20261110090000_two_factor",
+  "20261114120100_attachments_live_books",
+  "20261114140000_two_factor_everywhere",
+  "20261115090000_two_factor_everywhere_owner_check",
 ];
 
 /** Parts a function adds later; a value added to a type is used by the app, not by this script. */

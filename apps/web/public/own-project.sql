@@ -1425,6 +1425,80 @@ $$;
 
 revoke all on function public.prune_part_history(interval) from public, anon, authenticated;
 
+-- ============================================================ 20261026090000_attachments
+-- Files attached to documents, journals, contacts and register lines, for
+-- books kept online.
+--
+-- A private bucket, one folder a set of books: `<book id>/<attachment id>`.
+-- The books themselves say what each file is; this keeps the bytes. Access
+-- follows the book, through has_role as everything else does:
+--
+--   read          any member, read-only members included
+--   add, remove   those who may change the books (owner, bookkeeper, and so
+--                 an accountant); a read-only member cannot
+--
+-- A folder name that is not a book id is no book's, and so nobody's.
+
+insert into storage.buckets (id, name, public, file_size_limit)
+values ('attachments', 'attachments', false, 10485760)
+on conflict (id) do update set public = false, file_size_limit = 10485760;
+
+-- The book an object belongs to, from the first part of its name; null when
+-- that is not a book id, so a policy asking about it is simply false.
+create or replace function public.attachment_book(object_name text)
+returns uuid
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select case
+    when split_part(object_name, '/', 1) ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+      and split_part(object_name, '/', 2) ~ '^att-[0-9a-f]{16}$'
+      and split_part(object_name, '/', 3) = ''
+    then split_part(object_name, '/', 1)::uuid
+  end;
+$$;
+
+revoke execute on function public.attachment_book(text) from public, anon;
+grant execute on function public.attachment_book(text) to authenticated;
+
+drop policy if exists "attachments: members read" on storage.objects;
+create policy "attachments: members read" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper', 'accountant']::public.book_role[])
+  );
+
+drop policy if exists "attachments: writers add" on storage.objects;
+create policy "attachments: writers add" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper']::public.book_role[])
+  );
+
+-- Replacing a file of the same id: the upload asks to overwrite.
+drop policy if exists "attachments: writers replace" on storage.objects;
+create policy "attachments: writers replace" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper']::public.book_role[])
+  )
+  with check (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper']::public.book_role[])
+  );
+
+drop policy if exists "attachments: writers remove" on storage.objects;
+create policy "attachments: writers remove" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper']::public.book_role[])
+  );
+
 -- ============================================================ 20261027090000_access_until
 -- Access that ends on a date, and when each person last signed in.
 --
@@ -1589,6 +1663,800 @@ revoke execute on function public.set_access_until(uuid, text, date) from public
 grant execute on function public.book_member_list(uuid) to authenticated;
 grant execute on function public.book_invitation_list(uuid) to authenticated;
 grant execute on function public.set_access_until(uuid, text, date) to authenticated;
+
+-- ============================================================ 20261031120000_outside_apps
+-- Outside apps: Claude, ChatGPT and the like, connected through OsaBooks's
+-- connector (the `mcp` edge function) with Supabase's OAuth server.
+--
+-- A token Supabase gives an outside app is a sign-in token for the person
+-- who allowed it, and would otherwise reach everything the app can: invite
+-- members, change settings, read the bank feed's keys, delete books. Such a
+-- token carries the app's `client_id`; the app's own tokens never do. So:
+--
+-- - every request to the database through the API is refused when it comes
+--   with one (`refuse_outside_apps`, PostgREST's pre-request hook), and
+-- - membership is never granted to one (`is_member`, `has_role`), which also
+--   covers storage and anything that asks those two.
+--
+-- The connector does not go through either: it checks the token with Auth,
+-- checks membership itself, and reads and writes with the service key --
+-- the books' parts to read, and the one part `suggested` to write.
+
+alter type public.book_part add value if not exists 'suggested';
+
+-- Whether this request came from an outside app. Never fails: a request it
+-- cannot read is not one.
+create or replace function public.from_outside_app()
+returns boolean
+language plpgsql
+stable
+set search_path = public, pg_temp
+as $$
+declare
+  claims text := current_setting('request.jwt.claims', true);
+begin
+  if claims is null or claims = '' then
+    return false;
+  end if;
+  return coalesce(claims::jsonb ->> 'client_id', '') <> '';
+exception when others then
+  return false;
+end;
+$$;
+
+grant execute on function public.from_outside_app() to anon, authenticated, service_role;
+
+create or replace function public.refuse_outside_apps()
+returns void
+language plpgsql
+stable
+set search_path = public, pg_temp
+as $$
+begin
+  if public.from_outside_app() then
+    raise exception using
+      errcode = '42501',
+      message = 'An app connected through the NZOSA connector can only use the connector.';
+  end if;
+end;
+$$;
+
+grant execute on function public.refuse_outside_apps() to anon, authenticated, service_role;
+
+alter role authenticator set pgrst.db_pre_request = 'public.refuse_outside_apps';
+notify pgrst, 'reload config';
+
+-- As in 20261027090000_access_until.sql, and never for an outside app.
+create or replace function public.is_member(book uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select not public.from_outside_app() and exists (
+    select 1 from public.book_members m
+    where m.book_id = book and m.user_id = auth.uid()
+      and (m.access_until is null or m.access_until >= current_date)
+  );
+$$;
+
+create or replace function public.has_role(book uuid, roles public.book_role[])
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select not public.from_outside_app() and exists (
+    select 1 from public.book_members m
+    where m.book_id = book
+      and m.user_id = auth.uid()
+      and (m.access_until is null or m.access_until >= current_date)
+      and (
+        m.role = any (roles)
+        or (m.role::text = 'accountant' and 'bookkeeper' = any (roles::text[]))
+        or (
+          'owner' = any (roles::text[])
+          and 'bookkeeper' = any (roles::text[])
+          and 'accountant' = any (roles::text[])
+        )
+      )
+  );
+$$;
+
+-- What an outside app suggests, added to the part `suggested` by the
+-- connector only. New sets go in front of those held; a set already held (the
+-- same suggestions sent again) is not added twice; the newest 200 are kept.
+-- Under the row's lock, so two chats suggesting at once both land.
+create or replace function public.suggested_add(p_book uuid, p_sets jsonb, p_by uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  held jsonb;
+begin
+  select data into held from public.book_parts
+  where book_id = p_book and part = 'suggested'
+  for update;
+
+  if not found then
+    insert into public.book_parts (book_id, part, version, data, updated_by)
+    values (
+      p_book, 'suggested', 1,
+      jsonb_build_object('version', 1, 'sets', (
+        select coalesce(jsonb_agg(s order by n), '[]'::jsonb)
+        from (select s, n from jsonb_array_elements(p_sets) with ordinality as t(s, n) order by n limit 200) kept
+      )),
+      p_by
+    )
+    on conflict (book_id, part) do nothing;
+    if not found then
+      -- Somebody else's first set landed between the two: add to theirs.
+      perform public.suggested_add(p_book, p_sets, p_by);
+    end if;
+    return;
+  end if;
+
+  update public.book_parts
+  set data = jsonb_build_object('version', 1, 'sets', (
+        select coalesce(jsonb_agg(s order by n), '[]'::jsonb)
+        from (
+          select s, n from (
+            select s, n from jsonb_array_elements(p_sets) with ordinality as t(s, n)
+            where not exists (
+              select 1 from jsonb_array_elements(coalesce(held -> 'sets', '[]'::jsonb)) as h(v)
+              where h.v ->> 'id' = t.s ->> 'id'
+            )
+            union all
+            select s, 1000000 + n from jsonb_array_elements(coalesce(held -> 'sets', '[]'::jsonb)) with ordinality as u(s, n)
+          ) everything
+          order by n
+          limit 200
+        ) kept
+      )),
+      version = version + 1,
+      updated_at = now(),
+      updated_by = p_by
+  where book_id = p_book and part = 'suggested';
+end;
+$$;
+
+revoke execute on function public.suggested_add(uuid, jsonb, uuid) from public, anon, authenticated;
+grant execute on function public.suggested_add(uuid, jsonb, uuid) to service_role;
+
+-- ============================================================ 20261108090000_lock_watch
+-- Lock dates watched on the server: stage 1, noticing without refusing.
+--
+-- The page refuses a change that would alter a locked period's figures; the
+-- server, until now, only refused moving the lock dates themselves. Before it
+-- refuses anything more, it watches: each save that changes something dated
+-- in a locked period is noted in lock_watch, and the owner and the
+-- accountant see it on Settings, Lock dates. Once a week or two has shown
+-- that only genuine changes are caught, a later migration refuses them.
+--
+-- The server compares records, not figures as the page works them out:
+--   * up to the year lock: bank lines, their coding (account, GST treatment
+--     and side), their splits and invoice matches, invoices and bills (dates,
+--     amounts, tax and lines), and manual journals (dates and lines);
+--   * after the year lock and up to the GST lock: the GST parts only -- a
+--     line's treatment and side, and an invoice's or journal's amounts.
+-- An invoice's paid and owing are left out: a payment made after the lock
+-- changes them, and is no change to the locked period.
+
+create table if not exists public.lock_watch (
+  id bigserial primary key,
+  book_id uuid not null references public.books(id) on delete cascade,
+  part text not null,
+  noticed_at timestamptz not null default now(),
+  by_user uuid,
+  what jsonb not null
+);
+create index if not exists lock_watch_book on public.lock_watch (book_id, noticed_at desc);
+alter table public.lock_watch enable row level security;
+-- Read through lock_watch_list only; written by the trigger only.
+revoke all on table public.lock_watch from public, anon, authenticated;
+
+/** The year and GST lock dates in a decisions part, or nulls. */
+create or replace function public.lock_watch_dates(decisions jsonb, out year_lock text, out gst_lock text)
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select nullif(decisions #>> '{lockDates,year}', ''), nullif(decisions #>> '{lockDates,gst}', '');
+$$;
+
+/** An invoice's figure-making fields: what a locked period's figures are made of. */
+create or replace function public.lock_watch_doc(doc jsonb)
+returns jsonb
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select jsonb_build_object(
+    'kind', doc -> 'kind', 'issued', doc -> 'issued', 'total', doc -> 'total',
+    'tax', doc -> 'tax', 'lines', doc -> 'lines', 'status', case when lower(coalesce(doc ->> 'status', '')) in ('draft', 'voided', 'deleted', 'estimate') then doc -> 'status' end
+  );
+$$;
+
+/**
+ * What a save changed in locked periods: a list of {kind, key, date}, empty
+ * when nothing. `txns` is the books' bank lines, for the dates of the lines
+ * that codings, splits and matches name.
+ */
+create or replace function public.lock_watch_changes(
+  the_part text, old_data jsonb, new_data jsonb, year_lock text, gst_lock text, txns jsonb
+)
+returns jsonb
+language plpgsql
+stable
+set search_path = public, pg_temp
+as $$
+declare
+  upto text := greatest(coalesce(year_lock, ''), coalesce(gst_lock, ''));
+  found jsonb := '[]'::jsonb;
+begin
+  if upto = '' then return found; end if;
+
+  if the_part = 'transactions' then
+    -- A bank line dated up to either lock, added, removed or changed.
+    select coalesce(jsonb_agg(jsonb_build_object('kind', 'bank line', 'key', k, 'date', d)), '[]'::jsonb) into found
+    from (
+      select coalesce(o.id, n.id) as k, coalesce(o.d, n.d) as d
+      from (select t ->> 'id' as id, t ->> 'date' as d, t - 'extras' as v from jsonb_array_elements(coalesce(old_data, '[]')) t where t ->> 'date' <= upto) o
+      full join (select t ->> 'id' as id, t ->> 'date' as d, t - 'extras' as v from jsonb_array_elements(coalesce(new_data, '[]')) t where t ->> 'date' <= upto) n
+        on o.id = n.id
+      where o.v is distinct from n.v
+      limit 50
+    ) x;
+
+  elsif the_part = 'invoices' then
+    select coalesce(jsonb_agg(jsonb_build_object('kind', 'invoice', 'key', k, 'date', d)), '[]'::jsonb) into found
+    from (
+      select coalesce(o.num, n.num) as k, coalesce(o.d, n.d) as d
+      from (select t ->> 'number' as num, t ->> 'issued' as d, public.lock_watch_doc(t) as v from jsonb_array_elements(coalesce(old_data, '[]')) t where t ->> 'issued' <= upto) o
+      full join (select t ->> 'number' as num, t ->> 'issued' as d, public.lock_watch_doc(t) as v from jsonb_array_elements(coalesce(new_data, '[]')) t where t ->> 'issued' <= upto) n
+        on o.num = n.num
+      where o.v is distinct from n.v
+      limit 50
+    ) x;
+
+  elsif the_part = 'decisions' then
+    with dated as (
+      select t ->> 'id' as id, t ->> 'date' as d from jsonb_array_elements(coalesce(txns, '[]')) t where t ->> 'date' <= upto
+    ),
+    coding as (
+      -- Up to the year lock, the account as well; after it, up to the GST lock, the GST only.
+      select 'coding' as kind, dated.id as k, dated.d as d
+      from dated
+      where (
+        case when year_lock is not null and dated.d <= year_lock
+          then jsonb_build_object('code', old_data #> array['overrides', dated.id, 'code'], 'treatment', old_data #> array['overrides', dated.id, 'treatment'], 'side', old_data #> array['overrides', dated.id, 'side'], 'claimIn', old_data #> array['overrides', dated.id, 'claimIn'])
+          else jsonb_build_object('treatment', old_data #> array['overrides', dated.id, 'treatment'], 'side', old_data #> array['overrides', dated.id, 'side'], 'claimIn', old_data #> array['overrides', dated.id, 'claimIn'])
+        end
+      ) is distinct from (
+        case when year_lock is not null and dated.d <= year_lock
+          then jsonb_build_object('code', new_data #> array['overrides', dated.id, 'code'], 'treatment', new_data #> array['overrides', dated.id, 'treatment'], 'side', new_data #> array['overrides', dated.id, 'side'], 'claimIn', new_data #> array['overrides', dated.id, 'claimIn'])
+          else jsonb_build_object('treatment', new_data #> array['overrides', dated.id, 'treatment'], 'side', new_data #> array['overrides', dated.id, 'side'], 'claimIn', new_data #> array['overrides', dated.id, 'claimIn'])
+        end
+      )
+    ),
+    split as (
+      select 'split' as kind, dated.id as k, dated.d as d from dated
+      where year_lock is not null and dated.d <= year_lock
+        and (old_data #> array['splits', dated.id]) is distinct from (new_data #> array['splits', dated.id])
+    ),
+    matched as (
+      select 'invoice match' as kind, dated.id as k, dated.d as d from dated
+      where year_lock is not null and dated.d <= year_lock
+        and (old_data #> array['invoiceMatches', dated.id]) is distinct from (new_data #> array['invoiceMatches', dated.id])
+    ),
+    journals as (
+      select 'manual journal' as kind, coalesce(o.id, n.id) as k, coalesce(o.d, n.d) as d
+      from (select j ->> 'id' as id, j ->> 'date' as d, jsonb_build_object('date', j -> 'date', 'lines', j -> 'lines', 'deleted', j -> 'deleted') as v from jsonb_array_elements(coalesce(old_data -> 'manualJournals', '[]')) j where j ->> 'date' <= upto) o
+      full join (select j ->> 'id' as id, j ->> 'date' as d, jsonb_build_object('date', j -> 'date', 'lines', j -> 'lines', 'deleted', j -> 'deleted') as v from jsonb_array_elements(coalesce(new_data -> 'manualJournals', '[]')) j where j ->> 'date' <= upto) n
+        on o.id = n.id
+      where o.v is distinct from n.v
+    )
+    select coalesce(jsonb_agg(jsonb_build_object('kind', kind, 'key', k, 'date', d)), '[]'::jsonb) into found
+    from (
+      select * from coding union all select * from split union all select * from matched union all select * from journals
+      limit 50
+    ) x;
+  end if;
+  return found;
+end;
+$$;
+
+/** The trigger: after a save of a watched part, note what changed in locked periods. Never refuses. */
+create or replace function public.lock_watch_note()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  decisions_now jsonb;
+  dates record;
+  txns jsonb;
+  changed jsonb;
+begin
+  if new.part::text not in ('transactions', 'decisions', 'invoices') then return new; end if;
+  -- Everything inside the guard: watching never stops a save.
+  begin
+    -- The lock dates as they stood before this save: a save that moves them
+    -- is a deliberate act by an owner or the accountant, refused to anyone else.
+    if new.part::text = 'decisions' then
+      decisions_now := old.data;
+      if public.lock_dates_of(new.data) is distinct from public.lock_dates_of(old.data) then return new; end if;
+    else
+      select data into decisions_now from public.book_parts where book_id = new.book_id and part = 'decisions';
+    end if;
+    dates := public.lock_watch_dates(decisions_now);
+    if dates.year_lock is null and dates.gst_lock is null then return new; end if;
+    if new.part::text = 'transactions' then
+      txns := old.data;
+    else
+      select data into txns from public.book_parts where book_id = new.book_id and part = 'transactions';
+    end if;
+    changed := public.lock_watch_changes(new.part::text, old.data, new.data, dates.year_lock, dates.gst_lock, txns);
+    if jsonb_array_length(changed) > 0 then
+      insert into public.lock_watch (book_id, part, by_user, what)
+      values (new.book_id, new.part::text, auth.uid(), jsonb_build_object('locks', jsonb_build_object('year', dates.year_lock, 'gst', dates.gst_lock), 'changed', changed));
+    end if;
+  exception when others then
+    -- Watching never stops a save.
+    raise warning 'lock_watch: %', sqlerrm;
+  end;
+  return new;
+end;
+$$;
+
+drop trigger if exists lock_watch on public.book_parts;
+create trigger lock_watch
+  after update of data on public.book_parts
+  for each row execute function public.lock_watch_note();
+
+/** What the server noticed in a set of books, newest first: for the owner and the accountant. */
+create or replace function public.lock_watch_list(p_book uuid)
+returns table (noticed_at timestamptz, part text, by_email text, what jsonb)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.has_role(p_book, array['owner', 'accountant']::public.book_role[]) then
+    raise exception 'only an owner or the accountant' using errcode = '42501';
+  end if;
+  return query
+    select w.noticed_at, w.part, u.email::text, w.what
+    from public.lock_watch w
+    left join auth.users u on u.id = w.by_user
+    where w.book_id = p_book
+    order by w.noticed_at desc
+    limit 100;
+end;
+$$;
+
+revoke all on function public.lock_watch_list(uuid) from public, anon;
+grant execute on function public.lock_watch_list(uuid) to authenticated;
+revoke all on function public.lock_watch_changes(text, jsonb, jsonb, text, text, jsonb) from public, anon, authenticated;
+revoke all on function public.lock_watch_note() from public, anon, authenticated;
+
+-- ============================================================ 20261110090000_two_factor
+-- Two-factor sign-in: a code from an authenticator app, asked at sign-in.
+--
+-- Supabase's sign-in already offers it (TOTP factors), and a session that has
+-- given the code carries `aal2` in its token. Nothing here asks for the code;
+-- this decides when books are reachable without it:
+--
+-- - Somebody who has set up an authenticator is asked for it on every sign-in,
+--   for every set of books. Otherwise a stolen password would still open any
+--   books whose owner had not required it, and setting it up would protect
+--   nothing.
+-- - An owner can require it for a set of books, and then everybody in them,
+--   accountant included, must have set it up and signed in with it.
+--
+-- Checked in is_member and has_role, which every policy, every function, the
+-- attachments and the edge functions acting as the person already go through.
+-- The connector checks it itself (two_factor_needed), as it checks membership.
+--
+-- A session that has not given its code still signs in: it can list the books
+-- waiting for the code (books_waiting_for_two_factor) and set an authenticator
+-- up, and nothing else.
+
+alter table public.books add column if not exists require_two_factor boolean not null default false;
+
+comment on column public.books.require_two_factor is
+  'Everybody in these books must sign in with an authenticator code. Set by an owner through set_two_factor_required.';
+
+-- How the request signed in: 'aal2' when the code was given. Never fails: a
+-- request it cannot read has not given one.
+create or replace function public.jwt_aal()
+returns text
+language plpgsql
+stable
+set search_path = public, pg_temp
+as $$
+declare
+  claims text := current_setting('request.jwt.claims', true);
+begin
+  if claims is null or claims = '' then
+    return '';
+  end if;
+  return coalesce(claims::jsonb ->> 'aal', '');
+exception when others then
+  return '';
+end;
+$$;
+
+grant execute on function public.jwt_aal() to authenticated, service_role;
+
+-- Whether a person has an authenticator set up and confirmed.
+create or replace function public.has_two_factor(person uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select exists (
+    select 1 from auth.mfa_factors f
+    where f.user_id = person and f.status = 'verified'
+  );
+$$;
+
+revoke execute on function public.has_two_factor(uuid) from public, anon, authenticated;
+grant execute on function public.has_two_factor(uuid) to service_role;
+
+-- Whether this request may reach these books as far as two-factor goes.
+create or replace function public.two_factor_ok(book uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select public.jwt_aal() = 'aal2'
+    or (
+      not public.has_two_factor(auth.uid())
+      and not coalesce((select b.require_two_factor from public.books b where b.id = book), false)
+    );
+$$;
+
+revoke execute on function public.two_factor_ok(uuid) from public, anon;
+grant execute on function public.two_factor_ok(uuid) to authenticated, service_role;
+
+-- As in 20261031120000_outside_apps.sql, and only with two-factor satisfied.
+create or replace function public.is_member(book uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select not public.from_outside_app() and public.two_factor_ok(book) and exists (
+    select 1 from public.book_members m
+    where m.book_id = book and m.user_id = auth.uid()
+      and (m.access_until is null or m.access_until >= current_date)
+  );
+$$;
+
+create or replace function public.has_role(book uuid, roles public.book_role[])
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select not public.from_outside_app() and public.two_factor_ok(book) and exists (
+    select 1 from public.book_members m
+    where m.book_id = book
+      and m.user_id = auth.uid()
+      and (m.access_until is null or m.access_until >= current_date)
+      and (
+        m.role = any (roles)
+        or (m.role::text = 'accountant' and 'bookkeeper' = any (roles::text[]))
+        or (
+          'owner' = any (roles::text[])
+          and 'bookkeeper' = any (roles::text[])
+          and 'accountant' = any (roles::text[])
+        )
+      )
+  );
+$$;
+
+-- An owner requires it, or stops requiring it. Turning it on needs the owner
+-- to have signed in with a code themselves, so nobody can lock out the person
+-- doing the locking. Turning it off needs only what has_role already asks.
+create or replace function public.set_two_factor_required(p_book uuid, p_on boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if not public.has_role(p_book, array['owner']::public.book_role[]) then
+    -- An owner whose code these books are waiting for is told that, not that
+    -- they are not an owner.
+    if not public.two_factor_ok(p_book) and exists (
+      select 1 from public.book_members m
+      where m.book_id = p_book and m.user_id = auth.uid() and m.role = 'owner'
+    ) then
+      raise exception 'Sign in with the code from your authenticator app first.' using errcode = '42501';
+    end if;
+    raise exception 'Only an owner can change this.' using errcode = '42501';
+  end if;
+  if p_on and public.jwt_aal() <> 'aal2' then
+    raise exception 'Set up two-factor sign-in for yourself, and sign in with it, first.' using errcode = '42501';
+  end if;
+  update public.books set require_two_factor = p_on where id = p_book;
+end;
+$$;
+
+revoke execute on function public.set_two_factor_required(uuid, boolean) from public, anon;
+grant execute on function public.set_two_factor_required(uuid, boolean) to authenticated;
+
+-- The books this person belongs to that are waiting for their code: named, so
+-- the books list can say why they are not there rather than leave them out.
+-- `required` says whether the owner asked for it (the person may not have set
+-- it up yet) or it is their own authenticator.
+create or replace function public.books_waiting_for_two_factor()
+returns table (id uuid, name text, required boolean)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select b.id, b.name, b.require_two_factor
+  from public.books b
+  join public.book_members m on m.book_id = b.id
+  where m.user_id = auth.uid()
+    and (m.access_until is null or m.access_until >= current_date)
+    and b.deleted_at is null
+    and not public.from_outside_app()
+    and not public.two_factor_ok(b.id)
+  order by b.name;
+$$;
+
+revoke execute on function public.books_waiting_for_two_factor() from public, anon;
+grant execute on function public.books_waiting_for_two_factor() to authenticated;
+
+-- For the members page: whether these books require it, and who has set it up.
+create or replace function public.book_two_factor(p_book uuid)
+returns table (required boolean, user_id uuid, has_two_factor boolean)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select b.require_two_factor, m.user_id, public.has_two_factor(m.user_id)
+  from public.books b
+  join public.book_members m on m.book_id = b.id
+  where b.id = p_book and public.is_member(p_book);
+$$;
+
+revoke execute on function public.book_two_factor(uuid) from public, anon;
+grant execute on function public.book_two_factor(uuid) to authenticated;
+
+-- For the connector, which checks membership with the service key: whether
+-- this person must have given a code to reach these books.
+create or replace function public.two_factor_needed(p_book uuid, p_person uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  select public.has_two_factor(p_person)
+    or coalesce((select b.require_two_factor from public.books b where b.id = p_book), false);
+$$;
+
+revoke execute on function public.two_factor_needed(uuid, uuid) from public, anon, authenticated;
+grant execute on function public.two_factor_needed(uuid, uuid) to service_role;
+
+-- ============================================================ 20261114120100_attachments_live_books
+-- Attachments of deleted books: closed, as the books themselves are.
+--
+-- Deleting a set of books hides its parts and refuses saves to it
+-- (20261012120000_deleted_books_and_locks.sql); its files in the attachments
+-- bucket could still be read, added and removed by its members. Now every
+-- attachment policy also asks book_live, so the files come back with the
+-- books when an owner restores them, and not before.
+-- (Security review round 3, 14 November 2026.)
+
+drop policy if exists "attachments: members read" on storage.objects;
+create policy "attachments: members read" on storage.objects
+  for select to authenticated
+  using (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper', 'accountant']::public.book_role[])
+    and public.book_live(public.attachment_book(name))
+  );
+
+drop policy if exists "attachments: writers add" on storage.objects;
+create policy "attachments: writers add" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper']::public.book_role[])
+    and public.book_live(public.attachment_book(name))
+  );
+
+drop policy if exists "attachments: writers replace" on storage.objects;
+create policy "attachments: writers replace" on storage.objects
+  for update to authenticated
+  using (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper']::public.book_role[])
+    and public.book_live(public.attachment_book(name))
+  )
+  with check (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper']::public.book_role[])
+    and public.book_live(public.attachment_book(name))
+  );
+
+drop policy if exists "attachments: writers remove" on storage.objects;
+create policy "attachments: writers remove" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'attachments'
+    and public.has_role(public.attachment_book(name), array['owner', 'bookkeeper']::public.book_role[])
+    and public.book_live(public.attachment_book(name))
+  );
+
+-- ============================================================ 20261114140000_two_factor_everywhere
+-- Two-factor required in all the books a person owns, with one switch.
+--
+-- An owner could require it one set of books at a time
+-- (set_two_factor_required). This turns it on, or off, in every set they own,
+-- and keeps it on for books they start afterwards: their choice is kept in
+-- account_settings, and a trigger on new books reads it. Each set of books can
+-- still be changed on its own afterwards. Turning it on needs the owner signed
+-- in with their own code, as the per-book switch does.
+
+create table if not exists public.account_settings (
+  user_id            uuid primary key references auth.users(id) on delete cascade,
+  require_two_factor boolean not null default false,
+  updated_at         timestamptz not null default now()
+);
+
+alter table public.account_settings enable row level security;
+revoke all on public.account_settings from anon, authenticated;
+-- Read through two_factor_everywhere() only; written through the function below.
+
+/** The owner's books, and who in them has not set up an authenticator. */
+create or replace function public.two_factor_everywhere()
+returns table (on_for_new_books boolean, owned integer, required integer, people_without integer)
+language sql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+  with mine as (
+    select b.id, b.require_two_factor
+    from public.books b
+    join public.book_members m on m.book_id = b.id
+    where m.user_id = auth.uid() and m.role = 'owner' and b.deleted_at is null
+      and not public.from_outside_app()
+  )
+  select
+    coalesce((select s.require_two_factor from public.account_settings s where s.user_id = auth.uid()), false),
+    (select count(*)::integer from mine),
+    (select count(*)::integer from mine where require_two_factor),
+    (select count(distinct m.user_id)::integer
+       from public.book_members m
+       where m.book_id in (select id from mine)
+         and m.user_id <> auth.uid()
+         and (m.access_until is null or m.access_until >= current_date)
+         and not public.has_two_factor(m.user_id));
+$$;
+
+revoke execute on function public.two_factor_everywhere() from public, anon;
+grant execute on function public.two_factor_everywhere() to authenticated;
+
+/** On or off in every set of books the caller owns, and for books they start later. */
+create or replace function public.set_two_factor_everywhere(p_on boolean)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  changed integer;
+begin
+  if auth.uid() is null or public.from_outside_app() then
+    raise exception 'Only you can change this, signed in to OsaBooks.' using errcode = '42501';
+  end if;
+  if p_on and public.jwt_aal() <> 'aal2' then
+    raise exception 'Set up two-factor sign-in for yourself, and sign in with it, first.' using errcode = '42501';
+  end if;
+  insert into public.account_settings (user_id, require_two_factor, updated_at)
+  values (auth.uid(), p_on, now())
+  on conflict (user_id) do update set require_two_factor = excluded.require_two_factor, updated_at = now();
+  update public.books b
+  set require_two_factor = p_on
+  where b.deleted_at is null
+    and exists (
+      select 1 from public.book_members m
+      where m.book_id = b.id and m.user_id = auth.uid() and m.role = 'owner'
+    );
+  get diagnostics changed = row_count;
+  return changed;
+end;
+$$;
+
+revoke execute on function public.set_two_factor_everywhere(boolean) from public, anon;
+grant execute on function public.set_two_factor_everywhere(boolean) to authenticated;
+
+/** Books somebody starts are required from the start when they chose that for all theirs. */
+create or replace function public.books_two_factor_from_owner()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  if exists (select 1 from public.account_settings s where s.user_id = auth.uid() and s.require_two_factor) then
+    new.require_two_factor := true;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists books_two_factor_from_owner on public.books;
+create trigger books_two_factor_from_owner
+  before insert on public.books
+  for each row execute function public.books_two_factor_from_owner();
+
+-- ============================================================ 20261115090000_two_factor_everywhere_owner_check
+-- The one switch for two-factor in all of a person's books changes only the
+-- books they can open as an owner now, as the per-book switch does.
+--
+-- It changed every set of books in which they were listed as an owner. A
+-- co-owner shut out of a set of books because it needs a code they have not
+-- set up could turn the requirement off there, and so could somebody with
+-- only an owner's password. Now a set of books is changed only through
+-- has_role, which asks for the code a set of books needs, and somebody who
+-- has an authenticator must sign in with it to turn the requirement off as
+-- well as on.
+
+create or replace function public.set_two_factor_everywhere(p_on boolean)
+returns integer
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  changed integer;
+begin
+  if auth.uid() is null or public.from_outside_app() then
+    raise exception 'Only you can change this, signed in to OsaBooks.' using errcode = '42501';
+  end if;
+  if p_on and public.jwt_aal() <> 'aal2' then
+    raise exception 'Set up two-factor sign-in for yourself, and sign in with it, first.' using errcode = '42501';
+  end if;
+  if not p_on and public.has_two_factor(auth.uid()) and public.jwt_aal() <> 'aal2' then
+    raise exception 'Sign in with your authenticator code first.' using errcode = '42501';
+  end if;
+  insert into public.account_settings (user_id, require_two_factor, updated_at)
+  values (auth.uid(), p_on, now())
+  on conflict (user_id) do update set require_two_factor = excluded.require_two_factor, updated_at = now();
+  update public.books b
+  set require_two_factor = p_on
+  where b.deleted_at is null
+    and public.has_role(b.id, array['owner']::public.book_role[]);
+  get diagnostics changed = row_count;
+  return changed;
+end;
+$$;
+
+revoke execute on function public.set_two_factor_everywhere(boolean) from public, anon;
+grant execute on function public.set_two_factor_everywhere(boolean) to authenticated;
 
 -- ============================================================ parts added later
 alter type public.book_part add value if not exists 'payroll';
