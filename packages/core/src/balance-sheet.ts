@@ -154,7 +154,10 @@ function flip(amount: Cents): Cents {
  */
 function sectionFor(type: string, balance: Cents): Section {
   switch (type.trim().toLowerCase()) {
+    // A bank account overdrawn on the day is money owed: a current liability,
+    // as Xero places it, by the same reasoning as GST below.
     case "bank":
+      return balance < 0 ? "current-liability" : "current-asset";
     case "accounts receivable":
     case "current asset":
     case "inventory":
@@ -240,6 +243,12 @@ export function computeBalanceSheet(options: {
    * balances. Ignored when `profitInRetainedEarnings` folds it all in.
    */
   currentYearFrom?: IsoDate;
+  /**
+   * The name to show for a line the chart does not name: a bank account, kept
+   * under the id its lines are imported by. Without it, the name its postings
+   * carry -- and on a day with none, only the id.
+   */
+  nameFor?: (code: string) => string | undefined;
 }): BalanceSheet {
   const { asAt, openingBalances, journals, chart } = options;
   const byCode = new Map(chart.map((a) => [a.code, a]));
@@ -310,7 +319,7 @@ export function computeBalanceSheet(options: {
 
     const line: BalanceSheetLine = {
       code,
-      name: account?.name ?? nameOf.get(code) ?? code,
+      name: account?.name ?? options.nameFor?.(code) ?? nameOf.get(code) ?? code,
       opening: openingAmount,
       movement,
       closing,
@@ -369,15 +378,17 @@ export function computeBalanceSheet(options: {
   const xeroStyle = (): BalanceSheetLine[] => {
     const earlier = flip(profitEarlierYears);
     const current = flip(profitForPeriod - profitEarlierYears);
-    const currentLine = { code: "", name: "Current year earnings", opening: 0, movement: current, closing: current };
-    if (earlier === 0) return [...held.lines, currentLine];
+    // Left off when there is none, as on the day the books open.
+    const currentLine: BalanceSheetLine[] =
+      current === 0 ? [] : [{ code: "", name: "Current year earnings", opening: 0, movement: current, closing: current }];
+    if (earlier === 0) return [...held.lines, ...currentLine];
     const lines =
       retained === undefined
         ? [...held.lines, { code: "", name: "Retained earnings", opening: 0, movement: earlier, closing: earlier }]
         : held.lines.map((line) =>
             line === retained ? { ...line, movement: line.movement + earlier, closing: line.closing + earlier } : line,
           );
-    return [...lines, currentLine];
+    return [...lines, ...currentLine];
   };
   const equityLines =
     options.profitInRetainedEarnings !== true

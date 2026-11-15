@@ -232,7 +232,8 @@ export function ir10BoxForAccount(
 
   // --- Assets. ---
   if (digits === "610" || digits === "611" || t === "accounts receivable") return 30;
-  if (t === "bank") return 31;
+  // Overdrawn on the day: owed, with the other current liabilities, as on the balance sheet.
+  if (t === "bank") return balance < 0 ? 47 : 31;
   if (digits === "820" || t === "gst") return balance > 0 ? 32 : 47;
   // A current liability, signed, as the balance sheet and Xero place it.
   if (digits === "860" || t === "rounding") return 47;

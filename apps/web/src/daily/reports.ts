@@ -1756,6 +1756,12 @@ export function balanceSheetOn(date: string): ReturnType<typeof computeBalanceSh
   });
 }
 
+/** A bank account's name for a balance sheet line, where the id is one. */
+function bankName(id: string): string | undefined {
+  const named = bankLabel(id);
+  return named === id ? undefined : named;
+}
+
 function balanceSheetFor(year: number) {
   const asAt = reportRange(year).to;
   const position = positionJournals();
@@ -1776,6 +1782,7 @@ function balanceSheetFor(year: number) {
       chart: state.chart,
       shareholderCurrentAccounts: gathered,
       currentYearFrom: taxYearStart(taxYearOf(date)),
+      nameFor: bankName,
     });
   // The same day a year earlier, as a column of its own; the opening and
   // movement columns make way for it.
@@ -6368,6 +6375,7 @@ function accountantPackage(year: number): { name: string; data: Uint8Array }[] {
       chart: state.chart,
       shareholderCurrentAccounts: currentAccountsGathered(),
       currentYearFrom: taxYearStart(taxYearOf(to)),
+      nameFor: bankName,
     });
     const sheetRows: (string | number)[][] = [[`Balance sheet as at ${to}`], ["Section", "Account", "Opening", "Movement", "Closing"]];
     for (const part of [sheet.currentAssets, sheet.nonCurrentAssets, sheet.currentLiabilities, sheet.nonCurrentLiabilities, sheet.equity]) {

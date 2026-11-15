@@ -470,3 +470,25 @@ test("set out as Xero does: this year's earnings on a line of their own, earlier
   const plain = computeBalanceSheet({ asAt: "2026-11-15", openingBalances: opening, journals, chart });
   assert.equal(plain.equity.lines.find((l) => l.name === "Profit for the period").closing, 80000, "without it, one line from the opening");
 });
+
+test("an overdrawn bank is a current liability, named, and a day with no profit has no earnings line", () => {
+  const chart = [
+    { code: "090", name: "Business Bank Account", type: "Bank" },
+    { code: "960", name: "Retained Earnings", type: "Retained Earnings" },
+  ];
+  const sheet = computeBalanceSheet({
+    asAt: "2026-03-31",
+    openingBalances: { asAt: "2026-04-01", accounts: { "business-bank-account": -265232, "960": 265232 } },
+    journals: [],
+    chart,
+    currentYearFrom: "2025-04-01",
+    nameFor: (code) => (code === "business-bank-account" ? "Business Bank Account" : undefined),
+  });
+  const bank = sheet.currentLiabilities.lines.find((l) => l.code === "business-bank-account");
+  assert.ok(bank !== undefined, "under current liabilities");
+  assert.equal(bank.name, "Business Bank Account");
+  assert.equal(bank.closing, 265232, "owed, the right way up");
+  assert.equal(sheet.totalAssets, 0);
+  assert.equal(sheet.equity.lines.some((l) => l.name === "Current year earnings"), false);
+  assert.equal(sheet.imbalance, 0);
+});
