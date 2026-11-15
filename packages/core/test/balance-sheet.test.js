@@ -397,3 +397,21 @@ test("depreciation posted by name, with no contra account in the chart, sits wit
   assert.deepEqual(sheet.nonCurrentAssets.lines.map((l) => [l.name, l.closing]), [["Less Accumulated Depreciation — Computer Equipment", -165479]]);
   assert.equal(sheet.currentAssets.lines.length, 0);
 });
+
+test("a historical adjustment left over from the move is a current liability, as Xero places it", () => {
+  const chart = [
+    { code: "090", name: "Business Bank Account", type: "Bank" },
+    { code: "840", name: "Historical Adjustment", type: "Historical" },
+    { code: "960", name: "Retained Earnings", type: "Retained Earnings" },
+  ];
+  const sheet = computeBalanceSheet({
+    asAt: "2026-03-31",
+    openingBalances: { asAt: "2025-04-01", accounts: { "090": 1000000, "840": -413098, "960": -586902 } },
+    journals: [],
+    chart,
+  });
+  const line = sheet.currentLiabilities.lines.find((l) => l.code === "840");
+  assert.ok(line !== undefined, "under current liabilities");
+  assert.equal(sheet.equity.lines.some((l) => l.code === "840"), false, "not in equity");
+  assert.equal(sheet.netAssets, 586902);
+});

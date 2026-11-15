@@ -259,9 +259,12 @@ export function ir10BoxForAccount(
   if (t === "current liability" && /\bloan\b/.test(n)) return 46;
   if (digits === "900" || t === "non-current liability" || t === "term liability") return 49;
   if (t === "current liability" || t === "liability") return 47;
+  // What did not balance at the move, until it is cleared: a current
+  // liability, as the balance sheet places it.
+  if (digits === "840" || t === "historical") return 47;
 
   // --- Equity: owners equity is what assets leave once liabilities are met. ---
-  if (digits === "960" || digits === "840" || t === "retained earnings" || t === "historical" || t === "equity") {
+  if (digits === "960" || t === "retained earnings" || t === "equity") {
     return 51;
   }
 

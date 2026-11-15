@@ -164,12 +164,15 @@ function sectionFor(type: string, balance: Cents): Section {
     case "accounts payable":
     case "current liability":
     case "unpaid expense claims":
+    // What did not balance when the books moved over, until an accountant
+    // clears it: a current liability, as Xero's balance sheet and this trial
+    // balance place it, so that it shows as open rather than as owners' equity.
+    case "historical":
       return "current-liability";
     case "non-current liability":
       return "non-current-liability";
     case "equity":
     case "retained earnings":
-    case "historical":
       return "equity";
     // Every type a profit and loss can hold. "Depreciation" and "Sales" are
     // both types Xero writes; left out, a year's depreciation went to no
