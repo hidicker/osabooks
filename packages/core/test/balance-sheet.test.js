@@ -449,3 +449,24 @@ test("a balance left on tracking transfers stays on the sheet, as a current liab
   assert.ok(sheet.currentLiabilities.lines.some((l) => l.code === "877"));
   assert.equal(sheet.netAssets, sheet.totalEquity, "the sheet balances");
 });
+
+test("set out as Xero does: this year's earnings on a line of their own, earlier years' in retained earnings", () => {
+  const chart = [
+    { code: "200", name: "Sales", type: "Revenue" },
+    { code: "960", name: "Retained Earnings", type: "Retained Earnings" },
+  ];
+  const opening = { asAt: "2025-04-01", accounts: { "bank": 100000, "960": -100000 } };
+  const journals = [
+    journal("2025-10-01", [bankLine("bank", 30000), line("200", "Sales", -30000)]),
+    journal("2026-06-01", [bankLine("bank", 50000), line("200", "Sales", -50000)]),
+  ];
+  const sheet = computeBalanceSheet({ asAt: "2026-11-15", openingBalances: opening, journals, chart, currentYearFrom: "2026-04-01" });
+  const retained = sheet.equity.lines.find((l) => l.code === "960");
+  const current = sheet.equity.lines.find((l) => l.name === "Current year earnings");
+  assert.equal(retained.closing, 130000, "last year's 300 profit joins retained earnings");
+  assert.equal(current.closing, 50000, "this year's 500 on its own line");
+  assert.equal(sheet.totalEquity, 180000);
+  assert.equal(sheet.imbalance, 0);
+  const plain = computeBalanceSheet({ asAt: "2026-11-15", openingBalances: opening, journals, chart });
+  assert.equal(plain.equity.lines.find((l) => l.name === "Profit for the period").closing, 80000, "without it, one line from the opening");
+});

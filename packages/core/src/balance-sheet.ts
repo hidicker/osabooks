@@ -232,6 +232,14 @@ export function computeBalanceSheet(options: {
    * rather than on a line of its own.
    */
   profitInRetainedEarnings?: boolean;
+  /**
+   * The first day of the financial year the sheet is drawn in, for setting
+   * the profit out as Xero does: "Current year earnings" from this day, and
+   * the profit of earlier years since the opening balances inside retained
+   * earnings. Without it, one "Profit for the period" line from the opening
+   * balances. Ignored when `profitInRetainedEarnings` folds it all in.
+   */
+  currentYearFrom?: IsoDate;
 }): BalanceSheet {
   const { asAt, openingBalances, journals, chart } = options;
   const byCode = new Map(chart.map((a) => [a.code, a]));
@@ -240,16 +248,21 @@ export function computeBalanceSheet(options: {
 
   const openingOf = new Map<string, Cents>(Object.entries(opening));
   const movementOf = new Map<string, Cents>();
+  // The same, before the current financial year began: earlier years' profit.
+  const earlierOf = new Map<string, Cents>();
   const nameOf = new Map<string, string>();
+  const yearFrom = options.currentYearFrom;
 
   for (const journal of journals) {
     if (journal.date > asAt) continue;
     // A journal dated before the opening balances is already inside them, so
     // counting it again would state the opening year twice.
     if (from !== null && journal.date < from) continue;
+    const earlier = yearFrom !== undefined && journal.date < yearFrom;
     for (const line of journal.lines) {
       const code = line.accountCode || line.accountName;
       movementOf.set(code, (movementOf.get(code) ?? 0) + line.amount);
+      if (earlier) earlierOf.set(code, (earlierOf.get(code) ?? 0) + line.amount);
       if (!nameOf.has(code)) nameOf.set(code, line.accountName || code);
     }
   }
@@ -260,6 +273,7 @@ export function computeBalanceSheet(options: {
   const sections = new Map<Section, BalanceSheetLine[]>();
   const shareholder = { opening: 0, movement: 0, closing: 0 };
   let profitForPeriod = 0;
+  let profitEarlierYears = 0;
 
   for (const code of [...codes].sort()) {
     const openingAmount = openingOf.get(code) ?? 0;
@@ -290,6 +304,7 @@ export function computeBalanceSheet(options: {
 
     if (section === "profit-and-loss") {
       profitForPeriod += movement;
+      profitEarlierYears += earlierOf.get(code) ?? 0;
       continue;
     }
 
@@ -349,9 +364,26 @@ export function computeBalanceSheet(options: {
   const isRetained = (line: BalanceSheetLine): boolean =>
     byCode.get(line.code)?.type.trim().toLowerCase() === "retained earnings";
   const retained = held.lines.find(isRetained);
+  // As Xero sets it out: this year's profit on a line of its own, and the
+  // profit of earlier years since the opening balances in retained earnings.
+  const xeroStyle = (): BalanceSheetLine[] => {
+    const earlier = flip(profitEarlierYears);
+    const current = flip(profitForPeriod - profitEarlierYears);
+    const currentLine = { code: "", name: "Current year earnings", opening: 0, movement: current, closing: current };
+    if (earlier === 0) return [...held.lines, currentLine];
+    const lines =
+      retained === undefined
+        ? [...held.lines, { code: "", name: "Retained earnings", opening: 0, movement: earlier, closing: earlier }]
+        : held.lines.map((line) =>
+            line === retained ? { ...line, movement: line.movement + earlier, closing: line.closing + earlier } : line,
+          );
+    return [...lines, currentLine];
+  };
   const equityLines =
     options.profitInRetainedEarnings !== true
-      ? [...held.lines, profitLine]
+      ? yearFrom !== undefined
+        ? xeroStyle()
+        : [...held.lines, profitLine]
       : retained === undefined
         ? [...held.lines, { ...profitLine, name: "Retained earnings" }]
         : held.lines.map((line) =>

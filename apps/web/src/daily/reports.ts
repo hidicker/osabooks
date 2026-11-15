@@ -138,7 +138,7 @@ import type {
   TaxExtraCategory,
   Transaction,
 } from "@nzosa/core";
-import { taxYearEnd, taxYearEndSaid, taxYearEndShort, taxYearStart, taxYearStartSaid, depreciationRules, monthsOfTaxYear } from "../tax-year.js";
+import { taxYearEnd, taxYearEndSaid, taxYearEndShort, taxYearOf, taxYearStart, taxYearStartSaid, depreciationRules, monthsOfTaxYear } from "../tax-year.js";
 import { bookSettings } from "../book-settings.js";
 import { booksCountry, booksLocale, gstPercent, moneyPlaces, booksMoney, noSalesTax, sayTax, taxTypeLabel, booksCurrency } from "../country.js";
 import { type DownloadKind, hasDownload } from "./report-downloads.js";
@@ -1761,9 +1761,10 @@ function balanceSheetFor(year: number) {
   const position = positionJournals();
   // The chosen entity's own accounts and banks, as the IR10 keeps to them.
   const { journals, opening } = entityPart(position.journals, state.ledger.openingBalances);
-  // Set out as signed statements are: a company's shareholder current accounts
-  // as one current liability, and the year's profit inside retained earnings.
-  const company = companyBooks();
+  // A company's shareholder current accounts as one current liability, as
+  // signed statements set them out; the year's profit as Xero sets it out,
+  // "Current year earnings" on a line of its own and earlier years' profit
+  // inside retained earnings, so the sheet reads line for line with Xero's.
   // Shareholder current accounts are New Zealand's way of setting a company's out.
   const gathered = currentAccountsGathered();
   const currentAccounts = gathered !== false;
@@ -1774,7 +1775,7 @@ function balanceSheetFor(year: number) {
       journals,
       chart: state.chart,
       shareholderCurrentAccounts: gathered,
-      profitInRetainedEarnings: company,
+      currentYearFrom: taxYearStart(taxYearOf(date)),
     });
   // The same day a year earlier, as a column of its own; the opening and
   // movement columns make way for it.
@@ -6358,15 +6359,15 @@ function accountantPackage(year: number): { name: string; data: Uint8Array }[] {
       listed.push("profit-and-loss.csv: the year's income and expenses");
     }
 
-    const company = companyBooks();
     const opening = state.ledger.openingBalances;
+    // Set out as the balance sheet report is.
     const sheet = computeBalanceSheet({
       asAt: to,
       ...(opening ? { openingBalances: opening } : {}),
       journals: reportPostings(),
       chart: state.chart,
       shareholderCurrentAccounts: currentAccountsGathered(),
-      profitInRetainedEarnings: company,
+      currentYearFrom: taxYearStart(taxYearOf(to)),
     });
     const sheetRows: (string | number)[][] = [[`Balance sheet as at ${to}`], ["Section", "Account", "Opening", "Movement", "Closing"]];
     for (const part of [sheet.currentAssets, sheet.nonCurrentAssets, sheet.currentLiabilities, sheet.nonCurrentLiabilities, sheet.equity]) {
