@@ -2140,10 +2140,18 @@ function checklistQuestion(number: number, held: Onboarding): HTMLElement {
 
   const place = document.createElement("p");
   place.className = "migration-place";
-  place.textContent =
-    `Step ${where + 1} of ${total}` +
-    (step.optional === true ? " · optional" : "") +
-    (step.done ? " · done ✓" : "");
+  place.textContent = `Step ${where + 1} of ${total}` + (step.optional === true ? " · optional" : "");
+  if (step.done) {
+    // Plain to see: the card turns green with a tick for its number, and a
+    // badge says so beside the count, rather than a small tick at its end.
+    box.classList.add("done");
+    const mark = box.querySelector(".migration-num");
+    if (mark !== null) mark.textContent = "✓";
+    const badge = document.createElement("span");
+    badge.className = "migration-done-badge";
+    badge.textContent = "Done";
+    place.append(" ", badge);
+  }
   inner.append(place);
 
   const said = guidance(step.what, held);
