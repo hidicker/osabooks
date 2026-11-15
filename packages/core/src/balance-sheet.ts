@@ -196,8 +196,11 @@ function sectionFor(type: string, balance: Cents): Section {
     // retained earnings tie to the statements the books came from.
     case "rounding":
       return "current-liability";
+    // Transfers between tracking categories: nothing, once each is matched.
+    // A balance left there is a current liability, as Xero places it; left off
+    // the sheet, the sheet would not balance by it.
     case "tracking":
-      return "ignore";
+      return "current-liability";
     default:
       return "ignore";
   }

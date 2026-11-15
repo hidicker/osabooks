@@ -272,7 +272,8 @@ export function ir10BoxForAccount(
   // --- A chart this has never seen: by type, then by number. ---
   if (t === "revenue" || t === "sales") return 2;
   if (t === "other income") return 10;
-  if (t === "tracking") return null;
+  // Nothing once matched; a balance left is a current liability, as on the balance sheet.
+  if (t === "tracking") return 47;
   if (digits.startsWith("7")) return 38;
   if (digits.startsWith("8")) return 47;
   if (digits.startsWith("4") || digits.startsWith("5")) return 24;

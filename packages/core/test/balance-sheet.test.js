@@ -433,3 +433,19 @@ test("rounding is a current liability, signed, whichever way it runs, as Xero pl
   assert.equal(sheet.totalAssets, 1000000, "assets are the bank alone");
   assert.equal(sheet.netAssets, 1000005);
 });
+
+test("a balance left on tracking transfers stays on the sheet, as a current liability", () => {
+  const chart = [
+    { code: "090", name: "Business Bank Account", type: "Bank" },
+    { code: "877", name: "Tracking Transfers", type: "Tracking" },
+    { code: "960", name: "Retained Earnings", type: "Retained Earnings" },
+  ];
+  const sheet = computeBalanceSheet({
+    asAt: "2026-03-31",
+    openingBalances: { asAt: "2025-04-01", accounts: { "090": 1000000, "877": -2500, "960": -997500 } },
+    journals: [],
+    chart,
+  });
+  assert.ok(sheet.currentLiabilities.lines.some((l) => l.code === "877"));
+  assert.equal(sheet.netAssets, sheet.totalEquity, "the sheet balances");
+});
