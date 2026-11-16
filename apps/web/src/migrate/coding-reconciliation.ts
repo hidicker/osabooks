@@ -795,8 +795,17 @@ function compareAfresh() {
   // compared by its own code it read as a disagreement that could not be
   // settled: accepting the other coding changed nothing that posts.
   const assignedTo = invoiceAssignments();
-  const invoiceKind = new Map((state.ledger.invoices ?? []).map((i) => [i.number, i.kind]));
+  const invoiceKind = new Map(
+    (state.ledger.invoices ?? []).map((i) => [i.number, i.claim === true ? "claim" : i.kind]),
+  );
   const clearingLabel = (kind: string | undefined): string => {
+    // An expense claim is repaid out of Unpaid Expense Claims, not Accounts
+    // Payable: compared as 800, every claim repayment read as a difference
+    // with Xero, which has it in 801.
+    if (kind === "claim") {
+      const account = state.chart.find((a) => a.type.trim().toLowerCase() === "unpaid expense claims");
+      return account !== undefined ? `${account.code} ${account.name}`.trim() : "801 Unpaid Expense Claims";
+    }
     const receivable = kind !== "purchase";
     const wanted = receivable ? "accounts receivable" : "accounts payable";
     const account = state.chart.find((a) => a.type.trim().toLowerCase() === wanted);
@@ -2275,7 +2284,9 @@ function unmatchForCoding(
 ): string | null {
   const settles = invoiceAssignments().get(transaction.id);
   if (settles === undefined || settles === "") return null;
-  if (/\b(610|800)\b|accounts\s+(receivable|payable)/i.test(chosen)) return null;
+  // Receivables, payables or expense claims: the account a settled document
+  // clears, so taking it agrees with the match rather than refusing it.
+  if (/\b(610|800|801)\b|accounts\s+(receivable|payable)|unpaid\s+expense\s+claims?/i.test(chosen)) return null;
   matches[transaction.id] = "";
   return settles;
 }

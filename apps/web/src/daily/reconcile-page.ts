@@ -2210,6 +2210,11 @@ function shareOf(transaction: Transaction, number: string): number {
 export async function settleInvoicesExactly(transaction: Transaction, said: readonly string[]): Promise<boolean> {
   const assigned = invoiceAssignments();
   if (assigned.has(transaction.id) || (state.ledger.splits ?? {})[transaction.id] !== undefined) return false;
+  // Taken off a document by a person (kept as ""): never put back on one by
+  // this. The assignments drop a refusal, so it read as never matched, and
+  // the next settling from Xero matched it again -- every time the books
+  // opened, the coding chosen on Coding reconciliation was overwritten.
+  if ((state.ledger.invoiceMatches ?? {})[transaction.id] === "") return false;
   const numbers = resolveSettlement(transaction, said);
   if (numbers === null) return false;
   // One is a match of its own: the split that settles several needs two parts
