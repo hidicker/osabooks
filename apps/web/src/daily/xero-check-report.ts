@@ -1,4 +1,4 @@
-import { balancesOn, compareBalances, movementsBetween, postedFromImported, sectionForType } from "@nzosa/core";
+import { balancesOn, compareBalances, localToday, movementsBetween, postedFromImported, sectionForType } from "@nzosa/core";
 import type { AccountComparison, AccountDifference, Cents, IsoDate } from "@nzosa/core";
 import { showPage } from "../app.js";
 import { bankAccountsByCode, bankLabel, ledgerAccountFor, postedJournals, recomputeVariance } from "../books.js";
@@ -63,8 +63,20 @@ export function renderXeroCheck(body: HTMLElement, year: number): void {
   const coding = codingPart();
   const ai = aiPart(year);
 
-  page.append(tiles([accounts.tile, gst.tile, ird.tile, coding.tile, ai.tile]));
-  page.append(accounts.section, gst.section, ird.section, coding.section, ai.section);
+  page.append(tiles([accounts.tile, gst.tile, coding.tile, ird.tile, ai.tile]));
+  page.append(
+    group(
+      "Your Xero books checked against OsaBooks",
+      "Xero's own figures, coding and GST returns, set beside what these books work out from the same bank lines.",
+      [accounts.section, gst.section, coding.section],
+    ),
+    group(
+      "Your books checked against Inland Revenue filings",
+      "What Inland Revenue holds for these books in myIR: the returns filed, and what was paid and refunded.",
+      [ird.section],
+    ),
+    ai.section,
+  );
 
   const print = document.createElement("button");
   print.type = "button";
@@ -119,13 +131,19 @@ function accountName(key: string): string {
   return bankLabel(key);
 }
 
-/** A difference said in words, where the reason is a usual one. */
-function reasonFor(d: AccountDifference): string {
+/**
+ * A difference said in words, where the reason is a usual one. `current` is
+ * a year not yet ended: Xero's depreciation is usually run once, at the year
+ * end, so in the year itself its absence is the usual thing, not a fault.
+ */
+function reasonFor(d: AccountDifference, current: boolean): string {
   const row = state.chart.find((a) => a.code === d.account);
   const name = (row?.name ?? "").toLowerCase();
   const type = (row?.type ?? "").toLowerCase();
   if ((type === "depreciation" || /depreciation/.test(name)) && d.theirs === 0) {
-    return "Xero has no depreciation for this year yet; these books do.";
+    return current
+      ? "Usual during the year: in Xero, depreciation is commonly run only at the year end. These books work it out as the year goes."
+      : "Xero has no depreciation for this year; these books do. Worth asking whether it was run.";
   }
   if (type === "retained earnings") return "Follows from the other differences: it is where the year's profit goes.";
   if (row === undefined && /uncoded/i.test(d.account)) return "Bank lines not coded yet here; Xero has them in an account.";
@@ -137,7 +155,7 @@ function daySaid(iso: string): string {
   return new Date(`${iso}T00:00:00Z`).toLocaleDateString(booksLocale(), { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
 }
 
-function comparisonTable(result: AccountComparison, theirsLabel: string): HTMLElement {
+function comparisonTable(result: AccountComparison, theirsLabel: string, current: boolean): HTMLElement {
   const table = document.createElement("table");
   table.className = "report-table xcheck-table";
   table.innerHTML =
@@ -151,7 +169,7 @@ function comparisonTable(result: AccountComparison, theirsLabel: string): HTMLEl
       [booksMoney(d.theirs), "report-amount"],
       [booksMoney(d.ours), "report-amount"],
       [booksMoney(d.difference), "report-amount"],
-      [reasonFor(d), ""],
+      [reasonFor(d, current), ""],
     ];
     for (const [text, className] of cells) {
       const td = document.createElement("td");
@@ -177,10 +195,12 @@ function rekey(balances: Record<string, Cents>): Record<string, Cents> {
 }
 
 function accountsPart(year: number): { tile: Tile; section: HTMLElement } {
-  const section = part("Accounts against Xero", "xcheck-accounts");
+  const section = part("Every account", "xcheck-accounts");
   const opening = state.ledger.openingBalances;
   const from = taxYearStart(year);
   const to = taxYearEnd(year);
+  // A year not yet ended, where Xero's year-end entries are still to come.
+  const current = localToday() <= to;
   const ours = postedJournals();
   const isProfitAndLoss = (key: string): boolean => {
     const row = state.chart.find((a) => a.code === key);
@@ -209,7 +229,7 @@ function accountsPart(year: number): { tile: Tile; section: HTMLElement } {
           ? said(`Every one of the ${result.compared} balance-sheet accounts agrees.`, "good")
           : said(`${result.agree} of ${result.compared} balance-sheet accounts agree. These differ:`, "look"),
       );
-      if (result.differences.length > 0) section.append(comparisonTable(result, "Xero"));
+      if (result.differences.length > 0) section.append(comparisonTable(result, "Xero", current));
     }
   }
 
@@ -239,7 +259,7 @@ function accountsPart(year: number): { tile: Tile; section: HTMLElement } {
           ? said(`Every one of the ${result.compared} accounts moved by the same amount in both, income and expenses included.`, "good")
           : said(`${result.agree} of ${result.compared} accounts agree. These differ:`, "look"),
       );
-      if (result.differences.length > 0) section.append(comparisonTable(result, "Xero"));
+      if (result.differences.length > 0) section.append(comparisonTable(result, "Xero", current));
     }
   }
 
@@ -267,7 +287,7 @@ function accountsPart(year: number): { tile: Tile; section: HTMLElement } {
 // --- GST returns --------------------------------------------------------------
 
 function gstPart(): { tile: Tile; section: HTMLElement } {
-  const section = part("GST returns", "xcheck-gst");
+  const section = part("GST returns filed", "xcheck-gst");
   if (state.filed.length === 0) {
     section.append(note("No filed GST returns loaded. Load Xero's GST returns, or Inland Revenue's, on GST reconciliation."));
     section.append(linkLine("Go to GST reconciliation", () => showPage("gst")));
@@ -327,7 +347,7 @@ function gstPart(): { tile: Tile; section: HTMLElement } {
 // --- Inland Revenue -----------------------------------------------------------
 
 function irdPart(): { tile: Tile; section: HTMLElement } {
-  const section = part("Inland Revenue", "xcheck-ird");
+  const section = part("Inland Revenue's own record (myIR)", "xcheck-ird");
   const records = irdSummary();
   if (records.length === 0) {
     section.append(
@@ -402,7 +422,7 @@ function irdPart(): { tile: Tile; section: HTMLElement } {
 // --- coding -------------------------------------------------------------------
 
 function codingPart(): { tile: Tile; section: HTMLElement } {
-  const section = part("How the lines were coded", "xcheck-coding");
+  const section = part("How each bank line was coded", "xcheck-coding");
   if (state.reference.length === 0 || state.ledger.transactions.length === 0) {
     section.append(
       note("Load Xero's Account Transactions on Coding reconciliation to compare how each bank line was coded there and here."),
@@ -485,6 +505,19 @@ function aiPart(year: number): { tile: Tile; section: HTMLElement } {
 }
 
 // --- small builders -----------------------------------------------------------
+
+/** A group of parts under a heading of its own: what the books are checked against. */
+function group(title: string, about: string, parts: readonly HTMLElement[]): HTMLElement {
+  const box = document.createElement("section");
+  box.className = "xcheck-group";
+  const h = document.createElement("h2");
+  h.textContent = title;
+  const p = document.createElement("p");
+  p.className = "xcheck-group-about";
+  p.textContent = about;
+  box.append(h, p, ...parts);
+  return box;
+}
 
 function part(title: string, id: string): HTMLElement {
   const section = document.createElement("section");

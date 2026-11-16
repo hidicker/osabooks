@@ -4872,6 +4872,9 @@ select.needs-choice {
   background: color-mix(in srgb, var(--in) 8%, var(--surface)); }
 .xcheck-tile.xcheck-look { border-color: color-mix(in srgb, var(--review) 50%, var(--border));
   background: color-mix(in srgb, var(--review) 9%, var(--surface)); }
+.xcheck-group { margin: 1.4rem 0 0.6rem; }
+.xcheck-group > h2 { font-size: 1.2rem; margin: 0 0 0.2rem; padding-bottom: 0.3rem; border-bottom: 2px solid var(--accent); }
+.xcheck-group-about { color: var(--muted); font-size: 0.9rem; margin: 0.3rem 0 0.8rem; }
 .xcheck-part { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.8rem 1.1rem 0.9rem;
   margin: 0 0 1rem; background: var(--surface); }
 .xcheck-part > h3 { font-size: 1.05rem; margin: 0 0 0.5rem; }
