@@ -14,6 +14,7 @@ import {
 import {
   wireFileIntake,
 } from "./migrate/file-intake.js";
+import { autoFetchFromWise } from "./daily/wise-feed.js";
 import {
   autoFetchFromFeed,
   render,
@@ -433,8 +434,20 @@ async function init(): Promise<void> {
         `Got ready this morning: ${morning.ran.added} new line${morning.ran.added === 1 ? "" : "s"} from the bank, ` +
         `${morning.ran.suggested} suggestion${morning.ran.suggested === 1 ? "" : "s"} waiting on Reconcile.`;
     }
-    // Not asked again on opening what the morning already asked.
-    void autoFetchFromFeed(morning).then(() => (ranToday ? undefined : autoSuggestOnOpen()));
+    // Not asked again on opening what the morning already asked. Wise after
+    // the bank feed, one import at a time, and both before the suggestions,
+    // so the new lines are suggested for too.
+    void autoFetchFromFeed(morning)
+      .then(() => autoFetchFromWise())
+      .then((added) => {
+        if (added > 0) {
+          state.startupMessage =
+            (state.startupMessage ? `${state.startupMessage} ` : "") +
+            `${added} new transaction${added === 1 ? "" : "s"} from Wise, on the Bank import page.`;
+          showPage(state.page);
+        }
+      })
+      .then(() => (ranToday ? undefined : autoSuggestOnOpen()));
 
     // Someone opening this for the first time has nothing to reconcile, and the
     // Reconcile page cannot say what to do about that. The guided start can: it

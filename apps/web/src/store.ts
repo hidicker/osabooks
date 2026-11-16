@@ -181,6 +181,8 @@ export interface BookSettings {
    * chosen days overdue, above a minimum. Online books only.
    */
   reminders?: { on: boolean; days: number[]; minimum?: number };
+  /** Fetch new Wise lines when the books open. On unless turned off. */
+  wiseFetchOnOpen?: boolean;
 }
 
 export interface StoredLedger {

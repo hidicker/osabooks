@@ -9,6 +9,10 @@ import { chosenStartDate } from "../migrate/onboarding-state.js";
 import { feedRequestFrom, fromWise, onOrAfter, wiseAccountId } from "@nzosa/core";
 import type { IsoDate, WiseStatementLine } from "@nzosa/core";
 import { booksCurrency, booksLocale } from "../country.js";
+import { bookSettings } from "../book-settings.js";
+import { record } from "../books.js";
+import { booksReadOnly, save as saveLedger } from "../store.js";
+import type { BookSettings } from "../store.js";
 
 /**
  * Wise, connected with its own API token.
@@ -135,7 +139,7 @@ export async function renderWise(): Promise<void> {
       void renderWise();
     });
   });
-  body.append(head, disconnect);
+  body.append(head, disconnect, fetchOnOpenChoice());
 
   const table = document.createElement("div");
   // What the last fetch did, drawn again after the redraw its lines set off.
@@ -257,6 +261,100 @@ function connectForm(): HTMLElement {
   return wrap;
 }
 
+/** The balances to bring in: ticked, and in the books' own currency. */
+function wantedBalances(balances: readonly WiseBalanceRow[], chosen: Record<string, string>): WiseBalanceRow[] {
+  return balances.filter((b) => (chosen[String(b.balanceId)] ?? "") !== "" && b.currency === booksCurrency());
+}
+
+/**
+ * Bring in the ticked balances' lines: the fetch itself, with no page to draw
+ * on, so the Fetch button and opening the books do the same thing.
+ */
+async function bringIn(
+  wanted: readonly WiseBalanceRow[],
+  fromDay: IsoDate | undefined,
+  restore: boolean,
+  file: (currency: string) => string,
+): Promise<{ added: number; skipped: number; problems: string[]; start: IsoDate | undefined }> {
+  // Never before the books start, whatever day is typed.
+  const booksFrom = booksStart();
+  const start = fromDay !== undefined && (booksFrom === undefined || fromDay > booksFrom) ? fromDay : booksFrom;
+  let added = 0;
+  let skipped = 0;
+  const problems: string[] = [];
+  for (const b of wanted) {
+    const search = new URLSearchParams({
+      profileId: String(b.profileId),
+      balanceId: String(b.balanceId),
+      currency: b.currency,
+      // A week early, as the bank feed is, so nothing on the first day is
+      // missed; only lines from the start are kept.
+      ...(start ? { start: feedRequestFrom(start) } : {}),
+    });
+    const { transactions } = await call<{ transactions: WiseStatementLine[] }>(`/statement?${search.toString()}`);
+    const read = fromWise(transactions, { account: wiseAccountId(b), label: `Wise ${b.currency}` });
+    const kept = onOrAfter(read.transactions, start);
+    if (read.problems.length > 0) problems.push(`${read.problems.length} Wise ${b.currency} line(s) not read`);
+    const before = state.ledger.transactions.length;
+    const result = await addTransactions(
+      kept,
+      { importer: "wise-api", file: file(b.currency), problems: read.problems },
+      { restoreRemoved: restore },
+    );
+    added += state.ledger.transactions.length - before;
+    skipped += result.skippedAsRemoved;
+  }
+  // A Wise number in Xero's bank account list links its chart row now.
+  await autoLinkBankRows();
+  return { added, skipped, problems, start };
+}
+
+/**
+ * Fetch new Wise lines as the books open, as the bank feed does: on unless
+ * turned off on the Wise section. Quiet when nothing is new; a line at the
+ * top of the page when something is. What goes wrong is said on the Wise
+ * section, not on whatever page is showing.
+ */
+export async function autoFetchFromWise(): Promise<number> {
+  // Not into books opened only to read: nothing could be saved.
+  if (!feedPossible() || bookSettings().wiseFetchOnOpen === false || booksReadOnly()) return 0;
+  try {
+    const status = await call<WiseStatus>("").catch(() => null);
+    if (status === null || !status.configured) return 0;
+    if (!Object.values(status.accounts).some((to) => to !== "")) return 0;
+    const { balances } = await call<{ balances: WiseBalanceRow[] }>("/balances");
+    listed = balances;
+    const wanted = wantedBalances(balances, status.accounts);
+    if (wanted.length === 0) return 0;
+    const { added } = await bringIn(wanted, (status.from || undefined) as IsoDate | undefined, false, (c) => `Wise ${c}, on opening`);
+    return added;
+  } catch (error) {
+    lastWiseSaid = `Last time it looked: ${(error as Error).message}`;
+    return 0;
+  }
+}
+
+/** The tick for fetching on opening, kept in the books' settings. */
+function fetchOnOpenChoice(): HTMLElement {
+  const label = document.createElement("label");
+  label.className = "feed-auto";
+  const box = document.createElement("input");
+  box.type = "checkbox";
+  box.checked = bookSettings().wiseFetchOnOpen !== false;
+  box.addEventListener("change", async () => {
+    const before = state.ledger.settings ?? {};
+    const settings: BookSettings = { ...before };
+    // On is the usual, so only "off" is written down.
+    if (box.checked) delete settings.wiseFetchOnOpen;
+    else settings.wiseFetchOnOpen = false;
+    state.ledger = { ...state.ledger, settings };
+    state.persistent = await saveLedger(state.ledger);
+    await record("settings", box.checked ? "Wise: fetch when the books open" : "Wise: do not fetch when the books open", before, settings);
+  });
+  label.append(box, " Fetch new transactions when OsaBooks opens");
+  return label;
+}
+
 async function fetchStatements(
   balances: readonly WiseBalanceRow[],
   chosen: Record<string, string>,
@@ -265,44 +363,15 @@ async function fetchStatements(
   fromDay: IsoDate | undefined,
   restore: boolean,
 ): Promise<void> {
-  const wanted = balances.filter((b) => (chosen[String(b.balanceId)] ?? "") !== "" && b.currency === booksCurrency());
+  const wanted = wantedBalances(balances, chosen);
   if (wanted.length === 0) {
     said.textContent = `Tick the ${booksCurrency()} balances to bring in first.`;
     return;
   }
   button.disabled = true;
   said.textContent = "Fetching from Wise…";
-  // Never before the books start, whatever day is typed.
-  const booksFrom = booksStart();
-  const start = fromDay !== undefined && (booksFrom === undefined || fromDay > booksFrom) ? fromDay : booksFrom;
-  let added = 0;
-  let skipped = 0;
-  const problems: string[] = [];
   try {
-    for (const b of wanted) {
-      const search = new URLSearchParams({
-        profileId: String(b.profileId),
-        balanceId: String(b.balanceId),
-        currency: b.currency,
-        // A week early, as the bank feed is, so nothing on the first day is
-        // missed; only lines from the start are kept.
-        ...(start ? { start: feedRequestFrom(start) } : {}),
-      });
-      const { transactions } = await call<{ transactions: WiseStatementLine[] }>(`/statement?${search.toString()}`);
-      const read = fromWise(transactions, { account: wiseAccountId(b), label: `Wise ${b.currency}` });
-      const kept = onOrAfter(read.transactions, start);
-      if (read.problems.length > 0) problems.push(`${read.problems.length} Wise ${b.currency} line(s) not read`);
-      const before = state.ledger.transactions.length;
-      const result = await addTransactions(
-        kept,
-        { importer: "wise-api", file: `Wise ${b.currency}`, problems: read.problems },
-        { restoreRemoved: restore },
-      );
-      added += state.ledger.transactions.length - before;
-      skipped += result.skippedAsRemoved;
-    }
-    // A Wise number in Xero's bank account list links its chart row now.
-    await autoLinkBankRows();
+    const { added, skipped, problems, start } = await bringIn(wanted, fromDay, restore, (c) => `Wise ${c}`);
     said.textContent =
       `${added} new line${added === 1 ? "" : "s"} from Wise. Review them on this page, and code them on Reconcile.` +
       (problems.length > 0 ? ` ${problems.join("; ")}.` : "");
