@@ -7,7 +7,7 @@ import { state } from "../state.js";
 import { taxYearEnd, taxYearEndSaid, taxYearStart } from "../tax-year.js";
 import { note } from "../ui.js";
 import { reviewDisclaimer } from "../ai-review.js";
-import { reviewsFor } from "./ai-check-page.js";
+import { aiAnswer, reviewsFor } from "./ai-check-page.js";
 import { irdSummary } from "./ird-records.js";
 import {
   codingReconciliationWaiting,
@@ -51,7 +51,7 @@ export function renderXeroCheck(body: HTMLElement, year: number): void {
   heading.className = "xcheck-title";
   heading.textContent = `Your Xero books, checked: the year to ${taxYearEndSaid(year)}`;
   const when = document.createElement("p");
-  when.className = "page-hint";
+  when.className = "page-hint xcheck-when";
   when.textContent =
     `Worked out ${new Date().toLocaleString(booksLocale())}. Each part comes from the page it links to, ` +
     "so what it says here is what that page says.";
@@ -99,8 +99,11 @@ function loadedList(): HTMLElement {
     item.className = have ? "xcheck-have" : "xcheck-missing";
     item.append(`${have ? "✓" : "○"} ${what}`);
     if (!have) {
-      item.append(" — ");
-      item.append(link(where, target));
+      // Together, so on paper the dash goes with the button it introduces.
+      const load = document.createElement("span");
+      load.className = "xcheck-load";
+      load.append(" — ", link(where, target));
+      item.append(load);
     }
     list.append(item);
   }
@@ -466,10 +469,7 @@ function aiPart(year: number): { tile: Tile; section: HTMLElement } {
   for (const r of reviews) {
     const h = document.createElement("h4");
     h.textContent = `${r.title}, pasted back ${new Date(r.at).toLocaleDateString()}`;
-    const text = document.createElement("pre");
-    text.className = "ai-prompt";
-    text.textContent = r.text;
-    section.append(h, text);
+    section.append(h, aiAnswer(r.text));
   }
   section.append(reviewDisclaimer(), linkLine("Go to the AI accounts check", () => showPage("aicheck")));
   const latest = reviews[0];
@@ -514,6 +514,7 @@ function link(text: string, page: string): HTMLElement {
 
 function linkLine(text: string, go: () => void): HTMLElement {
   const p = document.createElement("p");
+  p.className = "xcheck-go";
   const button = document.createElement("button");
   button.type = "button";
   button.className = "link-button";

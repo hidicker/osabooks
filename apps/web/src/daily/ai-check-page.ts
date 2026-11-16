@@ -4,6 +4,7 @@ import { askOnPage, note } from "../ui.js";
 import { record } from "../books.js";
 import { save } from "../store.js";
 import type { AiReview } from "../store.js";
+import { markdownToHtml } from "../markdown.js";
 import { aiAllowed } from "../ai-consent.js";
 import {
   OPENACCOUNTANTS_CONNECT,
@@ -620,6 +621,18 @@ async function keepReview(text: string, year: number, title: string): Promise<vo
   redraw("reports");
 }
 
+/**
+ * An answer as the assistant formatted it: headings, lists, bold, tables.
+ * Drawn from its Markdown, every character escaped first (`markdownToHtml`),
+ * so nothing pasted back can become markup of its own.
+ */
+export function aiAnswer(text: string): HTMLElement {
+  const box = document.createElement("div");
+  box.className = "ai-answer";
+  box.innerHTML = markdownToHtml(text);
+  return box;
+}
+
 function answerPanel(got: AiReview): HTMLElement {
   const [box, inner] = panel();
 
@@ -630,9 +643,7 @@ function answerPanel(got: AiReview): HTMLElement {
   when.textContent = `Pasted back ${new Date(got.at).toLocaleString(booksLocale())}.`;
   inner.append(heading, when);
 
-  const text = document.createElement("pre");
-  text.className = "ai-prompt";
-  text.textContent = got.text;
+  const text = aiAnswer(got.text);
 
   const forget = document.createElement("button");
   forget.type = "button";

@@ -4827,10 +4827,35 @@ select.needs-choice {
   thead { display: table-header-group; }
   th { position: static !important; background: #fff !important; }
   a { color: inherit; text-decoration: none; }
+  /* A page that is not showing is not printed: forcing every page to show
+     put Start here, and every other page, in front of the report printed. */
+  .page[hidden] { display: none !important; }
   /* The summary's tiles are buttons, to jump to their part; on paper they are the summary. */
   .xcheck-tiles .xcheck-tile { display: flex !important; }
-  .xcheck-part { page-break-inside: auto; }
+  .xcheck-part { page-break-inside: avoid; break-inside: avoid; border-color: #bbb; }
+  .xcheck-tile, .xcheck-part { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  /* Xero books checked, showing: only the report goes on paper -- not the
+     menu, the bar, the report picker or anything else around it. */
+  body:has(#page-reports:not([hidden]) .xcheck) :not(:has(.xcheck)):not(.xcheck):not(.xcheck *) { display: none !important; }
+  .xcheck .xcheck-when { display: block !important; }
+  .xcheck .xcheck-load, .xcheck .xcheck-go { display: none !important; }
 }
+
+/* An AI answer, drawn from its Markdown: read as a document, not as code. */
+.ai-answer { font-size: 0.95rem; line-height: 1.5; max-width: 52rem; }
+.ai-answer h4 { font-size: 1.05rem; margin: 1rem 0 0.4rem; }
+.ai-answer h5 { font-size: 0.98rem; margin: 0.9rem 0 0.35rem; }
+.ai-answer h6 { font-size: 0.92rem; margin: 0.8rem 0 0.3rem; }
+.ai-answer > :first-child { margin-top: 0; }
+.ai-answer p { margin: 0.4rem 0 0.6rem; }
+.ai-answer ul, .ai-answer ol { margin: 0.3rem 0 0.7rem; padding-left: 1.4rem; }
+.ai-answer li { margin: 0.15rem 0; }
+.ai-answer code { font-size: 0.88em; background: var(--surface-2); padding: 0.05rem 0.3rem; border-radius: 4px; }
+.ai-answer pre { background: var(--surface-2); padding: 0.6rem 0.8rem; border-radius: var(--radius); overflow-x: auto; }
+.ai-answer pre code { background: none; padding: 0; }
+.ai-answer blockquote { margin: 0.5rem 0; padding: 0.1rem 0.8rem; border-left: 3px solid var(--border); color: var(--muted); }
+.ai-answer .md-table { margin: 0.5rem 0 0.8rem; }
+.ai-answer hr { border: none; border-top: 1px solid var(--border); margin: 1rem 0; }
 
 /* Xero books checked: tiles at the top, a part for each check below. */
 .xcheck-title { font-size: 1.15rem; margin: 0.4rem 0 0.2rem; }
