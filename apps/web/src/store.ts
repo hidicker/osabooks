@@ -147,6 +147,16 @@ export interface Filing {
 }
 
 /** The books' own settings, chosen on the Settings page. */
+/** An AI review of a year, as pasted back: which year, what kind, when, and what it said. */
+export interface AiReview {
+  year: number;
+  /** "Review", or the Inland Revenue guide it was checked against ("IR3G check"). */
+  title: string;
+  /** When it was pasted back, as an ISO timestamp. */
+  at: string;
+  text: string;
+}
+
 export interface BookSettings {
   /** Days after its date a new invoice falls due. */
   invoiceDueDays?: number;
@@ -435,6 +445,12 @@ export interface StoredLedger {
    * server keep theirs in the 'reminders' part, written by the server.
    */
   remindersSent?: Record<string, number>;
+  /**
+   * AI reviews of a finished year, pasted back from the AI accounts check: the
+   * latest of each kind for each year. Somebody's reading of the books, not a
+   * fact about them, and always shown as that, dated and with its disclaimer.
+   */
+  aiReviews?: AiReview[];
   /** Messages for the foot of an invoice, to choose from; one may start each new invoice. */
   invoiceMessages?: InvoiceMessage[];
   /** Files attached to documents, journals, contacts and register lines: what each is. */
@@ -955,6 +971,7 @@ function decisionsOf(ledger: StoredLedger): Record<string, unknown> {
     ...(ledger.emailWording && Object.keys(ledger.emailWording).length > 0 ? { emailWording: ledger.emailWording } : {}),
     ...(ledger.settings && Object.keys(ledger.settings).length > 0 ? { settings: ledger.settings } : {}),
     ...(ledger.remindersSent && Object.keys(ledger.remindersSent).length > 0 ? { remindersSent: ledger.remindersSent } : {}),
+    ...(ledger.aiReviews && ledger.aiReviews.length > 0 ? { aiReviews: ledger.aiReviews } : {}),
     ...(ledger.timeApproval === true ? { timeApproval: true } : {}),
     transfers: ledger.transfers ?? {},
     legitimateDuplicates: ledger.legitimateDuplicates ?? [],

@@ -1,6 +1,7 @@
 import { renderAuRentalSchedule, renderAuTax, renderBas, renderContractors, renderKrBusiness, renderKrRental, renderKrTax, renderKrVat, renderScheduleC, renderBudgetVsActual, renderProfitByClass, renderProfitByJob, renderPayrollTax, renderSalesTax, renderScheduleE, renderUsTax } from "./country-reports.js";
 import { attachmentsControl } from "./attachments-ui.js";
 import { renderDashboard } from "./dashboard-report.js";
+import { renderXeroCheck } from "./xero-check-report.js";
 import { comparing, drawPeriodControls, earlierRange, periodFileName, periodHeading, reportRange } from "./report-period.js";
 import { bestAccountMatch, cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell, localToday } from "@nzosa/core";
 import type { OpeningBalances, OwingDocument } from "@nzosa/core";
@@ -4482,6 +4483,7 @@ const REPORT_DESCRIPTIONS: Record<string, string> = {
   byitem: "What each product or service sold for in the period, and how many, from the invoice lines. Invoices and sales receipts only.",
   agedreceivables: "What each customer owes on a day, by how late, agreed to Accounts Receivable.",
   charts: "The year's income and spending, month by month.",
+  xerocheck: "Your books brought in from Xero, checked: every account, the GST returns, Inland Revenue's own figures, the coding and the AI accounts check, on one page to send to your accountant.",
   dashboard: "The books at a glance: the bank, what is owed each way, the year's profit, invoices by status and this month against last. Worked out when opened; Refresh brings it up to date.",
   schedulee: "Each rental property on Schedule E's lines, from its own accounts.",
   schedulec: "The business on Schedule C's lines, with the estimated tax dates.",
@@ -4776,12 +4778,14 @@ function renderReportsHome(body: HTMLElement): void {
       rows.push(pageItem(entry));
       placed.add(entry.name);
     }
+    // The extract and the package go with the checks, whichever way that
+    // group comes to be listed.
+    if (group.label === "Checks and history") rows.push(excelExtractItem(), packageItem());
     section(group.label, rows);
   }
   // Groups the report picker has no reports in, listed after the rest.
   for (const label of [...new Set(elsewhere.filter((e) => !placed.has(e.name)).map((e) => e.group))]) {
     const rows = elsewhere.filter((e) => e.group === label && !placed.has(e.name)).map(pageItem);
-    if (label === "Checks and history") rows.push(excelExtractItem(), packageItem());
     section(label, rows);
   }
 }
@@ -5125,6 +5129,12 @@ export function renderReportsPage(): void {
   if (kind === "dashboard") {
     ownerSelect.hidden = true;
     if (chosenYearNow !== undefined) renderDashboard(body, chosenYearNow);
+    return;
+  }
+
+  if (kind === "xerocheck") {
+    ownerSelect.hidden = true;
+    if (chosenYearNow !== undefined) renderXeroCheck(body, chosenYearNow);
     return;
   }
 

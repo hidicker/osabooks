@@ -373,6 +373,7 @@ export {
 export type { GeneralLedgerRow, GeneralLedgerOptions } from "./general-ledger.js";
 export * from "./ir10.js";
 export * from "./balance-sheet.js";
+export * from "./xero-check.js";
 export * from "./financial-years.js";
 export * from "./depreciation-journals.js";
 export * from "./disposal-journals.js";

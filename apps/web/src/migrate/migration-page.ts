@@ -1,5 +1,6 @@
 import { ASKED, MODULES, moduleOn, modulesPanel, previousSystem } from "../modules.js";
 import { showPage } from "../app.js";
+import { openReport } from "../menu.js";
 import { countryBox } from "./setup-wizard.js";
 import { booksCountry, noSalesTax } from "../country.js";
 import { countryLocked, isStarterChart } from "../new-books-country.js";
@@ -2249,11 +2250,24 @@ function doneQuestion(number: number, held: Onboarding): HTMLElement {
     );
   }
 
+  // Books from Xero: the report that sets them beside Xero, recommended now
+  // and complete once the coding has been worked through.
+  const fromXero = moduleOn("xero");
+  if (fromXero) {
+    points.push(
+      "When the lines are worked through on Coding reconciliation, Reports → Xero books checked sums up " +
+        "what agrees with Xero and what does not: every account, the GST returns, Inland Revenue's own " +
+        "figures and the AI accounts check, on one page. It is worth sending to your accountant. Open it " +
+        "any time; until then it says what is still to do.",
+    );
+  }
+
   inner.append(
     advice(...points),
     actions(
       button("Continue to Initial set-up →", () => showPage("setup", "top"), true),
       ...(several ? [button("Entities & accounts", () => showPage("entities"))] : []),
+      ...(fromXero ? [button("Xero books checked", () => openReport("xerocheck"))] : []),
     ),
   );
   return box;

@@ -914,6 +914,25 @@ export function ledgerAccountFor(name: string, account?: Account): string | null
 }
 
 /**
+ * The account each numbered bank row of the chart is, where its lines are
+ * imported under one: "090" to the account Xero's "Business Bank Account"
+ * lines came in as. Another system numbers its banks where this ledger keys
+ * them by the account, so anything read from it -- its trial balance, its
+ * journals -- is put under the ledger's key through this.
+ */
+export function bankAccountsByCode(): Map<string, string> {
+  const { accounts } = banks();
+  const byCode = new Map<string, string>();
+  for (const row of state.chart) {
+    const code = row.code.trim();
+    if (code === "" || row.type.trim().toLowerCase() !== "bank") continue;
+    const id = ledgerAccountFor(row.name, row);
+    if (id !== null && id !== code && accounts.has(id)) byCode.set(code, id);
+  }
+  return byCode;
+}
+
+/**
  * Move opening balances held under a bank's chart code onto the account its
  * lines are imported under, where the chart's bank row is linked to one.
  *
@@ -926,14 +945,7 @@ export function ledgerAccountFor(name: string, account?: Account): string | null
 export function settleBankOpeningBalances(): boolean {
   const held = state.ledger.openingBalances;
   if (held === undefined) return false;
-  const { accounts } = banks();
-  const byCode = new Map<string, string>();
-  for (const row of state.chart) {
-    const code = row.code.trim();
-    if (code === "" || row.type.trim().toLowerCase() !== "bank") continue;
-    const id = ledgerAccountFor(row.name, row);
-    if (id !== null && id !== code && accounts.has(id)) byCode.set(code, id);
-  }
+  const byCode = bankAccountsByCode();
   if (byCode.size === 0) return false;
   const { balances, moved } = relabelOpeningBalances(held, (key) => byCode.get(key.trim()));
   if (moved.length === 0) return false;

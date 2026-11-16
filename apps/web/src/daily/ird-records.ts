@@ -338,6 +338,37 @@ function filingPanel(): HTMLElement {
   return wrap;
 }
 
+/** One Inland Revenue record's checks, counted, for a summary of the books. */
+export interface IrdRecordSummary {
+  /** What it is: "GST return summary, Harbour Lane Bakery". */
+  what: string;
+  /** The periods it covers. */
+  when: string;
+  agrees: number;
+  differs: number;
+  notHeld: number;
+  /** The rows that differ, as the IRD records page shows them. */
+  differences: IrdCheck[];
+}
+
+/**
+ * Every Inland Revenue record kept, with its checks counted: the same checks
+ * the IRD records page shows, so a summary and the page cannot disagree.
+ */
+export function irdSummary(): IrdRecordSummary[] {
+  return (state.ledger.irdRecords ?? []).map((one) => {
+    const checks = checksFor(one);
+    return {
+      what: describe(one),
+      when: range(one),
+      agrees: checks.filter((c) => c.status === "agrees").length,
+      differs: checks.filter((c) => c.status === "differs").length,
+      notHeld: checks.filter((c) => c.status === "not-held").length,
+      differences: checks.filter((c) => c.status === "differs"),
+    };
+  });
+}
+
 export function renderIrdRecords(): void {
   const body = $("ird-body");
   body.textContent = "";

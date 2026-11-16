@@ -4827,7 +4827,35 @@ select.needs-choice {
   thead { display: table-header-group; }
   th { position: static !important; background: #fff !important; }
   a { color: inherit; text-decoration: none; }
+  /* The summary's tiles are buttons, to jump to their part; on paper they are the summary. */
+  .xcheck-tiles .xcheck-tile { display: flex !important; }
+  .xcheck-part { page-break-inside: auto; }
 }
+
+/* Xero books checked: tiles at the top, a part for each check below. */
+.xcheck-title { font-size: 1.15rem; margin: 0.4rem 0 0.2rem; }
+.xcheck-loaded { list-style: none; padding: 0; margin: 0.6rem 0 1rem; display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 0.2rem 1rem; font-size: 0.9rem; }
+.xcheck-loaded .xcheck-missing { color: var(--muted); }
+.xcheck-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 0.6rem; margin: 0 0 1.2rem; }
+.xcheck-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 0.25rem; text-align: left;
+  padding: 0.7rem 0.85rem; border-radius: var(--radius); border: 1px solid var(--border); cursor: pointer;
+  background: var(--surface); }
+.xcheck-tile strong { font-size: 1.02rem; }
+.xcheck-tile-label { font-size: 0.8rem; color: var(--muted); }
+.xcheck-tile.xcheck-good { border-color: color-mix(in srgb, var(--in) 45%, var(--border));
+  background: color-mix(in srgb, var(--in) 8%, var(--surface)); }
+.xcheck-tile.xcheck-look { border-color: color-mix(in srgb, var(--review) 50%, var(--border));
+  background: color-mix(in srgb, var(--review) 9%, var(--surface)); }
+.xcheck-part { border: 1px solid var(--border); border-radius: var(--radius); padding: 0.8rem 1.1rem 0.9rem;
+  margin: 0 0 1rem; background: var(--surface); }
+.xcheck-part > h3 { font-size: 1.05rem; margin: 0 0 0.5rem; }
+.xcheck-part h4 { font-size: 0.98rem; margin: 1rem 0 0.35rem; }
+.xcheck-said { margin: 0.3rem 0 0.6rem; font-weight: 600; }
+.xcheck-said.xcheck-good, .xcheck-ok { color: var(--in); }
+.xcheck-said.xcheck-look, .xcheck-look { color: var(--review); }
+.xcheck-list { margin: 0.4rem 0; padding-left: 1.2rem; }
+.xcheck-table { margin: 0.4rem 0 0.6rem; }
 
 /* Notes that go by themselves: news that needs no answer. */
 #brief-notes { position: fixed; right: 18px; bottom: 18px; z-index: 50; display: flex; flex-direction: column; gap: 8px; max-width: min(380px, calc(100vw - 36px)); }

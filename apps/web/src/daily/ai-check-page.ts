@@ -1,6 +1,9 @@
 import { redraw, showPage } from "../app.js";
-import { $ } from "../state.js";
-import { note } from "../ui.js";
+import { $, state } from "../state.js";
+import { askOnPage, note } from "../ui.js";
+import { record } from "../books.js";
+import { save } from "../store.js";
+import type { AiReview } from "../store.js";
 import { aiAllowed } from "../ai-consent.js";
 import {
   OPENACCOUNTANTS_CONNECT,
@@ -14,7 +17,7 @@ import { downloadExcelReport } from "./excel-export.js";
 import { IRD_FORMS_INDEX, IRD_GUIDES, guidePrompt, guidesForBooks } from "../ai-guides.js";
 import type { GuideId } from "../ai-guides.js";
 import { taxYearEndSaid } from "../tax-year.js";
-import { booksCountry, noSalesTax } from "../country.js";
+import { booksCountry, booksLocale, noSalesTax } from "../country.js";
 
 /**
  * A year-end check of the accounts, against New Zealand tax rules.
@@ -50,7 +53,6 @@ import { booksCountry, noSalesTax } from "../country.js";
  * a year nobody had asked about.
  */
 let chosenYear = 0;
-let result: { text: string; year: number; title: string } | null = null;
 /** Which of Inland Revenue's guides is chosen for the guide check. */
 let chosenGuide: GuideId | "" = "";
 
@@ -98,7 +100,7 @@ export function renderAiCheck(): void {
       : []),
   );
 
-  if (result !== null) body.append(answerPanel(result));
+  for (const review of reviewsFor(chosenYear)) body.append(answerPanel(review));
   body.append(reviewDisclaimer());
 }
 
@@ -340,13 +342,13 @@ function carryPanel(pickYear: HTMLSelectElement): HTMLElement {
 
   const read = document.createElement("button");
   read.type = "button";
-  read.textContent = "Keep it on screen";
+  read.textContent = "Keep it with the books";
   read.addEventListener("click", () => {
     const text = answer.value.trim();
     if (text === "") return;
-    result = { text, year: Number(pickYear.value), title: "Review" };
-    answer.value = "";
-    redraw("aiCheck");
+    void keepReview(text, Number(pickYear.value), "Review").then(() => {
+      answer.value = "";
+    });
   });
 
   wrap.append(backHeading, answer, actions([read]));
@@ -562,12 +564,13 @@ function guidePanel(pickYear: HTMLSelectElement): HTMLElement {
   answer.placeholder = `The ${guide.id} check, as the assistant wrote it`;
   const keep = document.createElement("button");
   keep.type = "button";
-  keep.textContent = "Keep it on screen";
+  keep.textContent = "Keep it with the books";
   keep.addEventListener("click", () => {
     const text = answer.value.trim();
     if (text === "") return;
-    result = { text, year: Number(pickYear.value), title: `${guide.id} check` };
-    redraw("aiCheck");
+    void keepReview(text, Number(pickYear.value), `${guide.id} check`).then(() => {
+      answer.value = "";
+    });
   });
 
   wrap.append(
@@ -594,19 +597,38 @@ function guidePanel(pickYear: HTMLSelectElement): HTMLElement {
 // --- what came back --------------------------------------------------------
 
 /**
- * The answer, held on the page and nowhere else.
+ * The answers kept for a year: the latest of each kind, newest first.
  *
- * A review is somebody's reading of the books, not a fact about them. Written
- * into the ledger it would be indistinguishable a year later from something
- * the books themselves say, so it is not written into the ledger. Closing the
- * page loses it, which is the right trade.
+ * A review is somebody's reading of the books, not a fact about them, so it
+ * is kept apart from the figures (`aiReviews`), always shown dated and with
+ * its disclaimer, and never read by anything that works a figure out. Kept at
+ * all so the summary of the books can show it, and an accountant opening the
+ * books can read what was asked and what came back.
  */
-function answerPanel(got: { text: string; year: number; title: string }): HTMLElement {
+export function reviewsFor(year: number): AiReview[] {
+  return (state.ledger.aiReviews ?? []).filter((r) => r.year === year).sort((a, b) => b.at.localeCompare(a.at));
+}
+
+/** Keep an answer pasted back, in place of any earlier one of the same kind for the year. */
+async function keepReview(text: string, year: number, title: string): Promise<void> {
+  const before = state.ledger.aiReviews ?? [];
+  const aiReviews = [...before.filter((r) => !(r.year === year && r.title === title)), { year, title, at: new Date().toISOString(), text }];
+  state.ledger = { ...state.ledger, aiReviews };
+  state.persistent = await save(state.ledger);
+  await record("aiReviews", `${title} of the year to ${taxYearEndSaid(year)} kept`, before, aiReviews);
+  redraw("aiCheck");
+  redraw("reports");
+}
+
+function answerPanel(got: AiReview): HTMLElement {
   const [box, inner] = panel();
 
   const heading = document.createElement("h3");
   heading.textContent = `${got.title} of the year to ${taxYearEndSaid(got.year)}`;
-  inner.append(heading);
+  const when = document.createElement("p");
+  when.className = "page-hint";
+  when.textContent = `Pasted back ${new Date(got.at).toLocaleString(booksLocale())}.`;
+  inner.append(heading, when);
 
   const text = document.createElement("pre");
   text.className = "ai-prompt";
@@ -614,10 +636,16 @@ function answerPanel(got: { text: string; year: number; title: string }): HTMLEl
 
   const forget = document.createElement("button");
   forget.type = "button";
-  forget.textContent = "Clear it";
-  forget.addEventListener("click", () => {
-    result = null;
+  forget.textContent = "Remove it";
+  forget.addEventListener("click", async () => {
+    if (!(await askOnPage(`Remove this ${got.title.toLowerCase()} from the books? It can be undone from History.`))) return;
+    const before = state.ledger.aiReviews ?? [];
+    const aiReviews = before.filter((r) => r !== got);
+    state.ledger = { ...state.ledger, aiReviews };
+    state.persistent = await save(state.ledger);
+    await record("aiReviews", `${got.title} of the year to ${taxYearEndSaid(got.year)} removed`, before, aiReviews);
     redraw("aiCheck");
+    redraw("reports");
   });
 
   inner.append(text, reviewDisclaimer(), actions([forget]));

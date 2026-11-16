@@ -41,6 +41,8 @@ function reportKinds() {
 const NO_DOWNLOAD = new Set([
   "home",
   "dashboard",
+  // A summary to print or save as PDF, as the dashboard is.
+  "xerocheck",
   "cashflow",
   "shareholders",
   "ir10",
