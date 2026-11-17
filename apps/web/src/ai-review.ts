@@ -1,6 +1,6 @@
 import { moduleOn } from "./modules.js";
 import { bookYears, gstBasis, postedJournals, varianceInput } from "./books.js";
-import { ir3For, rentalSchedulesFor, reportLookups } from "./daily/reports.js";
+import { ir3For, manualJournalEvents, postedOf, rentalSchedulesFor, reportLookups } from "./daily/reports.js";
 import { state } from "./state.js";
 import { note } from "./ui.js";
 import { computeOurReturns } from "./variance.js";
@@ -13,6 +13,7 @@ import {
   ownersOf,
 } from "@nzosa/core";
 import type { GstReturnResult } from "@nzosa/core";
+import { changesForYear } from "@nzosa/core";
 import { taxYearEnd, taxYearEndSaid, taxYearStart, taxYearStartSaid } from "./tax-year.js";
 import { booksCountry } from "./country.js";
 import { countryReportSheets } from "./daily/country-reports.js";
@@ -748,6 +749,61 @@ function invoicesBlock(period: Period): string[] {
   ];
 }
 
+/**
+ * The year's manual and year-end journals, each as it was written: the
+ * narration and each line's note -- an accountant's reasons, which no total
+ * shows -- who posted it and when, and what Xero's History and notes says
+ * happened to it, files attached included. The adjustments are where a year's
+ * judgements are, and a review given only the totals cannot see them.
+ */
+function manualJournalsBlock(period: Period): string[] {
+  const all = state.ledger.manualJournals ?? [];
+  const inYear = all.filter((j) => j.deleted === undefined && j.date >= period.from && j.date <= period.to);
+  if (inYear.length === 0) return [];
+  const lines = [`Manual and year-end journals this year (${inYear.length}), as written:`];
+  for (const journal of [...inYear].sort((a, b) => a.date.localeCompare(b.date)).slice(0, 40)) {
+    const posted = postedOf(journal);
+    lines.push(
+      `- ${journal.date}: ${journal.narration}` +
+        (journal.adjusting === true ? " [adjusting]" : "") +
+        (journal.reverses !== undefined ? " [a reversal]" : "") +
+        (posted !== null ? ` (posted in Xero by ${posted.by} on ${posted.date})` : ""),
+    );
+    for (const line of journal.lines.filter((l) => l.amount !== 0)) {
+      const said = (line.description ?? "").trim();
+      lines.push(
+        `    ${line.amount > 0 ? "Dr" : "Cr"} ${line.code}: ${money(Math.abs(line.amount))}` +
+          (said !== "" && said !== journal.narration.trim() ? ` -- note: ${said}` : ""),
+      );
+    }
+    const { events, shared } = manualJournalEvents(journal, all);
+    if (events.length > 0) {
+      lines.push(
+        `    Xero's history that day${shared ? " (more than one journal posted that day; these may be shared)" : ""}: ` +
+          events.map((e) => `${e.at.slice(11, 16)} ${e.detail}`).join("; "),
+      );
+    }
+  }
+  if (inYear.length > 40) lines.push(`- ...and ${inYear.length - 40} more`);
+  return lines;
+}
+
+/**
+ * What was changed in Xero about this year, from its History and notes: GST
+ * returns' boxes changed and returns filed, lock dates moved, lines recoded in
+ * bulk, journals voided or edited after they were posted, notes written. Made
+ * in the year, or in the year after while it was being finished.
+ */
+function xeroChangesBlock(period: Period): string[] {
+  const changes = changesForYear(state.ledger.xeroHistory ?? [], period);
+  if (changes.length === 0) return [];
+  return [
+    `Changes made in Xero about this year, from its History and notes (${changes.length}):`,
+    ...changes.slice(0, 60).map((e) => `- ${e.at.replace("T", " ")} ${e.user}, ${e.type}: ${e.detail}`),
+    ...(changes.length > 60 ? [`- ...and ${changes.length - 60} more`] : []),
+  ];
+}
+
 // --- the three prompts -----------------------------------------------------
 
 /** Which kinds of entity these books hold, which decides what is worth asking. */
@@ -794,6 +850,8 @@ export function reviewFacts(year: number): string[] {
     ...section(tripsBlock(period)),
     ...section(agentStatementsBlock(period)),
     ...section(invoicesBlock(period)),
+    ...section(manualJournalsBlock(period)),
+    ...section(xeroChangesBlock(period)),
     ...accountTotals(period),
     ...uncodedBlock(period),
   ];
@@ -818,6 +876,19 @@ export function reviewPrompt(year: number): string {
     "- What is missing entirely: a category of cost this kind of entity always has and these",
     "  books do not.",
     "",
+    ...(manualJournalsBlock(periodOf(year)).length > 0 || xeroChangesBlock(periodOf(year)).length > 0
+      ? [
+          "Manual and year-end adjustments",
+          "- Each manual journal listed above: whether what its narration and notes say it does is",
+          "  what its lines do, whether the treatment is right, and what it rests on (the files",
+          "  attached in Xero, where the history names them). Say which you would ask the person who",
+          "  posted it about, and what you would ask.",
+          "- Anything changed after the fact in the history: journals edited or voided after posting,",
+          "  a GST return's boxes changed before filing, a year's lock date moved back. Say what each",
+          "  suggests was corrected, and whether the books show the correction.",
+          "",
+        ]
+      : []),
     ...(tax === null
       ? [
           "Sales tax",

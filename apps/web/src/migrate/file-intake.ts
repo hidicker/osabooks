@@ -31,7 +31,10 @@ import {
   parseXeroJournalReport,
   contactsFromDocuments,
   mergeContacts,
+  mergeXeroHistory,
+  readXeroHistory,
   validateInvoices,
+  xeroHistoryWorthKeeping,
 } from "@nzosa/core";
 import type { Identified, Journal } from "@nzosa/core";
 
@@ -457,6 +460,9 @@ async function loadEach(
         case "aged-detail":
           say(`${file.name} \u2014 ${await loadOpeningDocuments(file)}`);
           continue;
+        case "xero-history":
+          say(`${file.name} \u2014 ${await loadXeroHistory(file)}`);
+          continue;
         default:
           // Dates and amounts, in a layout nothing knows: a bank's file, to
           // have its columns pointed out on Bank import.
@@ -491,6 +497,37 @@ async function loadEach(
   // Only reachable from Setup today, but named by page rather than by hand for
   // the same reason as above: the next thing to call this may not be.
   showPage(state.page);
+}
+
+/**
+ * Xero's History and notes, kept for what it says was done there: what
+ * happened to the manual journals, the GST returns changed and filed, lock
+ * dates moved, lines recoded, notes written. Each file adds what the ones
+ * before did not have, so several smaller exports make one history.
+ */
+export async function loadXeroHistory(file: File): Promise<string> {
+  const read = readXeroHistory(await asCsvText(file.name, new Uint8Array(await file.arrayBuffer())));
+  if (read === null) return "not read as Xero's History and notes.";
+  const worth = read.entries.filter(xeroHistoryWorthKeeping);
+  const before = state.ledger.xeroHistory ?? [];
+  const { entries, added } = mergeXeroHistory(before, worth);
+  if (added > 0) {
+    state.ledger = { ...state.ledger, xeroHistory: entries };
+    state.persistent = await save(state.ledger);
+    await record("xeroHistory", `${added} entries from Xero's History and notes (${file.name})`, before, entries);
+  }
+  const left = read.entries.length - worth.length;
+  return (
+    `Xero's History and notes: ${added} entr${added === 1 ? "y" : "ies"} kept about manual journals, GST returns, ` +
+    `settings, accounts, recodes and notes` +
+    (left > 0 ? `; ${left} about reconciling, invoices and the like left out` : "") +
+    (added < worth.length ? `; ${worth.length - added} already held` : "") +
+    "." +
+    (read.cutShort
+      ? " It stops at 1,000 entries, which is Xero's limit: the earlier history is missing. Export again with fewer types " +
+        "chosen (Manual journal, Tax Return, Financial settings, History event) or a shorter date range."
+      : "")
+  );
 }
 
 export function clearCheck(): void {

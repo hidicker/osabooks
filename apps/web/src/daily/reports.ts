@@ -4,7 +4,8 @@ import { renderDashboard } from "./dashboard-report.js";
 import { renderXeroCheck } from "./xero-check-report.js";
 import { comparing, drawPeriodControls, earlierRange, periodFileName, periodHeading, reportRange } from "./report-period.js";
 import { bestAccountMatch, cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell, localToday } from "@nzosa/core";
-import type { OpeningBalances, OwingDocument } from "@nzosa/core";
+import type { IsoDate, OpeningBalances, OwingDocument, XeroHistoryEntry } from "@nzosa/core";
+import { manualJournalHistory } from "@nzosa/core";
 import { computeOurReturns } from "../variance.js";
 import { renderCashFlow } from "./cash-flow-report.js";
 import { INCOME_HEAD, incomeRows } from "./income-rows.js";
@@ -539,6 +540,45 @@ export function startNewJournal(): void {
   redraw("reports");
 }
 
+/** Who posted a journal read from Xero, and when: kept on it, or read from the journal report. */
+export function postedOf(journal: ManualJournal): { date: IsoDate; by: string } | null {
+  if (journal.posted !== undefined) return journal.posted;
+  const there = (state.ledger.journals ?? []).find((j) => j.id === journal.id);
+  if (there === undefined || there.postedDate === null || there.postedBy.trim() === "") return null;
+  return { date: there.postedDate, by: there.postedBy.trim() };
+}
+
+/**
+ * What Xero's History and notes says happened to a manual journal: the events
+ * on the day it was posted, by whoever posted it. The report names no journal,
+ * so where that person posted another the same day, it says the events may be
+ * the other's.
+ */
+export function manualJournalEvents(journal: ManualJournal, all: readonly ManualJournal[]): { events: XeroHistoryEntry[]; shared: boolean } {
+  const posted = postedOf(journal);
+  if (posted === null) return { events: [], shared: false };
+  const others = all.filter((j) => j !== journal && j.deleted === undefined && (() => {
+    const p = postedOf(j);
+    return p !== null && p.date === posted.date && p.by === posted.by;
+  })()).length;
+  return manualJournalHistory(state.ledger.xeroHistory ?? [], posted, others);
+}
+
+/** Lines saying who posted a journal in Xero, and what its history says. */
+function postedAndHistory(journal: ManualJournal, all: readonly ManualJournal[]): string[] {
+  const posted = postedOf(journal);
+  if (posted === null) return [];
+  const out = [`Posted in Xero by ${posted.by} on ${posted.date}.`];
+  const { events, shared } = manualJournalEvents(journal, all);
+  if (events.length > 0) {
+    const said = events.map((e) => `${e.at.slice(11, 16)} ${e.detail}`).join("; ");
+    out.push(
+      `Xero's history that day${shared ? ` (${posted.by} posted more than one journal that day, so some of these may be another's)` : ""}: ${said}.`,
+    );
+  }
+  return out;
+}
+
 function renderManualJournals(body: HTMLElement, year: number): void {
   const from = taxYearStart(year);
   const to = taxYearEnd(year);
@@ -668,8 +708,12 @@ function renderManualJournals(body: HTMLElement, year: number): void {
       tbody.append(row);
     };
     for (const line of journal.lines) {
+      // The line's own note, as the accountant wrote it ("previous years ?"),
+      // where it says more than the journal's narration.
+      const said = (line.description ?? "").trim();
+      const noted = said !== "" && said !== journal.narration.trim() ? ` — ${said}` : "";
       if (line.gst === undefined || line.amount === 0) {
-        drawLine(line.code, line.amount);
+        drawLine(`${line.code}${noted}`, line.amount);
         continue;
       }
       const { net, tax } = splitManualGst(line.amount);
@@ -686,6 +730,7 @@ function renderManualJournals(body: HTMLElement, year: number): void {
     if (journal.source !== undefined && journal.source !== "") {
       card.append(note(journal.source));
     }
+    for (const line of postedAndHistory(journal, held)) card.append(note(line));
 
     // Which journal reversed which, both ways, so neither is read alone.
     const reversed = all.find((j) => j.reverses === journal.id && j.deleted === undefined);

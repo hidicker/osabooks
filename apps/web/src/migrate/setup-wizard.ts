@@ -636,6 +636,15 @@ export function xeroMigrationFiles(): SourceFile[] {
       have: (led.journals ?? []).length > 0,
       page: "reports",
     },
+    {
+      what: "History and notes",
+      where:
+        "Settings → History and notes, all dates, types Manual journal, Tax Return, Financial settings and History event " +
+        "(not Asset: its depreciation runs fill Xero's 1,000-row limit) → Export",
+      why: "What was changed after the fact: journals edited or voided, GST boxes changed, lock dates moved",
+      have: (led.xeroHistory ?? []).length > 0,
+      page: "setup",
+    },
     // Xero New Zealand's filed GST reports; Australia's activity statements
     // are not read, so not asked for.
     ...(booksCountry().id === "nz"

@@ -15,6 +15,7 @@ import { isProductList } from "./product-lists.js";
 import { isDueDateList } from "./document-dates.js";
 import { isQuickBooksTrialBalance } from "./trial-balance.js";
 import { isContactList } from "./contact-lists.js";
+import { isXeroHistory } from "./xero-history.js";
 
 /**
  * What kind of export a file is, worked out from its columns.
@@ -67,6 +68,7 @@ export type ExportKind =
   | "product-list"
   | "due-dates"
   | "contact-list"
+  | "xero-history"
   | "not-needed"
   | "unknown";
 
@@ -216,6 +218,9 @@ export function quickBooksReport(text: string): { title: string; empty: boolean 
  * by the caller, which is how every reader here takes them.
  */
 export function identifyExport(text: string): Identified {
+  // Xero's History and notes: who changed what, and when. First, as its rows
+  // carry a date and could be taken for something else.
+  if (isXeroHistory(text)) return { kind: "xero-history", what: "Xero's History and notes" };
   // QuickBooks Online's own two exports. Before everything else: the general
   // ledger carries a date and an amount like any statement, and read as one it
   // would put every account's postings in as bank lines.

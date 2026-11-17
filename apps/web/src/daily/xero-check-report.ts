@@ -1,4 +1,4 @@
-import { balancesOn, compareBalances, localToday, movementsBetween, postedFromImported, sectionForType } from "@nzosa/core";
+import { balancesOn, changesForYear, compareBalances, localToday, movementsBetween, postedFromImported, sectionForType } from "@nzosa/core";
 import type { AccountComparison, AccountDifference, Cents, IsoDate } from "@nzosa/core";
 import { showPage } from "../app.js";
 import { bankAccountsByCode, bankLabel, ledgerAccountFor, postedJournals, recomputeVariance } from "../books.js";
@@ -68,7 +68,7 @@ export function renderXeroCheck(body: HTMLElement, year: number): void {
     group(
       "Your Xero books checked against OsaBooks",
       "Xero's own figures, coding and GST returns, set beside what these books work out from the same bank lines.",
-      [accounts.section, gst.section, coding.section],
+      [accounts.section, gst.section, coding.section, changesPart(year)],
     ),
     group(
       "Your books checked against Inland Revenue filings",
@@ -105,6 +105,7 @@ function loadedList(): HTMLElement {
     [(state.ledger.invoices ?? []).length > 0, "Invoices and bills", "Load them on Invoices", "invoices"],
     [state.ledger.transactions.length > 0, "Bank lines", "Bring them in on Bank import", "import"],
     [(state.ledger.irdRecords ?? []).length > 0, "Inland Revenue (myIR) files", "Load them on IRD records", "ird"],
+    [(state.ledger.xeroHistory ?? []).length > 0, "Xero's History and notes", "Load it on Initial set-up", "setup"],
   ];
   for (const [have, what, where, target] of items) {
     const item = document.createElement("li");
@@ -468,6 +469,51 @@ function codingPart(): { tile: Tile; section: HTMLElement } {
     },
     section,
   };
+}
+
+// --- what was changed in Xero -------------------------------------------------
+
+/**
+ * What was done in Xero about the year after the fact, from its History and
+ * notes: the part the comparisons cannot explain on their own -- a GST
+ * return's box changed before it was filed, a journal voided and written
+ * again, a year's lock date moved back.
+ */
+function changesPart(year: number): HTMLElement {
+  const section = part("What was changed in Xero", "xcheck-changes");
+  const held = state.ledger.xeroHistory ?? [];
+  if (held.length === 0) {
+    section.append(
+      note(
+        "Load Xero's History and notes to see what was done in Xero after the fact: journals edited or voided, " +
+          "GST returns' boxes changed, lock dates moved, lines recoded. In Xero: Settings, then History and notes; " +
+          "choose the types Manual journal, Tax Return, Financial settings and History event, and export.",
+      ),
+    );
+    return section;
+  }
+  const changes = changesForYear(held, { from: taxYearStart(year) as IsoDate, to: taxYearEnd(year) as IsoDate });
+  if (changes.length === 0) {
+    section.append(said("Nothing in Xero's history was changed about this year after the fact.", "good"));
+    return section;
+  }
+  section.append(said(`${changes.length} change${changes.length === 1 ? "" : "s"} made in Xero about this year:`, "look"));
+  const table = document.createElement("table");
+  table.className = "report-table xcheck-table";
+  table.innerHTML = "<thead><tr><th>When</th><th>Who</th><th>What</th></tr></thead>";
+  const tbody = document.createElement("tbody");
+  for (const e of changes) {
+    const tr = document.createElement("tr");
+    for (const text of [`${daySaid(e.at.slice(0, 10))} ${e.at.slice(11, 16)}`, e.user, `${e.type}: ${e.detail}`]) {
+      const td = document.createElement("td");
+      td.textContent = text;
+      tr.append(td);
+    }
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  section.append(table, note("Made during the year, or in the year after it while the year was being finished."));
+  return section;
 }
 
 // --- the AI accounts check ----------------------------------------------------

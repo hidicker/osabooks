@@ -86,6 +86,8 @@ export interface ManualJournal {
    * out, rather than finding nothing at all.
    */
   deleted?: { at: string; by: string };
+  /** Who posted it in the other system, and on what day, where it was read from one. */
+  posted?: { date: IsoDate; by: string };
 }
 
 /** What is wrong with a manual journal. Named apart from the report reader's. */
@@ -297,6 +299,9 @@ export function manualJournalsIn(journals: readonly Journal[]): ManualJournal[] 
           ...(l.description ? { description: l.description } : {}),
         })),
       source: "imported from the journal report",
+      ...(journal.postedDate !== null && journal.postedBy.trim() !== ""
+        ? { posted: { date: journal.postedDate, by: journal.postedBy.trim() } }
+        : {}),
     });
   }
   return out;

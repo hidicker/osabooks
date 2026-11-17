@@ -1,5 +1,5 @@
 import { applyPartOps, copySize, entityId, partChanges, partCopy, writeQueue } from "@nzosa/core";
-import type { Attachment, CreditAllocation, JobsHeld, LockedChange, PartCopy, PartOp, SuggestionDone, Wording, WordingKind } from "@nzosa/core";
+import type { Attachment, CreditAllocation, JobsHeld, LockedChange, PartCopy, PartOp, SuggestionDone, Wording, WordingKind, XeroHistoryEntry } from "@nzosa/core";
 import type {
   AuPayroll,
   UsPayroll,
@@ -451,6 +451,13 @@ export interface StoredLedger {
    * fact about them, and always shown as that, dated and with its disclaimer.
    */
   aiReviews?: AiReview[];
+  /**
+   * What Xero's History and notes report says was done in the books there:
+   * manual journals created, edited or voided, GST returns changed and filed,
+   * lock dates moved, lines recoded, notes written. Only those entries; the
+   * run of reconciling and reminders is not kept.
+   */
+  xeroHistory?: XeroHistoryEntry[];
   /** Messages for the foot of an invoice, to choose from; one may start each new invoice. */
   invoiceMessages?: InvoiceMessage[];
   /** Files attached to documents, journals, contacts and register lines: what each is. */
@@ -972,6 +979,7 @@ function decisionsOf(ledger: StoredLedger): Record<string, unknown> {
     ...(ledger.settings && Object.keys(ledger.settings).length > 0 ? { settings: ledger.settings } : {}),
     ...(ledger.remindersSent && Object.keys(ledger.remindersSent).length > 0 ? { remindersSent: ledger.remindersSent } : {}),
     ...(ledger.aiReviews && ledger.aiReviews.length > 0 ? { aiReviews: ledger.aiReviews } : {}),
+    ...(ledger.xeroHistory && ledger.xeroHistory.length > 0 ? { xeroHistory: ledger.xeroHistory } : {}),
     ...(ledger.timeApproval === true ? { timeApproval: true } : {}),
     transfers: ledger.transfers ?? {},
     legitimateDuplicates: ledger.legitimateDuplicates ?? [],

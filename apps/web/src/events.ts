@@ -67,6 +67,8 @@ export type EventKind =
   | "budgets"
   /** The AI reviews kept from the AI accounts check, whole. */
   | "aiReviews"
+  /** What Xero's History and notes report says was done there, whole. */
+  | "xeroHistory"
   /** Products and services, whole. */
   | "items"
   /** Classes and what each is given to, whole. */
@@ -386,6 +388,8 @@ export function reverse(ledger: StoredLedger, event: LedgerEvent): StoredLedger 
       return { ...ledger, budgets: (event.before ?? {}) as NonNullable<StoredLedger["budgets"]> };
     case "aiReviews":
       return { ...ledger, aiReviews: (event.before ?? []) as NonNullable<StoredLedger["aiReviews"]> };
+    case "xeroHistory":
+      return { ...ledger, xeroHistory: (event.before ?? []) as NonNullable<StoredLedger["xeroHistory"]> };
     case "reconciliation":
       return { ...ledger, reconciliations: (event.before ?? []) as NonNullable<StoredLedger["reconciliations"]> };
     case "contacts":
@@ -725,6 +729,7 @@ export const KIND_LABELS: Record<EventKind, string> = {
   reconciliation: "Bank statement reconciled",
   budgets: "Budgets",
   aiReviews: "AI accounts check",
+  xeroHistory: "Xero history and notes",
   items: "Products and services",
   classes: "Classes",
   time: "Time",
