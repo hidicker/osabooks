@@ -121,7 +121,7 @@ import {
   wireSetup,
 } from "./migrate/setup-wizard.js";
 import { renderMigration, wireMigration } from "./migrate/migration-page.js";
-import { autoSuggestOnOpen, renderAi } from "./daily/ai-page.js";
+import { autoSuggestOnOpen, renderAi, renderAiSetup } from "./daily/ai-page.js";
 import { installLockGuard, resetLockBaseline } from "./lock.js";
 import { showOtherTabs, watchOtherTabs } from "./other-tabs.js";
 import { renderAiCheck } from "./daily/ai-check-page.js";
@@ -222,6 +222,7 @@ async function init(): Promise<void> {
     ird: renderIrdRecords,
     migration: renderMigration,
     ai: renderAi,
+    aiSetup: renderAiSetup,
     aiCheck: renderAiCheck,
     connector: renderConnector,
     openBooks: renderOpenBooks,

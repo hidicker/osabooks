@@ -40,6 +40,7 @@ export type PageName =
   | "ird"
   | "migration"
   | "ai"
+  | "aiSetup"
   | "aiCheck"
   | "connector"
   | "openBooks"
@@ -148,7 +149,7 @@ export function redraw(page: PageName): void {
  */
 /** Pages that are the same whichever entity is chosen: no entity picker on them. */
 const BOOK_WIDE_PAGES = new Set([
-  "settings", "apps", "setup", "migration", "books", "history", "ai", "connector", "aicheck",
+  "settings", "apps", "setup", "migration", "books", "history", "ai", "aisetup", "connector", "aicheck",
   "rules", "currencies", "items", "time", "opening", "import",
 ]);
 
@@ -219,6 +220,7 @@ export function showPage(page: string, scrollTo?: "top" | "bottom" | number): vo
   if (page === "setup") redraw("setup");
   if (page === "migration") redraw("migration");
   if (page === "ai") redraw("ai");
+  if (page === "aisetup") redraw("aiSetup");
   if (page === "aicheck") redraw("aiCheck");
   if (page === "connector") redraw("connector");
   if (page === "import") redraw("feed");

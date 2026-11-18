@@ -5,6 +5,7 @@ import { record } from "../books.js";
 import { save } from "../store.js";
 import type { AiReview } from "../store.js";
 import { markdownToHtml } from "../markdown.js";
+import { analysesPanel } from "./ai-page.js";
 import { aiAllowed } from "../ai-consent.js";
 import {
   OPENACCOUNTANTS_CONNECT,
@@ -65,16 +66,31 @@ export function renderAiCheck(): void {
     body.append(
       step("Not on yet", "AI accounts check"),
       note(
-        "Sending anything about these books to AI is off. Turn it on from the AI suggestions " +
-          "page, which shows exactly what would be sent; this page then works too, without a key.",
+        "Sending anything about these books to AI is off. Turn it on on AI set-up, " +
+          "which shows exactly what would be sent; this page then works too, without a key.",
       ),
-      actions([primary("Go to AI suggestions", () => showPage("ai"))]),
+      actions([primary("Go to AI set-up", () => showPage("aisetup"))]),
     );
     return;
   }
 
+  if (!reviewPossible()) {
+    body.append(note("Nothing to review yet: these books need transactions and a chart first."));
+    return;
+  }
+
+  // One year for everything on the page: the questions, the reviews and the
+  // answers kept.
+  const pickYear = yearPicker();
+  body.append(step("", "Which year"), pickYear.box);
+
   body.append(
-    step("What this is", `Year-end review against ${booksCountry().id === "generic" ? "the" : booksCountry().id === "us" ? "the United States'" : `${booksCountry().name}'s`} tax rules`),
+    step("", "Quick questions about the figures"),
+    analysesPanel(() => Number(pickYear.pick.value)),
+  );
+
+  body.append(
+    step("Full review", `Year-end review against ${booksCountry().id === "generic" ? "the" : booksCountry().id === "us" ? "the United States'" : `${booksCountry().name}'s`} tax rules`),
     note(
       "Reviews the finished year: whether each account holds what belongs in it, " +
         (noSalesTax() ? "" : `whether ${booksCountry().salesTax?.name ?? "GST"} treatments match each entity's registration, `) +
@@ -82,26 +98,19 @@ export function renderAiCheck(): void {
         "year's totals and the reports these books draw, not its transactions.",
     ),
     sourceNote(),
-  );
-
-  if (!reviewPossible()) {
-    body.append(note("Nothing to review yet: these books need transactions and a chart first."));
-    return;
-  }
-
-  const pickYear = yearPicker();
-  body.append(step("Choose", "Which year"), pickYear.box);
-  body.append(
-    step("Take it to OpenAccountants", "Download, copy, paste back"),
+    step("", "Take it to OpenAccountants: download, copy, paste back"),
     openAccountantsLogo(),
     carryPanel(pickYear.pick),
     // Inland Revenue's own return guides, attached by hand: New Zealand's only.
     ...(booksCountry().id === "nz"
-      ? [step("Or check against Inland Revenue's own guides", "Attach the guide, copy, paste back"), guidePanel(pickYear.pick)]
+      ? [step("", "Or check against Inland Revenue's own guides: attach the guide, copy, paste back"), guidePanel(pickYear.pick)]
       : []),
   );
 
-  for (const review of reviewsFor(chosenYear)) body.append(answerPanel(review));
+  const kept = reviewsFor(chosenYear);
+  if (kept.length > 0) body.append(step("", "Answers kept with these books"));
+
+  for (const review of kept) body.append(answerPanel(review));
   body.append(reviewDisclaimer());
 }
 
@@ -127,12 +136,16 @@ function openAccountantsLogo(): HTMLElement {
 function step(kicker: string, title: string): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "ai-step";
-  const small = document.createElement("span");
-  small.className = "ai-step-kicker";
-  small.textContent = kicker;
+  // A heading on its own where the heading says it all.
+  if (kicker !== "") {
+    const small = document.createElement("span");
+    small.className = "ai-step-kicker";
+    small.textContent = kicker;
+    wrap.append(small);
+  }
   const heading = document.createElement("h2");
   heading.textContent = title;
-  wrap.append(small, heading);
+  wrap.append(heading);
   return wrap;
 }
 
@@ -206,6 +219,8 @@ function yearPicker(): { box: HTMLElement; pick: HTMLSelectElement } {
   }
   pickYear.addEventListener("change", () => {
     chosenYear = Number(pickYear.value);
+    // The answers kept for the year chosen, and the questions about it, follow.
+    redraw("aiCheck");
   });
 
   const label = document.createElement("label");

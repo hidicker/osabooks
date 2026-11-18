@@ -64,8 +64,12 @@ function groups(): { title: string; rows: Row[] }[] {
         },
         {
           name: "Connected apps",
-          what: "Bank feeds, and the AI connector for Claude and others.",
-          where: [{ page: "import", label: "Bank import" }, { page: "connector", label: "AI connector" }],
+          what: "Bank feeds, and these books added to your AI app, such as Claude or ChatGPT (MCP).",
+          where: [
+            { page: "import", label: "Bank import" },
+            { page: "connector", label: "Add books to your AI app (MCP)" },
+            { page: "aisetup", label: "AI set-up" },
+          ],
         },
         {
           name: "Email settings",

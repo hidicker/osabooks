@@ -6055,12 +6055,13 @@ export const ANALYSES = [
 export type AnalysisKind = (typeof ANALYSES)[number][0];
 
 /**
- * A ready question for any AI assistant, with the figures it is about: the
- * latest year's profit and loss (and the year before), what customers owe, or
- * the cash forecast. Built from the same reports the pages show.
+ * A ready question for any AI assistant, with the figures it is about: a
+ * year's profit and loss (and the year before), what customers owe, or the
+ * cash forecast. Built from the same reports the pages show. The year chosen,
+ * or the latest where none is.
  */
-export function analysisPrompt(kind: AnalysisKind): string {
-  const year = bookYears()[0];
+export function analysisPrompt(kind: AnalysisKind, chosenYear?: number): string {
+  const year = chosenYear ?? bookYears()[0];
   const today = localToday();
   const kindSelect = $<HTMLSelectElement>("report-kind");
   const basisSelect = $<HTMLSelectElement>("report-basis");

@@ -185,7 +185,8 @@ export function actionItems(): ActionItem[] {
           ran === undefined
             ? "Turned on, but it has not run yet. It runs at 6am, or when the computer is next on and signed in."
             : `It last ran on ${when}. On this computer it runs at 6am if the computer is on and signed in, or when it is next on; books on the server are done by the server.`,
-        go: () => showPage("ai"),
+        // The morning run is chosen with the key, on AI set-up.
+        go: () => showPage("aisetup"),
       });
     }
   }
@@ -609,7 +610,8 @@ export function actionItems(): ActionItem[] {
       count: 1,
       urgency: "amber",
       detail: `When the books opened, the AI could not be asked: ${aiTrouble}`,
-      go: () => showPage("ai"),
+      // Where the key and the asking on opening are set.
+      go: () => showPage("aisetup"),
     });
   }
 

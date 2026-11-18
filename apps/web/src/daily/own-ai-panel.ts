@@ -148,7 +148,7 @@ function forOnline(inner: HTMLElement, book: string): void {
   );
 }
 
-/** The AI connector page: the panel, and what it means for books with AI suggestions off. */
+/** Add these books to your AI app (MCP): the panel, and what it means for books with AI off. */
 export function renderConnector(): void {
   const body = document.getElementById("connector-body");
   if (body === null) return;
@@ -156,7 +156,7 @@ export function renderConnector(): void {
   if (state.ledger.aiEnabled !== true) {
     body.append(
       note(
-        "AI suggestions are off for these books, which keeps OsaBooks itself from sending anything to an AI. A connector " +
+        "AI is off for these books (AI set-up), which keeps OsaBooks itself from sending anything to an AI. A connector " +
           "is separate: your own AI app reads the books only " +
           (backendKind() === "cloud" ? "after you sign in to OsaBooks and allow it there." : "once you install the extension and point it at them."),
       ),

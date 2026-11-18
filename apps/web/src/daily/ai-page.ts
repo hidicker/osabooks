@@ -40,65 +40,157 @@ import type { Entity } from "@nzosa/core";
  */
 
 
-export function renderAi(): void {
-  const body = $("ai-body");
+/**
+ * AI set-up: whether AI is used for these books at all, what each part of the
+ * books does (sent with every question), and the key. Everything the AI pages
+ * share, set once here, so each of those pages is only about what it does.
+ */
+export function renderAiSetup(): void {
+  const body = $("ai-setup-body");
   body.textContent = "";
 
+  // The consent, with exactly what would be sent, before anything else.
   if (!aiAllowed()) {
     body.append(offerIt());
     return;
   }
 
-  // What both ways need, first and once.
-  body.append(step("Set up", "Tell us about the business"), briefingPanel());
-
-  // Then the choice. Neither is better everywhere: one needs no key and can
-  // use a model somebody already pays for, the other is a button on the page
-  // where the coding is done.
   body.append(
-    step("Then, either way", "Two ways to ask AI"),
+    step("", "AI for these books: on"),
     note(
-      "Both ways ask the same question and check the answers the same way.",
+      "AI reconcile, the AI accounts check and the key below can now be used for these books. " +
+        "Nothing is sent until you ask, on those pages or with the automatic choices below.",
     ),
-    carryPanel(),
-    step("About the figures", "One-click analyses"),
-    analysesPanel(),
-    step("Or", "Use your own AI app"),
-    connectorPointer(),
+    step("", "About these books"),
+    briefingPanel(),
   );
 
   if (aiRoute() === "none") {
     body.append(
+      step("", "Your AI key"),
       note(
         "Asking automatically with a key needs the app running on your own computer, or " +
-          "books on the server, so only the way above is available here.",
+          "books on the server. Here, copy and paste on AI reconcile and the AI accounts check work without one.",
       ),
     );
     return;
   }
 
   body.append(
+    step("", "Your AI key"),
     aiKeyPanel({
-      page: "ai",
-      title: "Or ask automatically: add any AI key",
+      page: "aiSetup",
+      title: "",
       countedIn: "transactions",
-      whenSet: aboutAsking,
+      whenSet: automaticChoices,
     }),
   );
-  body.append(step("And separately", "Checking the finished year"), checkPointer());
-  void refreshAiStatus("ai");
+  void refreshAiStatus("aiSetup");
+}
+
+/**
+ * AI reconcile: suggestions for the lines nothing in these books recognises,
+ * by copying a prompt to any assistant, or with the key set on AI set-up. The
+ * suggestions land on Reconcile, beside the lines they are about.
+ */
+export function renderAi(): void {
+  const body = $("ai-body");
+  body.textContent = "";
+
+  if (!aiAllowed()) {
+    body.append(
+      note(
+        "AI is off for these books. Turn it on on AI set-up, which shows exactly what would be " +
+          "sent; then suggestions can be asked for here.",
+      ),
+      actionsRow(primaryButton("Go to AI set-up", () => showPage("aisetup"))),
+    );
+    return;
+  }
+
+  body.append(
+    note("Both ways ask the same question and check the answers the same way."),
+    step("", "Copy and paste"),
+    carryPanel(),
+    step("", "Ask with your key"),
+    askWithKeyPanel(),
+    step("", "Other ways to use AI with these books"),
+    checkPointer(),
+    connectorPointer(),
+  );
+}
+
+/**
+ * Asking with the key: on Reconcile, where the suggestions are read. What is
+ * waiting, what would be sent, and the way there; the key itself, and the
+ * choices to ask by itself, are on AI set-up.
+ */
+function askWithKeyPanel(): HTMLElement {
+  const [box, inner] = panel("");
+  if (aiRoute() === "none") {
+    inner.append(
+      note(
+        "Asking automatically with a key needs the app running on your own computer, or " +
+          "books on the server, so only the way above is available here.",
+      ),
+    );
+    return box;
+  }
+  const waiting = waitingForAnswers().length;
+  const ready = aiSuggestionCount();
+  if (ready > 0) {
+    inner.append(note(`${ready} suggestion${ready === 1 ? "" : "s"} waiting to be read on Reconcile.`));
+  }
+  if (waiting > 0) {
+    const details = document.createElement("details");
+    details.className = "setup-migration-details";
+    const summary = document.createElement("summary");
+    summary.className = "setup-migration-summary";
+    summary.textContent = "Show exactly what would be sent";
+    const pre = document.createElement("pre");
+    pre.className = "ai-prompt";
+    pre.textContent = whatWouldBeAsked(waitingForAnswers()).prompt;
+    details.append(summary, pre);
+    inner.append(details);
+  }
+  inner.append(
+    note(
+      "On Reconcile, press AI suggestions beside the filter and choose “Ask with my key”. " +
+        "Suggestions appear on the lines. The key, and asking by itself when the books open " +
+        "or each morning, are set on AI set-up.",
+    ),
+    actionsRow(
+      primaryButton("Go to Reconcile", () => showPage("reconcile")),
+      button("AI set-up", () => showPage("aisetup")),
+    ),
+  );
+  return box;
+}
+
+function primaryButton(label: string, onClick: () => void): HTMLButtonElement {
+  const b = button(label, onClick);
+  b.className = "primary";
+  return b;
+}
+
+function actionsRow(...buttons: HTMLButtonElement[]): HTMLElement {
+  const row = document.createElement("div");
+  row.className = "migration-actions";
+  row.append(...buttons);
+  return row;
 }
 
 /**
  * Questions about the figures, ready for any AI assistant: one press copies
  * the question and the figures it needs. Nothing is sent from here; the
- * person pastes it where they choose, beside their own conversation.
+ * person pastes it where they choose, beside their own conversation. Shown on
+ * the AI accounts check, for the year chosen there.
  */
-function analysesPanel(): HTMLElement {
+export function analysesPanel(year: () => number): HTMLElement {
   const [box, inner] = panel("");
   inner.append(
     note(
-      "Each copies a question with the figures it needs, from the latest year's reports, to paste into " +
+      "Each copies a question with the figures it needs, from the year chosen above, to paste into " +
         "ChatGPT, Claude, Gemini or any assistant. Nothing is sent from here.",
     ),
   );
@@ -114,7 +206,7 @@ function analysesPanel(): HTMLElement {
   for (const [kind, label] of ANALYSES) {
     row.append(
       button(label, () => {
-        const text = analysisPrompt(kind);
+        const text = analysisPrompt(kind, year());
         if (text === "") {
           said.textContent = "There is nothing in the books yet to ask about.";
           shown.hidden = true;
@@ -152,7 +244,7 @@ function checkPointer(): HTMLElement {
     note(
       "The AI accounts check reviews the finished year: whether each account holds what " +
         `belongs in it, ${noSalesTax() ? "" : "whether GST treatments match the registration, "}and what is missing. ` +
-        "It uses this key and OpenAccountants' tax guides, so answers cite their sources.",
+        "It uses OpenAccountants' tax guides, so answers cite their sources, and has quick questions about the figures.",
     ),
   );
   const go = button("Go to the AI accounts check", () => showPage("aicheck"));
@@ -165,46 +257,18 @@ function checkPointer(): HTMLElement {
 }
 
 /**
- * What asking would do, said under the key rather than beside it.
- *
- * This is the part of the panel that is about coding, so it is this page's
- * and not the shared panel's: the year-end check shares the key and should
- * not inherit a sentence about lines nothing recognises.
+ * What the key may do by itself, said under the key once one is set: ask
+ * about waiting lines as the books open, and get ready each morning. Asking
+ * by hand, and what would be sent, are on AI reconcile, beside the asking.
  */
-function aboutAsking(): HTMLElement[] {
-  const out: HTMLElement[] = [autoSuggestChoice(), morningChoice()];
-  const waiting = waitingForAnswers().length;
-  const ready = aiSuggestionCount();
-  if (ready > 0) {
-    out.push(note(`${ready} suggestion${ready === 1 ? "" : "s"} waiting to be read on Reconcile.`));
-  }
-
-  if (waiting > 0) {
-    const details = document.createElement("details");
-    details.className = "setup-migration-details";
-    const summary = document.createElement("summary");
-    summary.className = "setup-migration-summary";
-    summary.textContent = "Show exactly what would be sent";
-    const pre = document.createElement("pre");
-    pre.className = "ai-prompt";
-    pre.textContent = whatWouldBeAsked(waitingForAnswers()).prompt;
-    details.append(summary, pre);
-    out.push(details);
-  }
-
-  out.push(
-    note(
-      "On Reconcile, press AI suggestions beside the filter and choose “Ask with my key”. " +
-        "Suggestions appear on the lines.",
-    ),
-  );
-  const go = button("Go to Reconcile", () => showPage("reconcile"));
-  go.className = "primary";
-  const row = document.createElement("div");
-  row.className = "migration-actions";
-  row.append(go);
-  out.push(row);
-  return out;
+function automaticChoices(): HTMLElement[] {
+  return [
+    step("", "Automatic"),
+    autoSuggestChoice(),
+    morningChoice(),
+    note("To ask now, or to see exactly what would be sent, go to AI reconcile."),
+    actionsRow(button("Go to AI reconcile", () => showPage("ai"))),
+  ];
 }
 
 // --- turning it on ---------------------------------------------------------
@@ -222,12 +286,12 @@ function connectorPointer(): HTMLElement {
   wrap.append(
     note(
       "Claude, ChatGPT or another AI app you already use can read these books and suggest codes, splits and journals, " +
-        "using your own subscription. Its address and the steps to add it are on the AI connector page.",
+        "using your own subscription. Its address and the steps to add it are on Add these books to your AI app (MCP).",
     ),
   );
   const go = document.createElement("button");
   go.type = "button";
-  go.textContent = "Go to the AI connector";
+  go.textContent = "Add these books to your AI app";
   go.addEventListener("click", () => showPage("connector"));
   wrap.append(go);
   return wrap;
@@ -238,7 +302,7 @@ function offerIt(): HTMLElement {
   wrap.className = "ai-offer";
 
   const heading = document.createElement("h3");
-  heading.textContent = "Suggestions for the lines nothing recognises";
+  heading.textContent = "AI for these books: off";
   wrap.append(heading);
 
   const what = document.createElement("p");
@@ -285,7 +349,11 @@ function offerIt(): HTMLElement {
   on.textContent = "Turn on for these books";
   on.addEventListener("click", () => {
     state.ledger.aiEnabled = true;
-    void save(state.ledger).then(() => redraw("ai"));
+    void save(state.ledger).then(() => {
+      redraw("aiSetup");
+      redraw("ai");
+      redraw("aiCheck");
+    });
   });
   const row = document.createElement("div");
   row.className = "migration-actions";
@@ -304,12 +372,16 @@ function offerIt(): HTMLElement {
 function step(kicker: string, title: string): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "ai-step";
-  const small = document.createElement("span");
-  small.className = "ai-step-kicker";
-  small.textContent = kicker;
+  // A heading on its own where the heading says it all.
+  if (kicker !== "") {
+    const small = document.createElement("span");
+    small.className = "ai-step-kicker";
+    small.textContent = kicker;
+    wrap.append(small);
+  }
   const heading = document.createElement("h2");
   heading.textContent = title;
-  wrap.append(small, heading);
+  wrap.append(heading);
   return wrap;
 }
 

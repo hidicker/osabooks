@@ -4151,7 +4151,7 @@ function wireAiButton(): void {
         : aiRoute() === "none"
           ? "Needs the app on your own computer, or books on the server. Copy a prompt " +
             "instead; it works anywhere without a key."
-          : "No key set for these books. Set one on the AI suggestions page.";
+          : "No key set for these books. Set one on AI set-up.";
     // No count: how many is chosen in the section this opens, so naming one
     // here would be promising a number the next screen then asks about.
     withPrompt.textContent = "Copy a prompt for any AI model";
@@ -4217,7 +4217,7 @@ function wireAiButton(): void {
         where.textContent = isDemoBuild()
           ? "or add your own key for Claude, OpenAI (ChatGPT), Gemini, OpenRouter or Jev"
           : "Add your own key";
-        where.addEventListener("click", () => showPage("ai"));
+        where.addEventListener("click", () => showPage("aisetup"));
         notice.append(where);
         // The worry that stops somebody pasting a paid key, answered where
         // they are deciding rather than only on the page the link goes to.
@@ -4250,15 +4250,15 @@ function wireAiButton(): void {
     notice.textContent = "";
     notice.append(
       document.createTextNode(
-        "AI suggestions are turned off for these books. They suggest an account for the " +
+        "AI is turned off for these books. AI suggests an account for the " +
           "lines your rules do not recognise. ",
       ),
     );
     const go = document.createElement("button");
     go.type = "button";
     go.className = "link-button";
-    go.textContent = "Turn on AI suggestions";
-    go.addEventListener("click", () => showPage("ai"));
+    go.textContent = "Turn it on in AI set-up";
+    go.addEventListener("click", () => showPage("aisetup"));
     notice.append(go);
   };
 
