@@ -2141,8 +2141,19 @@ details.fold-section > :last-child { margin-bottom: 0; }
 .migration-here { margin-top: 1rem; }
 .migration-here h4 { margin: 0 0 0.4rem; font-size: 0.92rem; }
 /* Asking a model ------------------------------------------------------------ */
-.ai-offer, .ai-panel { border: 1px solid rgba(128,128,128,0.28); border-radius: 6px;
-  padding: 0.9rem 1.1rem; margin: 0 0 1rem; max-width: 62rem; }
+/* An AI panel on its own (the MCP page) is a section like any other page's:
+   theme colours, on a faint tint. Inside a page section it is just its
+   contents, the section being the panel; two in a row get a rule between. */
+.ai-offer, .ai-panel { border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 0.9rem 1.1rem; margin: 0 0 1rem; max-width: 62rem;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.page-section .ai-panel, .page-section .ai-offer { border: none; padding: 0; margin: 0 0 0.6rem;
+  background: transparent; max-width: none; }
+.page-section .ai-panel + .ai-panel { border-top: 1px solid var(--border); padding-top: 0.8rem; margin-top: 0.8rem; }
+/* The AI accounts check's one year for the whole page: a slim bar, not a panel. */
+.ai-year-bar { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.9rem; margin: 0 0 1rem;
+  border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); max-width: 62rem; }
+.ai-year-bar .ai-model { margin: 0; font-weight: 600; }
 .ai-offer h3, .ai-panel h3 { margin: 0 0 0.5rem; font-size: 1rem; }
 .ai-panel h4 { margin: 0.9rem 0 0.35rem; font-size: 0.98rem; }
 .ai-offer p { font-size: 0.86rem; margin: 0.4rem 0; }

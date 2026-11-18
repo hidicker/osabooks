@@ -3,7 +3,8 @@ import { noSalesTax } from "../country.js";
 import { record, saveEntities } from "../books.js";
 import { $, state } from "../state.js";
 import { save } from "../store.js";
-import { note, tellOnPage } from "../ui.js";
+import { note, pageSection, tellOnPage } from "../ui.js";
+import type { SectionTone } from "../ui.js";
 import { AI_OWN_BATCH, aiSuggestionCount, askAboutLines, waitingForAnswers, whatWouldBeAsked } from "../ai.js";
 import { carrySection } from "../ai-carry.js";
 import { aiRoute, aiStatus } from "../ai-backend.js";
@@ -51,41 +52,60 @@ export function renderAiSetup(): void {
 
   // The consent, with exactly what would be sent, before anything else.
   if (!aiAllowed()) {
-    body.append(offerIt());
+    body.append(section("AI for these books: off", "account", offerIt()));
     return;
   }
 
   body.append(
-    step("", "AI for these books: on"),
-    note(
-      "AI reconcile, the AI accounts check and the key below can now be used for these books. " +
-        "Nothing is sent until you ask, on those pages or with the automatic choices below.",
+    section(
+      "AI for these books: on",
+      "account",
+      note(
+        "AI reconcile, the AI accounts check and the key below can now be used for these books. " +
+          "Nothing is sent until you ask, on those pages or with the automatic choices below.",
+      ),
     ),
-    step("", "About these books"),
-    briefingPanel(),
+    section("About these books", "books", briefingPanel()),
   );
 
   if (aiRoute() === "none") {
     body.append(
-      step("", "Your AI key"),
-      note(
-        "Asking automatically with a key needs the app running on your own computer, or " +
-          "books on the server. Here, copy and paste on AI reconcile and the AI accounts check work without one.",
+      section(
+        "Your AI key",
+        "keep",
+        note(
+          "Asking automatically with a key needs the app running on your own computer, or " +
+            "books on the server. Here, copy and paste on AI reconcile and the AI accounts check work without one.",
+        ),
       ),
     );
     return;
   }
 
   body.append(
-    step("", "Your AI key"),
-    aiKeyPanel({
-      page: "aiSetup",
-      title: "",
-      countedIn: "transactions",
-      whenSet: automaticChoices,
-    }),
+    section(
+      "Your AI key",
+      "keep",
+      aiKeyPanel({
+        page: "aiSetup",
+        title: "",
+        countedIn: "transactions",
+        whenSet: automaticChoices,
+      }),
+    ),
   );
   void refreshAiStatus("aiSetup");
+}
+
+/**
+ * A part of an AI page, as every page's parts now are: its heading inside a
+ * panel on a faint background of its own (`pageSection`), so where one part
+ * ends and the next begins shows at a glance.
+ */
+function section(title: string, tone: SectionTone, ...parts: HTMLElement[]): HTMLElement {
+  const box = pageSection(title, tone);
+  box.append(...parts);
+  return box;
 }
 
 /**
@@ -99,24 +119,24 @@ export function renderAi(): void {
 
   if (!aiAllowed()) {
     body.append(
-      note(
-        "AI is off for these books. Turn it on on AI set-up, which shows exactly what would be " +
-          "sent; then suggestions can be asked for here.",
+      section(
+        "AI for these books: off",
+        "account",
+        note(
+          "AI is off for these books. Turn it on on AI set-up, which shows exactly what would be " +
+            "sent; then suggestions can be asked for here.",
+        ),
+        actionsRow(primaryButton("Go to AI set-up", () => showPage("aisetup"))),
       ),
-      actionsRow(primaryButton("Go to AI set-up", () => showPage("aisetup"))),
     );
     return;
   }
 
   body.append(
     note("Both ways ask the same question and check the answers the same way."),
-    step("", "Copy and paste"),
-    carryPanel(),
-    step("", "Ask with your key"),
-    askWithKeyPanel(),
-    step("", "Other ways to use AI with these books"),
-    checkPointer(),
-    connectorPointer(),
+    section("Copy and paste", "books", carryPanel()),
+    section("Ask with your key", "keep", askWithKeyPanel()),
+    section("Other ways to use AI with these books", "open", checkPointer(), connectorPointer()),
   );
 }
 
@@ -262,8 +282,10 @@ function checkPointer(): HTMLElement {
  * by hand, and what would be sent, are on AI reconcile, beside the asking.
  */
 function automaticChoices(): HTMLElement[] {
+  const heading = document.createElement("h3");
+  heading.textContent = "Automatic";
   return [
-    step("", "Automatic"),
+    heading,
     autoSuggestChoice(),
     morningChoice(),
     note("To ask now, or to see exactly what would be sent, go to AI reconcile."),
@@ -301,10 +323,7 @@ function offerIt(): HTMLElement {
   const wrap = document.createElement("div");
   wrap.className = "ai-offer";
 
-  const heading = document.createElement("h3");
-  heading.textContent = "AI for these books: off";
-  wrap.append(heading);
-
+  // Named by the panel it is drawn in: "AI for these books: off".
   const what = document.createElement("p");
   what.textContent =
     "Rules code most lines. For the rest, such as a new payee, AI can suggest an account " +
@@ -359,29 +378,6 @@ function offerIt(): HTMLElement {
   row.className = "migration-actions";
   row.append(on);
   wrap.append(row);
-  return wrap;
-}
-
-/**
- * Where you are on this page.
- *
- * It read as four boxes of equal weight, and it is not four things: it is one
- * set-up and then a choice between two ways of asking. Saying so is cheaper
- * than hoping somebody infers it from the order.
- */
-function step(kicker: string, title: string): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "ai-step";
-  // A heading on its own where the heading says it all.
-  if (kicker !== "") {
-    const small = document.createElement("span");
-    small.className = "ai-step-kicker";
-    small.textContent = kicker;
-    wrap.append(small);
-  }
-  const heading = document.createElement("h2");
-  heading.textContent = title;
-  wrap.append(heading);
   return wrap;
 }
 

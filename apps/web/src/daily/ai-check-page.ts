@@ -1,6 +1,7 @@
 import { redraw, showPage } from "../app.js";
 import { $, state } from "../state.js";
-import { askOnPage, note } from "../ui.js";
+import { askOnPage, note, pageSection } from "../ui.js";
+import type { SectionTone } from "../ui.js";
 import { record } from "../books.js";
 import { save } from "../store.js";
 import type { AiReview } from "../store.js";
@@ -64,12 +65,15 @@ export function renderAiCheck(): void {
 
   if (!aiAllowed()) {
     body.append(
-      step("Not on yet", "AI accounts check"),
-      note(
-        "Sending anything about these books to AI is off. Turn it on on AI set-up, " +
-          "which shows exactly what would be sent; this page then works too, without a key.",
+      section(
+        "AI for these books: off",
+        "account",
+        note(
+          "Sending anything about these books to AI is off. Turn it on on AI set-up, " +
+            "which shows exactly what would be sent; this page then works too, without a key.",
+        ),
+        actions([primary("Go to AI set-up", () => showPage("aisetup"))]),
       ),
-      actions([primary("Go to AI set-up", () => showPage("aisetup"))]),
     );
     return;
   }
@@ -80,38 +84,58 @@ export function renderAiCheck(): void {
   }
 
   // One year for everything on the page: the questions, the reviews and the
-  // answers kept.
+  // answers kept. A slim bar of its own rather than a panel.
   const pickYear = yearPicker();
-  body.append(step("", "Which year"), pickYear.box);
+  pickYear.box.className = "ai-year-bar";
+  body.append(pickYear.box);
 
   body.append(
-    step("", "Quick questions about the figures"),
-    analysesPanel(() => Number(pickYear.pick.value)),
+    section("Quick questions about the figures", "open", analysesPanel(() => Number(pickYear.pick.value))),
   );
 
   body.append(
-    step("Full review", `Year-end review against ${booksCountry().id === "generic" ? "the" : booksCountry().id === "us" ? "the United States'" : `${booksCountry().name}'s`} tax rules`),
-    note(
-      "Reviews the finished year: whether each account holds what belongs in it, " +
-        (noSalesTax() ? "" : `whether ${booksCountry().salesTax?.name ?? "GST"} treatments match each entity's registration, `) +
-        "which deductions need records, and what is usually present but missing. It reads the " +
-        "year's totals and the reports these books draw, not its transactions.",
+    section(
+      `Year-end review against ${booksCountry().id === "generic" ? "the" : booksCountry().id === "us" ? "the United States'" : `${booksCountry().name}'s`} tax rules`,
+      "books",
+      note(
+        "Reviews the finished year: whether each account holds what belongs in it, " +
+          (noSalesTax() ? "" : `whether ${booksCountry().salesTax?.name ?? "GST"} treatments match each entity's registration, `) +
+          "which deductions need records, and what is usually present but missing. It reads the " +
+          "year's totals and the reports these books draw, not its transactions.",
+      ),
+      sourceNote(),
+      subheading("Take it to OpenAccountants: download, copy, paste back"),
+      openAccountantsLogo(),
+      carryPanel(pickYear.pick),
+      // Inland Revenue's own return guides, attached by hand: New Zealand's only.
+      ...(booksCountry().id === "nz"
+        ? [subheading("Or check against Inland Revenue's own guides: attach the guide, copy, paste back"), guidePanel(pickYear.pick)]
+        : []),
     ),
-    sourceNote(),
-    step("", "Take it to OpenAccountants: download, copy, paste back"),
-    openAccountantsLogo(),
-    carryPanel(pickYear.pick),
-    // Inland Revenue's own return guides, attached by hand: New Zealand's only.
-    ...(booksCountry().id === "nz"
-      ? [step("", "Or check against Inland Revenue's own guides: attach the guide, copy, paste back"), guidePanel(pickYear.pick)]
-      : []),
   );
 
   const kept = reviewsFor(chosenYear);
-  if (kept.length > 0) body.append(step("", "Answers kept with these books"));
-
-  for (const review of kept) body.append(answerPanel(review));
+  if (kept.length > 0) {
+    body.append(section("Answers kept with these books", "keep", ...kept.map(answerPanel)));
+  }
   body.append(reviewDisclaimer());
+}
+
+/**
+ * A part of the page, as every page's parts now are: its heading inside a
+ * panel on a faint background of its own (`pageSection`).
+ */
+function section(title: string, tone: SectionTone, ...parts: HTMLElement[]): HTMLElement {
+  const box = pageSection(title, tone);
+  box.append(...parts);
+  return box;
+}
+
+/** A heading within a part. */
+function subheading(text: string): HTMLElement {
+  const h = document.createElement("h3");
+  h.textContent = text;
+  return h;
 }
 
 // --- small builders, kept here so the page reads top to bottom -------------
@@ -133,21 +157,6 @@ function openAccountantsLogo(): HTMLElement {
   return link;
 }
 
-function step(kicker: string, title: string): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "ai-step";
-  // A heading on its own where the heading says it all.
-  if (kicker !== "") {
-    const small = document.createElement("span");
-    small.className = "ai-step-kicker";
-    small.textContent = kicker;
-    wrap.append(small);
-  }
-  const heading = document.createElement("h2");
-  heading.textContent = title;
-  wrap.append(heading);
-  return wrap;
-}
 
 function primary(label: string, onClick: () => void): HTMLButtonElement {
   const b = document.createElement("button");
