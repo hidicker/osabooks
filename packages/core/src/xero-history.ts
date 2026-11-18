@@ -119,9 +119,31 @@ export function xeroHistoryWorthKeeping(entry: XeroHistoryEntry): boolean {
       return true;
     case "History event":
       return /^Recode\b/i.test(entry.detail);
+    // A document changed after the fact: its date or amount edited, a credit
+    // given or taken back, the document voided or deleted. Creating,
+    // approving, paying and reconciling one says only what the books do.
+    case "Invoice":
+    case "Bill":
+      return afterTheFact(entry.detail);
+    // A credit note applied says to which day: one written in June applied at
+    // the March year end moves a figure into a year already over.
+    case "Sales credit note":
+    case "Bill credit note":
+      return afterTheFact(entry.detail) || /^Applied\b/i.test(entry.detail);
+    case "Payment batch":
+      return /^(Deleted|Unreconciled)\b/i.test(entry.detail);
+    // The register says what each asset is; what it does not say is an asset
+    // disposed of, a disposal taken back, an asset edited. Depreciation runs
+    // are most of an asset's history and the journal report holds them.
+    case "Asset":
+      return !/^Depreciation\b/i.test(entry.detail);
     default:
       return false;
   }
+}
+
+function afterTheFact(detail: string): boolean {
+  return /^(Edited|Voided|Deleted|Credited|Credit Reversed|Payment Reversed)\b/i.test(detail);
 }
 
 /** Entries kept already and those read, together: each once, newest first. */
@@ -159,8 +181,9 @@ export function manualJournalHistory(
 
 /**
  * The changes worth knowing about for a year's books: settings, GST returns,
- * bulk recodes, journals voided or edited after they were posted. Made during
- * the year, or in the year after it while it was being finished.
+ * bulk recodes, journals voided or edited after they were posted, documents
+ * changed or credited after the fact, assets disposed of or taken back. Made
+ * during the year, or in the year after it while it was being finished.
  */
 export function changesForYear(
   entries: readonly XeroHistoryEntry[],
@@ -174,6 +197,10 @@ export function changesForYear(
       if (e.type === "Financial settings" || (e.type === "History event" && /^Recode\b/i.test(e.detail))) return true;
       if (e.type === "Tax Return") return /^Changed\b|reverted|filed/i.test(e.detail);
       if (e.type === "Manual journal") return /^(Voided|Edited|Deleted)\b/i.test(e.detail);
+      if (/^(Invoice|Bill)$/.test(e.type)) return afterTheFact(e.detail);
+      if (/^(Sales|Bill) credit note$/.test(e.type)) return afterTheFact(e.detail) || /^Applied\b/i.test(e.detail);
+      if (e.type === "Payment batch") return /^(Deleted|Unreconciled)\b/i.test(e.detail);
+      if (e.type === "Asset") return /^(Disposed|Disposal reversed|Edit)\b/i.test(e.detail);
       return /^Note\b/i.test(e.detail);
     })
     .sort((a, b) => a.at.localeCompare(b.at));

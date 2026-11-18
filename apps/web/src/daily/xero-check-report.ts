@@ -486,8 +486,9 @@ function changesPart(year: number): HTMLElement {
     section.append(
       note(
         "Load Xero's History and notes to see what was done in Xero after the fact: journals edited or voided, " +
-          "GST returns' boxes changed, lock dates moved, lines recoded. In Xero: Settings, then History and notes; " +
-          "choose the types Manual journal, Tax Return, Financial settings and History event, and export.",
+          "GST returns' boxes changed, lock dates moved, lines recoded, bills credited. In Xero: Settings, then History " +
+          "and notes; choose the types Manual journal, Tax Return, Financial settings, History event, Account, Bill and " +
+          "the credit notes (not Asset), and export.",
       ),
     );
     return section;

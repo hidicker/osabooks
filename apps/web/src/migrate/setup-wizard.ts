@@ -639,9 +639,10 @@ export function xeroMigrationFiles(): SourceFile[] {
     {
       what: "History and notes",
       where:
-        "Settings → History and notes, all dates, types Manual journal, Tax Return, Financial settings and History event " +
-        "(not Asset: its depreciation runs fill Xero's 1,000-row limit) → Export",
-      why: "What was changed after the fact: journals edited or voided, GST boxes changed, lock dates moved",
+        "Settings → History and notes, all dates, types Manual journal, Tax Return, Financial settings, History event, " +
+        "Account, Bill, Bill credit note and Sales credit note (not Asset: its depreciation runs fill Xero's 1,000-row " +
+        "limit, and the register has the rest) → Export",
+      why: "What was changed after the fact: journals edited or voided, GST boxes changed, lock dates moved, bills credited",
       have: (led.xeroHistory ?? []).length > 0,
       page: "setup",
     },

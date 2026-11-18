@@ -53,6 +53,26 @@ test("only what says something about the accounts is kept", () => {
   assert.ok(!kept.some((e) => e.detail.startsWith("Reconciled")));
 });
 
+test("documents and assets: what was done after the fact is kept, the routine is not", () => {
+  const entry = (type, detail) => ({ at: "2026-06-12T14:30", user: "Pat Lee", type, detail });
+  const kept = (type, detail) => xeroHistoryWorthKeeping(entry(type, detail));
+  assert.equal(kept("Bill", "Edited - The Due Date was changed from 19 June 2025 to 1 April 2025."), true);
+  assert.equal(kept("Bill", "Credit Reversed - Credit reversed on 12 June 2026 for 37.69."), true);
+  assert.equal(kept("Bill credit note", "Voided"), true);
+  assert.equal(kept("Sales credit note", "Applied - Credit applied on 31 March 2026 for 150.00."), true);
+  assert.equal(kept("Sales credit note", "Created - CN-0154 for 150.00 approved."), false);
+  assert.equal(kept("Payment batch", "Deleted"), true);
+  assert.equal(kept("Asset", "Disposal reversed - Asset FA-0021 disposal reversed."), true);
+  assert.equal(kept("Bill", "Created"), false);
+  assert.equal(kept("Bill", "Paid - Payment made"), false);
+  assert.equal(kept("Invoice", "Reminders - Invoice reminder was not sent"), false);
+  assert.equal(kept("Payment batch", "Reconciled - Payment from B"), false);
+  assert.equal(kept("Asset", "Depreciation - Depreciation of 145.65 posted."), false, "the journal report holds those");
+  assert.equal(kept("Inventory item", "Created - Item created."), false);
+  const changes = changesForYear([entry("Bill", "Edited - due date"), entry("Bill", "Approved")], { from: "2025-04-01", to: "2026-03-31" });
+  assert.deepEqual(changes.map((e) => e.detail), ["Edited - due date"]);
+});
+
 test("a second file adds only what the first did not have", () => {
   const first = readXeroHistory(REPORT).entries;
   const { entries, added } = mergeXeroHistory(first.slice(0, 4), first);

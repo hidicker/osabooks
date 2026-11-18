@@ -519,13 +519,14 @@ export async function loadXeroHistory(file: File): Promise<string> {
   const left = read.entries.length - worth.length;
   return (
     `Xero's History and notes: ${added} entr${added === 1 ? "y" : "ies"} kept about manual journals, GST returns, ` +
-    `settings, accounts, recodes and notes` +
-    (left > 0 ? `; ${left} about reconciling, invoices and the like left out` : "") +
+    `settings, accounts, recodes, documents changed after the fact and notes` +
+    (left > 0 ? `; ${left} about creating, reconciling and the like left out` : "") +
     (added < worth.length ? `; ${worth.length - added} already held` : "") +
     "." +
     (read.cutShort
       ? " It stops at 1,000 entries, which is Xero's limit: the earlier history is missing. Export again with fewer types " +
-        "chosen (Manual journal, Tax Return, Financial settings, History event) or a shorter date range."
+        "chosen (Manual journal, Tax Return, Financial settings, History event, Account, Bill and the credit notes; " +
+        "not Asset) or a shorter date range."
       : "")
   );
 }
