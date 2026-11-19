@@ -43,7 +43,7 @@ import {
   sourceForTheseBooks,
 } from "./onboarding-state.js";
 import type { Onboarding, PlannedEntity, Source, Step } from "./onboarding-state.js";
-import { taxYearEnd, taxYearOf, taxYearStart } from "../tax-year.js";
+import { taxYearEnd, taxYearEndSaid, taxYearOf, taxYearStart, taxYearStartSaid } from "../tax-year.js";
 
 /**
  * Migration: the guided start.
@@ -540,15 +540,18 @@ function gstPeriodWord(): string {
 
 function dateQuestion(number: number, held: Onboarding): HTMLElement {
   const [box, inner] = card(number, "What date do these books start?");
+  // The last year already over, for the example: the one a review is of.
+  const reviewed = taxYearOf(localToday()) - 1;
   inner.append(
     held.source === "xero"
       ? advice(
-          `The day OsaBooks takes over from Xero. The first day of a financial year (${yearStartSaid()} ` +
-            `for most) is the cleanest: the whole year's reports, depreciation and ${taxReturnWord()} then ` +
-            "come from one system, and the opening balances are year-end figures your " +
-            "accountant has already signed off.",
-          `Part way through a year works too. Choose the first day of a ${gstPeriodWord()}, so no ` +
-            "return is split between two systems.",
+          "To have AI review your Xero books: start on the first day of the year to review, e.g. " +
+            `${taxYearStartSaid(reviewed)} for the year to ${taxYearEndSaid(reviewed)}. The whole year then ` +
+            "comes in from Xero, so Xero books checked and the AI accounts check can review all of it, " +
+            "including your accountant's year-end journals.",
+          "To move from Xero to OsaBooks: the first day of a financial year is cleanest, as the year's " +
+            `reports, depreciation and ${taxReturnWord()} then come from one system. Part way through works too: ` +
+            `choose the first day of a ${gstPeriodWord()}, so no return is split between systems.`,
         )
       : held.opening === true
         ? advice(
@@ -595,8 +598,8 @@ function dateQuestion(number: number, held: Onboarding): HTMLElement {
   inner.append(
     note(
       booksCountry().id === "nz"
-        ? "Opening balances are dated this day and the bank feed fetches from it, so nothing asks for it twice."
-        : "Opening balances are dated this day, so nothing asks for it twice.",
+        ? "Opening balances are dated this day and the bank feed fetches from it."
+        : "Opening balances are dated this day.",
     ),
     actions(
       button(
