@@ -100,12 +100,12 @@ export async function loadQuickBooksBankLines(file: File): Promise<string> {
       const id = pay.transaction.id;
       if (id === "") continue;
       const only = pay.parts.length === 1 ? pay.parts[0] : undefined;
-      if (only !== undefined && only.invoiceNumber !== null && only.amount === pay.transaction.amount) {
-        matches[id] = only.invoiceNumber;
+      if (only !== undefined && only.document !== null && only.amount === pay.transaction.amount) {
+        matches[id] = only.document;
       } else {
         splits[id] = pay.parts.map((p) => ({ amount: p.amount, code: p.code, note: p.note }));
         pay.parts.forEach((p, index) => {
-          if (p.invoiceNumber !== null) matches[splitPartId(id, index)] = p.invoiceNumber;
+          if (p.document !== null) matches[splitPartId(id, index)] = p.document;
         });
       }
       paymentCount += 1;
@@ -134,9 +134,9 @@ export async function loadQuickBooksBankLines(file: File): Promise<string> {
     }
     // The file's whole list of classes, with or without lines given them.
     for (const name of fromIif.classNames) names.add(name);
-    for (const [number, klass] of fromIif.classOf.invoices) {
-      if (assigned[number] !== undefined) continue;
-      assigned[number] = klass;
+    for (const [key, klass] of fromIif.classOf.invoices) {
+      if (assigned[key] !== undefined) continue;
+      assigned[key] = klass;
       names.add(klass);
       classCount += 1;
     }

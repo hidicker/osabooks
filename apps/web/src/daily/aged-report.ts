@@ -1,4 +1,4 @@
-import { convert, isForeign, rateOn, spreadsheetCell, localToday } from "@nzosa/core";
+import { convert, documentKey, isForeign, rateOn, spreadsheetCell, localToday } from "@nzosa/core";
 import { accountingDocument, fxRates } from "../fx-books.js";
 import { redraw } from "../app.js";
 import {
@@ -74,11 +74,11 @@ function inBooksCurrency(invoices: Invoice[], payments: DatedPayment[]): { invoi
   const books = booksCurrency();
   if (!invoices.some((i) => isForeign(i.currency, books))) return { invoices, payments };
   const rates = fxRates();
-  const byNumber = new Map(invoices.map((i) => [i.number, i]));
+  const byKey = new Map(invoices.map((i) => [documentKey(i), i]));
   return {
     invoices: invoices.map(accountingDocument),
     payments: payments.map((p) => {
-      const invoice = byNumber.get(p.invoiceNumber);
+      const invoice = byKey.get(p.document);
       if (invoice === undefined || !isForeign(invoice.currency, books)) return p;
       const paidIn = (p.currency || books).toUpperCase();
       const size = Math.abs(p.amount);

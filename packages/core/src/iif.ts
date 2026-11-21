@@ -1,3 +1,4 @@
+import { documentKey } from "./document-key.js";
 import type { Account } from "./chart.js";
 import type { Contact } from "./contacts.js";
 import type { Item } from "./items.js";
@@ -283,7 +284,7 @@ export type ReadBooks = QuickBooksBooks & {
   classNames: string[];
   /** Products and services the file lists, with the account's code where the chart has it. */
   items: Omit<Item, "id">[];
-  /** The class each bank line and document was given, where the file gave one. */
+  /** The class each bank line and document (by its key) was given, where the file gave one. */
   classOf: { transactions: Map<Transaction, string>; invoices: Map<string, string> };
 };
 
@@ -367,7 +368,7 @@ export function booksFromEntries(
       (e) => e.date === invoice.issued && e.name === invoice.contact && e.num !== "" && invoice.number.startsWith(e.num),
     );
     const klass = entry === undefined ? undefined : file.classes.get(entry);
-    if (klass !== undefined) classOfDocument.set(invoice.number, klass);
+    if (klass !== undefined) classOfDocument.set(documentKey(invoice), klass);
   }
   return {
     ...books,

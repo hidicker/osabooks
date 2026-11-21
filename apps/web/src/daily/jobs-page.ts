@@ -5,8 +5,8 @@ import { $, state } from "../state.js";
 import { save } from "../store.js";
 import { askOnPage, askTextOnPage, note, tellOnPage } from "../ui.js";
 import { taxYearEnd, taxYearOf, taxYearStart } from "../tax-year.js";
-import { jobLabel, jobProfits, localToday } from "@nzosa/core";
-import type { Job, JobsHeld } from "@nzosa/core";
+import { assignedFor, documentSource, jobLabel, jobProfits, localToday, withAssignment } from "@nzosa/core";
+import type { Invoice, Job, JobsHeld } from "@nzosa/core";
 import { sources } from "./classes-page.js";
 
 /**
@@ -61,16 +61,21 @@ export function jobChoices(customer: string): Job[] {
     });
 }
 
-/** Give a document (by its number) to a job, or take it off one; renumbered, it keeps it. */
-export async function giveDocument(number: string, jobId: string, was?: string): Promise<void> {
+/**
+ * Give a document to a job, or take it off one; renumbered, it keeps it.
+ * Kept by the document's key: a sale and a bill can share a number.
+ */
+export async function giveDocument(document: Invoice, jobId: string, was?: Invoice): Promise<void> {
   const held = heldJobs();
-  const current = held.assigned[was ?? number] ?? "";
-  if (current === jobId && (was === undefined || was === number)) return;
-  const assigned = { ...held.assigned };
-  if (was !== undefined) delete assigned[was];
-  delete assigned[number];
-  if (jobId !== "") assigned[number] = jobId;
+  const source = documentSource(document);
+  const before = was === undefined ? source : documentSource(was);
+  const current = assignedFor(held.assigned, before) ?? "";
+  if (current === jobId && before === source) return;
+  // Off the key it was under, renumbered, then on under its own.
+  let assigned = before === source ? { ...held.assigned } : withAssignment(held.assigned, before, "");
+  assigned = withAssignment(assigned, source, jobId);
   const job = held.jobs.find((j) => j.id === jobId);
+  const number = document.number;
   await keepJobs({ ...held, assigned }, job === undefined ? `${number} taken off its job` : `${number} given to ${jobLabel(job)}`);
 }
 
@@ -295,15 +300,13 @@ function workSection(body: HTMLElement, job: Job): void {
       tr.append(td);
     }
     const cell = document.createElement("td");
-    const mine = held.assigned[source.id] === job.id;
+    const mine = assignedFor(held.assigned, source.id) === job.id;
     const toggle = document.createElement("button");
     toggle.type = "button";
     toggle.className = "small";
     toggle.textContent = mine ? "Take off" : "Give to this job";
     toggle.addEventListener("click", () => {
-      const assigned = { ...held.assigned };
-      if (mine) delete assigned[source.id];
-      else assigned[source.id] = job.id;
+      const assigned = withAssignment(held.assigned, source.id, mine ? "" : job.id);
       void keepJobs(
         { ...held, assigned },
         mine ? `${source.narration || source.id} taken off ${jobLabel(job)}` : `${source.narration || source.id} given to ${jobLabel(job)}`,

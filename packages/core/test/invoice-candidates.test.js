@@ -101,8 +101,8 @@ test("a split part counts as a payment against its own invoice", () => {
     splits: { pay: [{ amount: 15100 }, { amount: 4900 }] },
     assignments: new Map([["pay:1", "INV-1"], ["pay:2", "INV-2"]]),
   });
-  assert.equal(balances.get("INV-1").remaining, 0);
-  assert.equal(balances.get("INV-2").remaining, 0);
+  assert.equal(balances.get("sales:INV-1").remaining, 0);
+  assert.equal(balances.get("sales:INV-2").remaining, 0);
 });
 
 test("an invoice raised long ago is out of the window", () => {

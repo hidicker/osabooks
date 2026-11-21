@@ -6,6 +6,8 @@ import type { GstClassification } from "./gst.js";
 import { gstContent } from "./gst.js";
 import type { Invoice } from "./invoices.js";
 import { taxWithin } from "./sales-tax.js";
+import { documentKey } from "./document-key.js";
+import type { DocumentKey } from "./document-key.js";
 
 /**
  * Turning a coded bank line into double-entry journal lines.
@@ -136,6 +138,13 @@ export interface PostedJournal {
   taxBasis: TaxBasis;
   /** An adjusting entry, which a report can be asked to leave out. */
   adjusting?: boolean;
+  /**
+   * The document it belongs to -- an invoice or bill, its payments made
+   * outside the bank, the cost of the stock it sold -- by key. A class or job
+   * given to the document follows it here; the number in `transactionId` is
+   * shared by a sale and a bill.
+   */
+  document?: DocumentKey;
 }
 
 /**
@@ -629,6 +638,7 @@ export function postInvoice(invoice: Invoice, options: PostingOptions = {}): Pos
 
   return {
     transactionId: invoice.number,
+    document: documentKey(invoice),
     date: invoice.issued,
     narration: `${invoice.number} ${invoice.contact}`.trim(),
     // A line of words alone, or a document for nothing, moves no money: left

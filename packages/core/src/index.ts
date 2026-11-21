@@ -318,6 +318,7 @@ export {
   invoiceGross,
   allocateAcrossLines,
   invoiceBalances,
+  resolveAllocation,
   emailForContact,
   cleanDocumentLink,
   isCreditNote,
@@ -382,6 +383,7 @@ export * from "./post-ledger.js";
 export * from "./assignments.js";
 export * from "./coding-engine.js";
 export * from "./invoice-candidates.js";
+export * from "./document-key.js";
 export * from "./payout-matching.js";
 export * from "./coding-progress.js";
 export * from "./report-labels.js";

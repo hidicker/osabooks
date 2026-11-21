@@ -3,6 +3,8 @@ import { matchInvoices } from "./invoice-matching.js";
 import { splitPartId } from "./splits.js";
 import type { Splits } from "./splits.js";
 import type { Transaction } from "./types.js";
+import { DocumentIndex, documentKey, settlesInDirection } from "./document-key.js";
+import type { DocumentKey } from "./document-key.js";
 
 /**
  * Which receipt settled which invoice, from every source that has an opinion.
@@ -23,6 +25,12 @@ import type { Transaction } from "./types.js";
  * An empty string is not an assignment. It is a refusal, recorded so the
  * matcher stops offering a line somebody has already rejected, and it does not
  * leave this function looking like an answer.
+ *
+ * Every answer comes out as a document key. What a person accepted is stored
+ * as a key now, and as a bare number in books saved before; a bare number a
+ * sale and a bill share is told apart by the money's direction. One that
+ * still cannot be is left out -- shown as unmatched, to be matched again --
+ * and not handed to the matcher, since somebody did answer it.
  */
 export interface AssignmentOptions {
   invoices: readonly Invoice[];
@@ -33,9 +41,20 @@ export interface AssignmentOptions {
   splits: Splits;
 }
 
-export function invoiceAssignments(options: AssignmentOptions): Map<string, string> {
+export function invoiceAssignments(options: AssignmentOptions): Map<string, DocumentKey> {
   const { invoices, transactions, allocations, accepted, splits } = options;
-  const settled = new Map<string, string>(Object.entries(accepted));
+  const index = new DocumentIndex(invoices);
+  const amountOf = lineAmounts(transactions, splits);
+
+  const answered = new Set<string>();
+  const settled = new Map<string, DocumentKey>();
+  for (const [id, ref] of Object.entries(accepted)) {
+    answered.add(id);
+    if (ref === "") continue;
+    const amount = amountOf.get(id);
+    const key = index.resolveKey(ref, amount === undefined ? undefined : (d) => settlesInDirection(d, amount));
+    if (key !== undefined) settled.set(id, key);
+  }
 
   if (invoices.length > 0) {
     const found = matchInvoices({
@@ -46,17 +65,26 @@ export function invoiceAssignments(options: AssignmentOptions): Map<string, stri
 
     const splitAcross = new Set<string>();
     for (const [id, parts] of Object.entries(splits)) {
-      if (parts.some((_, index) => settled.has(splitPartId(id, index)))) splitAcross.add(id);
+      if (parts.some((_, i) => answered.has(splitPartId(id, i)))) splitAcross.add(id);
     }
 
     for (const match of found.matched) {
       for (const t of match.transactions) {
-        if (splitAcross.has(t.id)) continue;
-        if (!settled.has(t.id)) settled.set(t.id, match.invoice.number);
+        if (splitAcross.has(t.id) || answered.has(t.id)) continue;
+        settled.set(t.id, documentKey(match.invoice));
       }
     }
   }
 
-  for (const [id, number] of [...settled]) if (number === "") settled.delete(id);
   return settled;
+}
+
+/** Each bank line's amount, and each split part's, by the id an assignment names it by. */
+function lineAmounts(transactions: readonly Transaction[], splits: Splits): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const t of transactions) out.set(t.id, t.amount);
+  for (const [id, parts] of Object.entries(splits)) {
+    parts.forEach((part, i) => out.set(splitPartId(id, i), part.amount));
+  }
+  return out;
 }

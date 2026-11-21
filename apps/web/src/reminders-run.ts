@@ -65,7 +65,7 @@ export function remindersToday(ledger: StoredLedger, sent: Readonly<Record<strin
 /** The email for one customer due a reminder; or why it cannot go. */
 export function reminderEmail(one: ReminderDue, today = localToday()): ReminderEmail | { why: string } {
   const first = one.invoices[0]?.balance.invoice;
-  const full = (state.ledger.invoices ?? []).find((i) => i.number === first?.number);
+  const full = (state.ledger.invoices ?? []).find((i) => i.kind === "sales" && i.number === first?.number);
   const supplier = full === undefined ? null : supplierFor(full);
   if (supplier === null) return { why: "no entity to send it from" };
   const replyTo = (supplier.email ?? "").trim();

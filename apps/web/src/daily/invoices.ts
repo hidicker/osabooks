@@ -66,8 +66,16 @@ import {
   isForeign,
   localToday,
   parseAmount,
+  documentKey,
+  documentNumberOf,
+  DocumentIndex,
+  isCreditNote,
+  storedFor,
+  assignedFor,
+  documentSource,
 } from "@nzosa/core";
 import type {
+  DocumentKey,
   SalesTaxRate,
   Account,
   Invoice,
@@ -92,7 +100,8 @@ import { booksCountry, booksCurrency, booksLocale, booksMoney, documentOptions, 
  * `null` means the form is closed; a number means that invoice is being edited;
  * the empty string means a new one is being written.
  */
-let editingInvoice: string | null = null;
+/** The document open in the editor, by key (a sale and a bill can share a number); "" for a new one. */
+let editingInvoice: DocumentKey | "" | null = null;
 
 /**
  * Which page the editor is open on.
@@ -323,7 +332,7 @@ export function renderInvoiceEditor(): void {
   const existing =
     editingInvoice === ""
       ? undefined
-      : (state.ledger.invoices ?? []).find((i) => i.number === editingInvoice);
+      : (state.ledger.invoices ?? []).find((i) => documentKey(i) === editingInvoice);
   // A working copy: nothing reaches the ledger until Save, so closing the form
   // leaves the invoice exactly as it was.
   const draft: Invoice = existing
@@ -489,7 +498,7 @@ export function renderInvoiceEditor(): void {
 
   // The job it is for, where jobs are kept: the customer's own listed first.
   const jobPick = document.createElement("select");
-  const wasJob = existing === undefined ? "" : (heldJobs().assigned[existing.number] ?? "");
+  const wasJob = existing === undefined ? "" : (assignedFor(heldJobs().assigned, documentSource(existing)) ?? "");
   const fillJobs = (): void => {
     const chosen = jobPick.value === "" && jobPick.options.length === 0 ? wasJob : jobPick.value;
     jobPick.textContent = "";
@@ -1159,7 +1168,7 @@ export function renderInvoiceEditor(): void {
   const saveWithJob = async (built: Invoice): Promise<void> => {
     await saveInvoice(built, existing);
     if (jobPick.options.length === 0 || !(state.ledger.invoices ?? []).includes(built)) return;
-    await giveDocument(built.number, jobPick.value, existing?.number);
+    await giveDocument(built, jobPick.value, existing);
   };
 
   const save = document.createElement("button");
@@ -1351,7 +1360,8 @@ async function saveInvoice(built: Invoice, existing: Invoice | undefined): Promi
   if (!(await creditLimitAllows(built, existing))) return;
   if (!(await accountsChosen(built))) return;
   const invoices = [...(state.ledger.invoices ?? [])];
-  const clash = invoices.findIndex((i) => i.number === built.number);
+  // Unique within a kind: a supplier's bill may carry the number of one of our sales.
+  const clash = invoices.findIndex((i) => i.kind === built.kind && i.number === built.number);
   if (clash >= 0 && invoices[clash] !== existing) {
     await tellOnPage(`There is already an invoice numbered ${built.number}.`);
     return;
@@ -1359,11 +1369,12 @@ async function saveInvoice(built: Invoice, existing: Invoice | undefined): Promi
 
   // The same number under a different prefix -- CN-0155 beside INV-0155 -- is
   // two documents that sound like one. Worth stopping to check, not worth
-  // forbidding, so it asks.
+  // forbidding, so it asks. Within one kind: a supplier's bill numbered like
+  // one of our sales is not a second document that sounds like it.
   const mine = splitInvoiceNumber(built.number);
   if (mine !== null) {
     const twin = invoices.find(
-      (i) => i !== existing && splitInvoiceNumber(i.number)?.value === mine.value,
+      (i) => i !== existing && i.kind === built.kind && splitInvoiceNumber(i.number)?.value === mine.value,
     );
     if (
       twin !== undefined &&
@@ -1437,7 +1448,8 @@ async function billReady(bill: Invoice): Promise<boolean> {
 }
 
 async function deleteInvoice(invoice: Invoice): Promise<void> {
-  const invoices = (state.ledger.invoices ?? []).filter((i) => i.number !== invoice.number);
+  // By key: deleting a bill took the sale of the same number with it.
+  const invoices = (state.ledger.invoices ?? []).filter((i) => documentKey(i) !== documentKey(invoice));
   state.ledger = { ...state.ledger, invoices };
   state.persistent = await savePart(state.ledger, "invoices");
   await record(
@@ -1502,7 +1514,7 @@ function editInvoiceCell(invoice: Invoice): HTMLTableCellElement {
   edit.textContent = "edit";
   edit.addEventListener("click", () => {
     editorOn = "invoices";
-    editingInvoice = invoice.number;
+    editingInvoice = documentKey(invoice);
     redraw("invoiceEditor");
     $("invoice-editor").scrollIntoView({ block: "nearest" });
   });
@@ -1634,7 +1646,7 @@ function editInvoiceCell(invoice: Invoice): HTMLTableCellElement {
 
   // A link to pay it by card, through the business's own Stripe account.
   if (stripeConnected() && !booksReadOnly() && invoice.kind === "sales" && isPosted(invoice) && invoice.receipt !== true) {
-    const owing = invoiceBalanceMap().get(invoice.number)?.remaining ?? 0;
+    const owing = invoiceBalanceMap().get(documentKey(invoice))?.remaining ?? 0;
     if (owing > 0) {
       const pay = document.createElement("button");
       pay.type = "button";
@@ -1724,7 +1736,7 @@ export function renderInvoices(): void {
     return;
   }
 
-  const byNumber = new Map(invoices.map((i) => [i.number, i]));
+  const byKey = new Map(invoices.map((i) => [documentKey(i), i]));
   const byTransaction = new Map(state.ledger.transactions.map((t) => [t.id, t]));
   // Split parts too, so a payment that settled several invoices can be shown
   // against each of them. A part is addressed by the id `expandSplits` gives
@@ -1815,7 +1827,7 @@ export function renderInvoices(): void {
     const tbody = document.createElement("tbody");
 
     for (const proposal of proposed) {
-      const invoice = byNumber.get(proposal.invoiceNumber);
+      const invoice = byKey.get(proposal.document);
       const bank = byTransaction.get(proposal.transactionId);
       const searchable =
         `${proposal.invoiceNumber} ${proposal.source} ${invoice?.contact ?? ""} ` +
@@ -1844,7 +1856,7 @@ export function renderInvoices(): void {
       accept.type = "button";
       accept.className = "primary";
       accept.textContent = "accept";
-      accept.addEventListener("click", () => void acceptMatch(proposal.transactionId, proposal.invoiceNumber));
+      accept.addEventListener("click", () => void acceptMatch(proposal.transactionId, proposal.document));
       actions.append(accept);
       tr.append(actions);
       tbody.append(tr);
@@ -2012,21 +2024,21 @@ export function renderInvoices(): void {
   // reports. Without these a payment split across two invoices cleared them
   // both out of "still owing" and then appeared nowhere at all -- money that
   // had gone somewhere the page could not say.
-  const shownAlready = new Set([
-    ...result.matched.map((m) => m.invoice.number),
-    ...acceptedDifferences.map((p) => p.invoiceNumber),
+  const shownAlready = new Set<DocumentKey>([
+    ...result.matched.map((m) => documentKey(m.invoice)),
+    ...acceptedDifferences.map((p) => p.document),
   ]);
-  const byInvoice = new Map<string, Transaction[]>();
-  for (const [transactionId, number] of invoiceAssignments()) {
-    if (number === "" || shownAlready.has(number)) continue;
+  const byInvoice = new Map<DocumentKey, Transaction[]>();
+  for (const [transactionId, key] of invoiceAssignments()) {
+    if (shownAlready.has(key)) continue;
     const t = byTransaction.get(transactionId);
     if (t === undefined) continue;
-    const list = byInvoice.get(number);
+    const list = byInvoice.get(key);
     if (list) list.push(t);
-    else byInvoice.set(number, [t]);
+    else byInvoice.set(key, [t]);
   }
-  for (const [number, lines] of byInvoice) {
-    const invoice = byNumber.get(number);
+  for (const [key, lines] of byInvoice) {
+    const invoice = byKey.get(key);
     if (invoice === undefined) continue;
     if (!hit(`${invoice.number} ${invoice.contact} ${invoice.reference}`)) continue;
     const tr = document.createElement("tr");
@@ -2056,8 +2068,8 @@ export function renderInvoices(): void {
   // a balance written off, a payment into undeposited funds.
   let elsewhere = 0;
   for (const invoice of invoices) {
-    if ((invoice.paidOutside ?? []).length === 0 || shownAlready.has(invoice.number) || byInvoice.has(invoice.number)) continue;
-    if (!isPosted(invoice) || (balances.get(invoice.number)?.remaining ?? 0) > 0) continue;
+    if ((invoice.paidOutside ?? []).length === 0 || shownAlready.has(documentKey(invoice)) || byInvoice.has(documentKey(invoice))) continue;
+    if (!isPosted(invoice) || (balances.get(documentKey(invoice))?.remaining ?? 0) > 0) continue;
     elsewhere += 1;
     if (!hit(`${invoice.number} ${invoice.contact} ${invoice.reference}`)) continue;
     const payments = invoice.paidOutside ?? [];
@@ -2102,7 +2114,7 @@ export function renderInvoices(): void {
       "<tr><th>Invoice</th><th>Invoice total</th><th>Bank line</th><th>Received</th><th>Difference</th><th>Why</th></tr>";
     const accBody = document.createElement("tbody");
     for (const proposal of acceptedDifferences) {
-      const invoice = byNumber.get(proposal.invoiceNumber);
+      const invoice = byKey.get(proposal.document);
       const bank = byTransaction.get(proposal.transactionId);
       if (!hit(`${proposal.invoiceNumber} ${invoice?.contact ?? ""} ${invoice?.reference ?? ""} ${bank?.otherParty ?? ""}`)) {
         continue;
@@ -2132,11 +2144,11 @@ export function renderInvoices(): void {
 }
 
 /** Record an accepted match, so it is not guessed again. */
-async function acceptMatch(transactionId: string, invoiceNumber: string): Promise<void> {
-  const invoiceMatches = { ...(state.ledger.invoiceMatches ?? {}), [transactionId]: invoiceNumber };
+async function acceptMatch(transactionId: string, key: DocumentKey): Promise<void> {
+  const invoiceMatches = { ...(state.ledger.invoiceMatches ?? {}), [transactionId]: key };
   state.ledger = { ...state.ledger, invoiceMatches };
   state.persistent = await savePart(state.ledger, "invoiceMatches");
-  state.invoiceMessage = `Matched ${invoiceNumber}. The difference is still yours to code.`;
+  state.invoiceMessage = `Matched ${documentNumberOf(key)}. The difference is still yours to code.`;
   redraw("invoices");
 }
 
@@ -2170,7 +2182,7 @@ export function startNewReceipt(): void {
  * that does not add up.
  */
 export async function approveBill(number: string): Promise<void> {
-  const existing = (state.ledger.invoices ?? []).find((i) => i.number === number);
+  const existing = (state.ledger.invoices ?? []).find((i) => i.kind === "purchase" && i.number === number);
   if (existing === undefined) return;
   await saveInvoice({ ...existing, status: "Awaiting Payment" }, existing);
 }
@@ -2185,7 +2197,7 @@ export function startNewBill(): void {
 /** Open an invoice in the editor, on the Invoices page. */
 export function editInvoice(number: string): void {
   editorOn = "invoices";
-  editingInvoice = number;
+  editingInvoice = documentKey("sales", number);
   newReceipt = false;
   redraw("invoiceEditor");
   document.getElementById("invoice-editor")?.scrollIntoView({ block: "nearest" });
@@ -2194,7 +2206,7 @@ export function editInvoice(number: string): void {
 /** Open a bill in the editor, on the Bills page. */
 export function editBill(number: string): void {
   editorOn = "bills";
-  editingInvoice = number;
+  editingInvoice = documentKey("purchase", number);
   redraw("invoiceEditor");
   document.getElementById("bill-editor")?.scrollIntoView({ block: "nearest" });
 }
@@ -2236,7 +2248,7 @@ export function wireInvoices(): void {
  */
 export function creditNoteSection(
   body: HTMLElement,
-  balances: Map<string, InvoiceBalance>,
+  balances: Map<DocumentKey, InvoiceBalance>,
   money: (cents: number) => string,
 ): void {
   const notes = [...balances.values()].filter((b) => b.status === "credit note");
@@ -2244,6 +2256,7 @@ export function creditNoteSection(
   const bills = notes.every((b) => b.invoice.kind === "purchase");
 
   const links = state.ledger.creditNotes ?? {};
+  const index = new DocumentIndex([...balances.values()].map((b) => b.invoice));
   const heading = document.createElement("h3");
   heading.textContent = `Credit notes (${notes.length})`;
   body.append(heading);
@@ -2306,19 +2319,20 @@ export function creditNoteSection(
     ];
     for (const other of ordered) {
       const option = document.createElement("option");
-      option.value = other.invoice.number;
+      option.value = documentKey(other.invoice);
       option.textContent =
         `${other.invoice.number} · ${other.invoice.issued} · ${other.invoice.contact} · ` +
         `${money(other.invoice.total)} (${money(other.remaining)} owing)`;
       pick.append(option);
     }
-    pick.value = links[cn.number] ?? "";
+    const linked = storedFor(links, cn) ?? "";
+    pick.value = index.resolveKey(linked, (d) => d.kind === cn.kind) ?? "";
     pick.addEventListener("change", () => {
-      void saveCreditNote(cn.number, pick.value);
+      void saveCreditNote(cn, pick.value);
     });
     // Used in part under Credit on account: applying it whole as well would
     // count it twice.
-    if (usedInPart(cn.number) && (links[cn.number] ?? "") === "") cell.append("Used in part, under Credit on account");
+    if (usedInPart(cn) && linked === "") cell.append("Used in part, under Credit on account");
     else cell.append(pick);
     tr.append(cell);
     tbody.append(tr);
@@ -2329,20 +2343,25 @@ export function creditNoteSection(
 }
 
 /** Record which invoice a credit note credits, or take the link away. */
-async function saveCreditNote(note: string, invoice: string): Promise<void> {
+async function saveCreditNote(note: Invoice, target: string): Promise<void> {
   const before = state.ledger.creditNotes ?? {};
   const after = { ...before };
-  if (invoice === "") delete after[note];
-  else after[note] = invoice;
+  // Kept by key from now on; the bare number older books used goes with it,
+  // when that number meant this note and not another kind's of the same number.
+  const index = new DocumentIndex(state.ledger.invoices ?? []);
+  const bare = index.resolve(note.number, isCreditNote);
+  if (bare !== undefined && documentKey(bare) === documentKey(note)) delete after[note.number];
+  delete after[documentKey(note)];
+  if (target !== "") after[documentKey(note)] = target;
 
   state.ledger = { ...state.ledger, creditNotes: after };
   state.persistent = await savePart(state.ledger);
   await record(
     "invoice",
-    invoice === "" ? `${note} credits nothing` : `${note} credits ${invoice}`,
+    target === "" ? `${note.number} credits nothing` : `${note.number} credits ${documentNumberOf(target)}`,
     before,
     after,
-    note,
+    note.number,
   );
   // Both pages list credit notes: a supplier's chosen on Bills stayed on the
   // screen, still unassigned, until the page was left and opened again.

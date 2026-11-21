@@ -1,4 +1,5 @@
 import type { PostedJournal } from "./posting.js";
+import { splitDocumentKey } from "./document-key.js";
 
 /**
  * Classes: a second way of cutting the profit and loss, across accounts --
@@ -18,10 +19,37 @@ export const UNCLASSIFIED = "Unclassified";
  * journal it came from. An invoice's payment, and the cost of the stock it
  * sold, are classed with the invoice.
  */
-export function classSource(journal: Pick<PostedJournal, "transactionId">): string {
+export function classSource(journal: Pick<PostedJournal, "transactionId" | "document">): string {
+  // A document's journals say which document, by key: its number alone is
+  // shared by a sale and a bill, and a job given the sale took the bill too.
+  if (journal.document !== undefined) return journal.document;
   const id = journal.transactionId;
   const paid = /^(.*):(?:paid:\d+|cost)$/.exec(id);
   return paid !== null && paid[1] !== undefined ? paid[1] : id;
+}
+
+/**
+ * What a source is given -- a class, a job -- from what is kept: under the
+ * source itself, or, for a document, under its bare number as books saved
+ * before document keys kept it. An empty string kept under the key is a
+ * taking-off, and stops the bare number answering for it.
+ */
+export function assignedFor<T>(assignments: Readonly<Record<string, T>>, source: string): T | undefined {
+  const own = assignments[source];
+  if (own !== undefined) return own;
+  const split = splitDocumentKey(source);
+  return split === null ? undefined : assignments[split.number];
+}
+
+/** The assignments with a source given `value`, or taken off with "". */
+export function withAssignment(assignments: Readonly<Record<string, string>>, source: string, value: string): Record<string, string> {
+  const next = { ...assignments };
+  const split = splitDocumentKey(source);
+  if (value !== "") next[source] = value;
+  // Still answered by a bare number from older books: said "" so it stays off.
+  else if (split !== null && next[split.number] !== undefined && next[split.number] !== "") next[source] = "";
+  else delete next[source];
+  return next;
 }
 
 export interface ClassColumn {
@@ -43,7 +71,7 @@ export function profitAndLossByClass(
   const columns = new Map<string, ClassColumn>();
   for (const journal of journals) {
     if (journal.date < range.from || journal.date > range.to) continue;
-    const name = assignments[classSource(journal)] ?? UNCLASSIFIED;
+    const name = assignedFor(assignments, classSource(journal)) || UNCLASSIFIED;
     for (const line of journal.lines) {
       const code = line.accountCode.trim();
       if (!counts(code)) continue;

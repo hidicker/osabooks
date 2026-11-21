@@ -3,6 +3,8 @@ import { daysBetween } from "./dates.js";
 import type { Transaction } from "./types.js";
 import type { Invoice, PaymentAllocation } from "./invoices.js";
 import { namesInvoice } from "./invoice-candidates.js";
+import { documentKey, settlesInDirection } from "./document-key.js";
+import type { DocumentKey } from "./document-key.js";
 
 /**
  * Matching invoices to the money that settled them.
@@ -27,6 +29,11 @@ import { namesInvoice } from "./invoice-candidates.js";
 
 const WINDOW_DAYS = 120;
 
+/** A document settled by money arriving, with a positive total: a sale. */
+function receivable(invoice: Invoice): boolean {
+  return invoice.total > 0 && settlesInDirection(invoice, invoice.total);
+}
+
 export interface InvoiceMatch {
   invoice: Invoice;
   /** One receipt for a single payment, several for instalments. */
@@ -39,6 +46,8 @@ export interface InvoiceMatchProposal {
   id: string;
   transactionId: string;
   invoiceNumber: string;
+  /** The document it is for, by key. */
+  document: DocumentKey;
   /** What the invoice says is outstanding. */
   invoiceAmount: Cents;
   /** What actually arrived. */
@@ -103,7 +112,7 @@ export function matchInvoices(options: InvoiceMatchOptions): InvoiceMatchResult 
   // that merely has the same amount.
   const claimed = new Map<string, Transaction>();
   for (const invoice of invoices) {
-    if (invoice.paid === 0) continue;
+    if (invoice.paid === 0 || !receivable(invoice)) continue;
     const named = (byAmount.get(invoice.total) ?? []).filter(
       (t) =>
         !used.has(t.id) &&
@@ -123,7 +132,11 @@ export function matchInvoices(options: InvoiceMatchOptions): InvoiceMatchResult 
     // invoice still exists and still has to be visible: skipping it outright
     // hid every invoice awaiting payment, and every invoice raised by hand,
     // which is the normal state of one the moment it is written.
-    if (invoice.paid === 0) {
+    //
+    // Only money in is looked for, so only what money in settles is matched:
+    // a sale. A bill paid in Xero was otherwise paired with a customer's
+    // receipt of the same amount, and the receipt posted to Accounts Payable.
+    if (invoice.paid === 0 || !receivable(invoice)) {
       unmatched.push(invoice);
       continue;
     }
@@ -186,6 +199,7 @@ export function matchInvoices(options: InvoiceMatchOptions): InvoiceMatchResult 
             id: `${invoice.number}~${candidate.id.slice(0, 8)}`,
             transactionId: candidate.id,
             invoiceNumber: invoice.number,
+            document: documentKey(invoice),
             invoiceAmount: allocation.amount,
             bankAmount: candidate.amount,
             adjustment: candidate.amount - allocation.amount,
@@ -241,6 +255,7 @@ export function matchInvoices(options: InvoiceMatchOptions): InvoiceMatchResult 
         id: `${invoice.number}~${candidate.id.slice(0, 8)}`,
         transactionId: candidate.id,
         invoiceNumber: invoice.number,
+        document: documentKey(invoice),
         invoiceAmount: invoice.total,
         bankAmount: candidate.amount,
         adjustment: candidate.amount - invoice.total,

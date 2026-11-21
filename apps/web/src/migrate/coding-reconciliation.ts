@@ -65,6 +65,8 @@ import {
   labelForChartAccount,
   parseOwners,
   localToday,
+  documentKey,
+  documentNumberOf,
 } from "@nzosa/core";
 import type {
   Account,
@@ -795,8 +797,9 @@ function compareAfresh() {
   // compared by its own code it read as a disagreement that could not be
   // settled: accepting the other coding changed nothing that posts.
   const assignedTo = invoiceAssignments();
+  // By key: a claim, a bill and a sale can share a number.
   const invoiceKind = new Map(
-    (state.ledger.invoices ?? []).map((i) => [i.number, i.claim === true ? "claim" : i.kind]),
+    (state.ledger.invoices ?? []).map((i) => [documentKey(i), i.claim === true ? "claim" : i.kind]),
   );
   const clearingLabel = (kind: string | undefined): string => {
     // An expense claim is repaid out of Unpaid Expense Claims, not Accounts
@@ -820,7 +823,7 @@ function compareAfresh() {
     return {
       transaction: one.transaction,
       code:
-        settles !== undefined && settles !== ""
+        settles !== undefined
           ? clearingLabel(invoiceKind.get(settles))
           : one.code,
     };
@@ -1776,9 +1779,9 @@ function section(
     // what it says. Showing the code matching gave it -- "200 Sales" -- read as
     // agreeing with the other system on a row reporting that it did not.
     const settles = invoiceAssignments().get(row.transaction.id);
-    const settlesInvoice = settles !== undefined && settles !== "";
+    const settlesInvoice = settles !== undefined;
     const coded = settlesInvoice
-      ? `settles ${settles}`
+      ? `settles ${documentNumberOf(settles)}`
       : override?.code === undefined
         ? ""
         : override.confirmed === true
@@ -2283,12 +2286,12 @@ function unmatchForCoding(
   matches: Record<string, string>,
 ): string | null {
   const settles = invoiceAssignments().get(transaction.id);
-  if (settles === undefined || settles === "") return null;
+  if (settles === undefined) return null;
   // Receivables, payables or expense claims: the account a settled document
   // clears, so taking it agrees with the match rather than refusing it.
   if (/\b(610|800|801)\b|accounts\s+(receivable|payable)|unpaid\s+expense\s+claims?/i.test(chosen)) return null;
   matches[transaction.id] = "";
-  return settles;
+  return documentNumberOf(settles);
 }
 
 /**

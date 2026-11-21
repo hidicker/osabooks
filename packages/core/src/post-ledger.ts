@@ -2,6 +2,7 @@ import type { Account } from "./chart.js";
 import type { GstClassification } from "./gst.js";
 import type { Invoice } from "./invoices.js";
 import { isPosted } from "./invoices.js";
+import { DocumentIndex, settlesInDirection } from "./document-key.js";
 import { outsidePaymentJournals } from "./bills.js";
 import type { ManualJournal } from "./manual-journals.js";
 import { postManualJournal } from "./manual-journals.js";
@@ -55,7 +56,7 @@ export interface PostLedgerOptions {
   /** Every transaction unexpanded, which is where a transfer's legs are found. */
   byId: ReadonlyMap<string, Transaction>;
   invoices: readonly Invoice[];
-  /** Which transaction, or split part, settled which invoice. */
+  /** Which transaction, or split part, settled which document: its key, or a bare number in older books. */
   settled: ReadonlyMap<string, string>;
   /** Each leg pointing at its partner; both directions are present. */
   transfers: Readonly<Record<string, string>>;
@@ -162,7 +163,9 @@ export function postLedger(options: PostLedgerOptions): PostedJournal[] {
     },
   };
 
-  const byNumber = new Map(invoices.map((i) => [i.number, i]));
+  // By kind and number: a sale and a bill can share a number, and a receipt
+  // found the bill's Accounts Payable when looked up by the number alone.
+  const documents = new DocumentIndex(invoices);
 
   // Each document's own control account, as posting options: the invoice
   // journal, its bank settlements and its other payments all name the same
@@ -197,7 +200,7 @@ export function postLedger(options: PostLedgerOptions): PostedJournal[] {
 
   const bank = transactions.flatMap((t) => {
     if (postedAsTransfer.has(t.id)) return [];
-    const invoice = byNumber.get(settled.get(t.id) ?? "");
+    const invoice = documents.resolve(settled.get(t.id), (d) => settlesInDirection(d, t.amount));
     if (invoice) {
       return [
         postTransaction(t, [], {
