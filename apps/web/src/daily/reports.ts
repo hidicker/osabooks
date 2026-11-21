@@ -3338,6 +3338,15 @@ function renderGstReturn(body: HTMLElement, year: number): void {
       "on an assumption. Code them before filing.";
     body.append(warn);
   }
+  if (result.refundsMoved !== undefined) {
+    // The form has no minus sign on Boxes 5 and 11: a period of net refunds
+    // is said as an adjustment, which is what Inland Revenue expects.
+    const { toBox13, toBox9 } = result.refundsMoved;
+    const said: string[] = [];
+    if (toBox13 !== 0) said.push(`refunds to customers came to more than the period's sales, so their GST, ${booksMoney(toBox13)}, is in Box 13 as a credit adjustment`);
+    if (toBox9 !== 0) said.push(`refunds from suppliers came to more than the period's purchases, so their GST, ${booksMoney(toBox9)}, is in Box 9 as a debit adjustment`);
+    body.append(note(`In this period ${said.join("; and ")}. Box 15 is the same either way.`));
+  }
   if (result.missingTaxPoint.length > 0) {
     body.append(
       note(

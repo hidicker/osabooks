@@ -197,6 +197,13 @@ export interface GstReturnOptions {
   otherSales?: readonly OtherPurchase[];
   /** How to arrive at the GST content. Defaults to `per-line`. */
   rounding?: GstRounding;
+  /**
+   * New Zealand's GST101A: Boxes 5, 6 and 11 carry no sign, so a period's net
+   * refunds are said as adjustments -- to customers in Box 13, from suppliers
+   * in Box 9 -- with Box 15 the same. Off by default: the Australian and
+   * Korean returns read these boxes their own way.
+   */
+  refundsAsAdjustments?: boolean;
 }
 
 /** A purchase paid other than through a bank line, as the return takes it. */
@@ -251,6 +258,12 @@ export interface GstReturnResult {
   otherPurchases: OtherPurchase[];
   /** Sales in Box 5 that no bank line shows, after any share. */
   otherSales: OtherPurchase[];
+  /**
+   * A period's net refunds, moved out of Boxes 5 to 8 or 11 and 12, which
+   * cannot be negative: the GST on refunds to customers into Box 13, on
+   * refunds from suppliers into Box 9. Absent when nothing moved.
+   */
+  refundsMoved?: { toBox13: Cents; toBox9: Cents };
 }
 
 /**
@@ -417,7 +430,7 @@ export function gstReturn(
   const perLine = rounding === "per-line";
 
   let box7 = box5 - box6;
-  const box8 = perLine ? perLineGst : gstContent(box7);
+  let box8 = perLine ? perLineGst : gstContent(box7);
   if (perLine) {
     // Box 7 is worked back from Box 8, and Box 5 has to follow it.
     //
@@ -431,11 +444,34 @@ export function gstReturn(
     box5 = box7 + box6;
   }
 
-  const box9 = (options.adjustments ?? 0) + lateDebit;
-  const box10 = box8 + box9;
   if (perLine) box11 = grossFromTax(perLinePurchaseGst);
-  const box12 = perLine ? perLinePurchaseGst : gstContent(box11);
-  const box13 = (options.creditAdjustments ?? 0) + importGst + lateCredit;
+  let box12 = perLine ? perLinePurchaseGst : gstContent(box11);
+
+  // A period whose refunds outweigh its trading. The form has no sign on
+  // Boxes 5, 6 and 11, and Inland Revenue (and the filing service) refuse a
+  // negative one: net refunds to customers are a credit adjustment, in Box 13,
+  // and net refunds from suppliers a debit adjustment, in Box 9. Box 15 comes
+  // out the same; only where the GST is said moves.
+  let refundsToCustomers = 0;
+  let refundsFromSuppliers = 0;
+  if (options.refundsAsAdjustments === true) {
+    if (box6 < 0) box6 = 0; // zero-rated: no GST to move
+    if (box7 < 0) {
+      refundsToCustomers = -box8;
+      box7 = 0;
+      box8 = 0;
+    }
+    box5 = box7 + box6;
+    if (box11 < 0) {
+      refundsFromSuppliers = -box12;
+      box11 = 0;
+      box12 = 0;
+    }
+  }
+
+  const box9 = (options.adjustments ?? 0) + lateDebit + refundsFromSuppliers;
+  const box10 = box8 + box9;
+  const box13 = (options.creditAdjustments ?? 0) + importGst + lateCredit + refundsToCustomers;
   const box14 = box12 + box13;
 
   const difference = box10 - box14;
@@ -464,6 +500,9 @@ export function gstReturn(
     missingTaxPoint,
     otherPurchases,
     otherSales,
+    ...(refundsToCustomers !== 0 || refundsFromSuppliers !== 0
+      ? { refundsMoved: { toBox13: refundsToCustomers, toBox9: refundsFromSuppliers } }
+      : {}),
   };
 }
 
