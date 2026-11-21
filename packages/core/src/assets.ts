@@ -196,13 +196,14 @@ function monthsBefore(date: IsoDate, months: number): IsoDate {
 /**
  * What an asset has already depreciated before a period opens.
  *
- * Straight line takes the same slice of cost every year, so the whole run can
- * be worked out in one multiplication. Diminishing value cannot: each year is
- * a percentage of what was left after the last one, so the years are walked.
- *
- * The years are anchored on the period being reported, twelve months at a
- * time. That is what makes the opening value here the closing value of the
- * schedule printed last year.
+ * The years are walked, twelve months at a time and anchored on the period
+ * being reported, each charged as that year's own schedule charged it:
+ * diminishing value on what was left after the year before, straight line on
+ * cost. That is what makes the opening value here the closing value of the
+ * schedule printed last year. Straight line was once worked as one charge
+ * over the whole span, and a sum of rounded yearly charges is not always one
+ * rounded charge: about one year in fifteen opened a cent off last year's
+ * close, and the posted depreciation and the register disagreed by cents.
  */
 function priorDepreciationOf(asset: FixedAsset, from: IsoDate, period: DateRange, options: DepreciationOptions = {}): Cents {
   const dayBefore = (date: IsoDate): IsoDate => {
@@ -212,10 +213,7 @@ function priorDepreciationOf(asset: FixedAsset, from: IsoDate, period: DateRange
   };
   const priorEnd = dayBefore(period.from);
   if (from > priorEnd) return 0;
-
-  if (!isDiminishing(asset)) {
-    return charge(asset.cost, asset.rate, from, priorEnd, asset.cost, options);
-  }
+  const diminishing = isDiminishing(asset);
 
   // How many whole years back the first one starts.
   let years = 0;
@@ -228,7 +226,8 @@ function priorDepreciationOf(asset: FixedAsset, from: IsoDate, period: DateRange
     const end = dayBefore(monthsBefore(period.from, (back - 1) * 12));
     if (end < from) continue;
 
-    const taken = charge(book, asset.rate, from > start ? from : start, end > priorEnd ? priorEnd : end, book, options);
+    const base = diminishing ? book : asset.cost;
+    const taken = charge(base, asset.rate, from > start ? from : start, end > priorEnd ? priorEnd : end, book, options);
     accumulated += taken;
     book -= taken;
   }
