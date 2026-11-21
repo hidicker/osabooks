@@ -268,6 +268,10 @@ export function computeOurReturns(input: VarianceInput, from: string, to: string
       // works Box 5 back from it. Elsewhere the form's way: the totals, so an
       // Australian BAS's G1 is the sales as they were, not a cent off them.
       rounding: booksCountry().id === "nz" ? "per-line" : "form",
+      // The GST101A has no sign on Boxes 5 and 11: a period's net refunds are
+      // adjustments there, and only there (a BAS and a Korean return read
+      // these boxes their own way).
+      refundsAsAdjustments: booksCountry().id === "nz",
       adjustments: input.debitAdjustments?.(period) ?? 0,
       otherPurchases: input.otherPurchases?.(period) ?? [],
       otherSales: input.otherSales?.(period) ?? [],

@@ -11,6 +11,7 @@ import {
   accountEntityKey,
   knownCodes,
   labelForChartAccount,
+  jurisdictionOf,
   type EntityModel,
 } from "@nzosa/core";
 import type {
@@ -183,6 +184,8 @@ export function computeGstReturns(
       basis: options.basis,
       rounding: options.rounding,
       sharePercent: options.sharePercent,
+      // New Zealand's GST101A has no sign on Boxes 5 and 11; other countries' books keep them as they are.
+      refundsAsAdjustments: jurisdictionOf(ledger.jurisdiction).id === "nz",
     }),
   );
 
