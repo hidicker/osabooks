@@ -11,7 +11,7 @@ import type {
   TransactionOverride,
   VarianceNote,
 } from "@nzosa/core";
-import { restoreMove } from "@nzosa/core";
+import { documentKey, restoreMove } from "@nzosa/core";
 import type { MovableBooks, MoveSnapshot } from "@nzosa/core";
 import type { StoredLedger } from "./store.js";
 
@@ -498,7 +498,8 @@ export function reverse(ledger: StoredLedger, event: LedgerEvent): StoredLedger 
       const invoices = [...(ledger.invoices ?? [])];
       const target = (event.after ?? event.before) as Invoice | null;
       if (target === null) return ledger;
-      const at = invoices.findIndex((i) => i.number === target.number);
+      // By kind and number: a sale and a bill can share a number.
+      const at = invoices.findIndex((i) => i.kind === target.kind && i.number === target.number);
       if (event.before === null || event.before === undefined) {
         if (at >= 0) invoices.splice(at, 1);
       } else if (at >= 0) {
@@ -649,8 +650,8 @@ export function reverse(ledger: StoredLedger, event: LedgerEvent): StoredLedger 
       return { ...ledger, chart };
     }
     case "invoiceBatch": {
-      const made = new Set(((event.after ?? []) as Invoice[]).map((i) => i.number));
-      return { ...ledger, invoices: (ledger.invoices ?? []).filter((i) => !made.has(i.number)) };
+      const made = new Set(((event.after ?? []) as Invoice[]).map((i) => documentKey(i)));
+      return { ...ledger, invoices: (ledger.invoices ?? []).filter((i) => !made.has(documentKey(i))) };
     }
     case "timeApproval":
       return { ...ledger, timeApproval: event.before === true };

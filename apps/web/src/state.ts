@@ -4,6 +4,7 @@ import type {
   Account,
   CodingCounts,
   DedupeEntry,
+  DocumentKey,
   FiledReturn,
   ImportProblem,
   Invoice,
@@ -257,7 +258,7 @@ export const $ = <T extends HTMLElement>(id: string): T => {
  * instead of being missed.
  */
 export const caches = {
-  assignment: null as | { ledger: unknown; map: Map<string, string> }  | null,
+  assignment: null as | { ledger: unknown; map: Map<string, DocumentKey> }  | null,
   inPlay: null as { ledger: unknown; start: string | undefined; invoices: Invoice[] } | null,
   transfer: null as { ledger: unknown; ids: Set<string> } | null,
   bank: undefined as | { source: readonly Transaction[]; accounts: Set<string>; labels: Map<string, string> }  | undefined,

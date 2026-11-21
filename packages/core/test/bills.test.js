@@ -25,7 +25,7 @@ const bill = (over = {}) => ({
 });
 
 const balanceOf = (doc, assignments = []) =>
-  invoiceBalances([doc], assignments).get(doc.number);
+  invoiceBalances([doc], assignments).get(`${doc.kind}:${doc.number}`);
 
 test("a bill's status: draft and voided are decisions, the rest are the money", () => {
   assert.equal(documentStatus(balanceOf(bill({ status: "Draft" })), "2025-05-10"), "Draft");
@@ -33,11 +33,11 @@ test("a bill's status: draft and voided are decisions, the rest are the money", 
   assert.equal(documentStatus(balanceOf(bill()), "2025-05-10"), "Awaiting payment");
   assert.equal(documentStatus(balanceOf(bill()), "2025-05-21"), "Overdue");
   assert.equal(
-    documentStatus(balanceOf(bill(), [{ invoiceNumber: "BILL-0001", amount: -5000 }]), "2025-05-10"),
+    documentStatus(balanceOf(bill(), [{ document: "BILL-0001", amount: -5000 }]), "2025-05-10"),
     "Part paid",
   );
   assert.equal(
-    documentStatus(balanceOf(bill(), [{ invoiceNumber: "BILL-0001", amount: -11500 }]), "2025-06-10"),
+    documentStatus(balanceOf(bill(), [{ document: "BILL-0001", amount: -11500 }]), "2025-06-10"),
     "Paid",
   );
 });
@@ -138,7 +138,7 @@ test("aged payables: owing on the day asked, by days past due", () => {
   const report = agedReport({
     invoices: docs, kind: "purchase", asAt: "2025-03-31",
     // Paid after the day asked about, so still owing then.
-    payments: [{ invoiceNumber: "B2", date: "2025-04-03", amount: -2000 }],
+    payments: [{ document: "purchase:B2", date: "2025-04-03", amount: -2000 }],
   });
   assert.equal(report.total, 6000, "B1 + B2 + B3; not the draft, not next month's bill");
   const kowhai = report.contacts.find((c) => c.contact === "Kowhai Plumbing");
@@ -148,7 +148,7 @@ test("aged payables: owing on the day asked, by days past due", () => {
 
   const later = agedReport({
     invoices: docs, kind: "purchase", asAt: "2025-04-30",
-    payments: [{ invoiceNumber: "B2", date: "2025-04-03", amount: -2000 }],
+    payments: [{ document: "purchase:B2", date: "2025-04-03", amount: -2000 }],
   });
   assert.equal(later.total, 1000 + 3000 + 700);
 });

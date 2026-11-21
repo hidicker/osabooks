@@ -24,6 +24,7 @@ import {
   formatAmount,
   isPosted,
   localToday,
+  documentKey,
 } from "@nzosa/core";
 import type { DocumentStatus, Entity, Invoice, InvoiceBalance, OutsidePayment } from "@nzosa/core";
 import { booksCountry, booksMoney, noSalesTax, sayTax } from "../country.js";
@@ -103,7 +104,7 @@ export function renderBills(): void {
   const bills = billsInView();
   const rows = bills
     .map((bill) => {
-      const balance = balances.get(bill.number);
+      const balance = balances.get(documentKey(bill));
       return balance === undefined ? null : { bill, balance, status: documentStatus(balance, now) };
     })
     .filter((r): r is { bill: Invoice; balance: InvoiceBalance; status: DocumentStatus } => r !== null);
@@ -544,7 +545,7 @@ function billsBankFile(): void {
   const balances = invoiceBalanceMap();
   const now = today();
   const open = billsInView()
-    .map((bill) => ({ bill, balance: balances.get(bill.number) }))
+    .map((bill) => ({ bill, balance: balances.get(documentKey(bill)) }))
     .filter((r): r is { bill: Invoice; balance: InvoiceBalance } => r.balance !== undefined)
     .filter((r) => ["Awaiting payment", "Part paid", "Overdue"].includes(documentStatus(r.balance, now)) && r.balance.remaining > 0)
     .sort((a, b) => (a.bill.due ?? a.bill.issued).localeCompare(b.bill.due ?? b.bill.issued));

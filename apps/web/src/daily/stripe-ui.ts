@@ -6,7 +6,7 @@ import { booksCurrency } from "../country.js";
 import { state } from "../state.js";
 import { backendKind, booksReadOnly, openCloudBookId, savePart } from "../store.js";
 import { askOnPage, note, noteBriefly, tellOnPage } from "../ui.js";
-import { formatAmount, isPosted, localToday } from "@nzosa/core";
+import { documentKey, formatAmount, isPosted, localToday } from "@nzosa/core";
 import type { Invoice } from "@nzosa/core";
 
 /**
@@ -83,7 +83,7 @@ async function replaceInvoice(before: Invoice, after: Invoice, what: string): Pr
  */
 export async function payLinkFor(invoice: Invoice): Promise<void> {
   const book = openCloudBookId();
-  const owing = invoiceBalanceMap().get(invoice.number)?.remaining ?? invoice.total;
+  const owing = invoiceBalanceMap().get(documentKey(invoice))?.remaining ?? invoice.total;
   if (!isPosted(invoice) || owing <= 0) {
     await tellOnPage(`${invoice.number} has nothing owing.`);
     return;

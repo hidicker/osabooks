@@ -4,8 +4,18 @@ import { booksCurrency, booksMoney } from "../country.js";
 import { state } from "../state.js";
 import { save } from "../store.js";
 import { amountCell, nameCell, note, wideTable } from "../ui.js";
-import { allocationProblem, creditsOnAccount, parseAmount, proposeAllocations, localToday } from "@nzosa/core";
-import type { CreditAllocation, CreditOnAccount, InvoiceBalance, InvoiceKind, IsoDate } from "@nzosa/core";
+import {
+  allocationProblem,
+  creditsOnAccount,
+  DocumentIndex,
+  documentKey,
+  documentNumberOf,
+  parseAmount,
+  proposeAllocations,
+  localToday,
+  resolveAllocation,
+} from "@nzosa/core";
+import type { CreditAllocation, CreditOnAccount, DocumentKey, Invoice, InvoiceBalance, InvoiceKind, IsoDate } from "@nzosa/core";
 
 /**
  * Credit on account: what a customer or supplier has in credit -- a credit
@@ -16,9 +26,13 @@ import type { CreditAllocation, CreditOnAccount, InvoiceBalance, InvoiceKind, Is
 const today = (): IsoDate => localToday() as IsoDate;
 
 /** Credit on account for a page's documents, by contact, with a way to use it. */
-export function creditOnAccountSection(body: HTMLElement, balances: Map<string, InvoiceBalance>, kind: InvoiceKind): void {
+export function creditOnAccountSection(body: HTMLElement, balances: Map<DocumentKey, InvoiceBalance>, kind: InvoiceKind): void {
   const credits = creditsOnAccount(balances.values(), kind, state.ledger.creditNotes ?? {});
-  const used = (state.ledger.creditAllocations ?? []).filter((a) => balances.get(a.from)?.invoice.kind === kind);
+  const index = new DocumentIndex([...balances.values()].map((b) => b.invoice));
+  const used = (state.ledger.creditAllocations ?? []).filter((a) => {
+    const pair = resolveAllocation(index, a);
+    return pair !== undefined && balances.get(pair.from)?.invoice.kind === kind;
+  });
   if (credits.length === 0 && used.length === 0) return;
   const heading = document.createElement("h3");
   heading.textContent = "Credit on account";
@@ -71,7 +85,9 @@ function usedList(used: readonly CreditAllocation[]): HTMLElement {
   const tbody = document.createElement("tbody");
   for (const a of [...used].sort((x, y) => y.date.localeCompare(x.date))) {
     const tr = document.createElement("tr");
-    tr.append(nameCell(a.date), nameCell(a.from), nameCell(a.to), amountCell(booksMoney(a.amount)));
+    const fromNumber = documentNumberOf(a.from);
+    const toNumber = documentNumberOf(a.to);
+    tr.append(nameCell(a.date), nameCell(fromNumber), nameCell(toNumber), amountCell(booksMoney(a.amount)));
     const cell = document.createElement("td");
     const remove = document.createElement("button");
     remove.type = "button";
@@ -79,7 +95,7 @@ function usedList(used: readonly CreditAllocation[]): HTMLElement {
     remove.textContent = "Remove";
     remove.addEventListener("click", () => {
       const all = state.ledger.creditAllocations ?? [];
-      void keepAllocations(all.filter((x) => x !== a), `Took ${booksMoney(a.amount)} of ${a.from} back off ${a.to}`);
+      void keepAllocations(all.filter((x) => x !== a), `Took ${booksMoney(a.amount)} of ${fromNumber} back off ${toNumber}`);
     });
     cell.append(remove);
     tr.append(cell);
@@ -129,15 +145,17 @@ function openUseCredit(credit: CreditOnAccount): void {
 
   // Proposed: oldest due first, as much as the credit covers.
   const proposed = proposeAllocations(credit, undefined, date.value as IsoDate);
-  const firstGuess = new Map<string, number>();
-  for (const a of proposed) firstGuess.set(a.to, (firstGuess.get(a.to) ?? 0) + a.amount);
+  const firstGuess = new Map<DocumentKey, number>();
+  // proposeAllocations writes keys, never bare numbers.
+  for (const a of proposed) firstGuess.set(a.to as DocumentKey, (firstGuess.get(a.to as DocumentKey) ?? 0) + a.amount);
 
   const table = document.createElement("table");
   table.className = "report-table payment-file-table";
   table.innerHTML = "<thead><tr><th>Document</th><th>Date</th><th>Due</th><th style=\"text-align:right\">Owing</th><th style=\"text-align:right\">Use</th></tr></thead>";
   const tbody = document.createElement("tbody");
-  const boxes = new Map<string, HTMLInputElement>();
+  const boxes = new Map<DocumentKey, HTMLInputElement>();
   for (const b of credit.open) {
+    const key = documentKey(b.invoice);
     const tr = document.createElement("tr");
     tr.append(nameCell(b.invoice.number), nameCell(b.invoice.issued), nameCell(b.invoice.due ?? ""), amountCell(booksMoney(b.remaining)));
     const cell = document.createElement("td");
@@ -147,11 +165,11 @@ function openUseCredit(credit: CreditOnAccount): void {
     amount.inputMode = "decimal";
     amount.style.width = "7em";
     amount.style.textAlign = "right";
-    const guess = firstGuess.get(b.invoice.number) ?? 0;
+    const guess = firstGuess.get(key) ?? 0;
     amount.value = guess === 0 ? "" : (guess / 100).toFixed(2);
     amount.setAttribute("aria-label", `Credit to use on ${b.invoice.number}`);
     amount.addEventListener("input", () => showTotal());
-    boxes.set(b.invoice.number, amount);
+    boxes.set(key, amount);
     cell.append(amount);
     tr.append(cell);
     tbody.append(tr);
@@ -163,12 +181,12 @@ function openUseCredit(credit: CreditOnAccount): void {
   const said = document.createElement("p");
   said.className = "cloud-said";
   said.setAttribute("role", "alert");
-  const wanted = (): Map<string, number> | null => {
-    const out = new Map<string, number>();
-    for (const [number, input] of boxes) {
+  const wanted = (): Map<DocumentKey, number> | null => {
+    const out = new Map<DocumentKey, number>();
+    for (const [key, input] of boxes) {
       const cents = parseAmount(input.value.trim() || "0", booksCurrency());
       if (cents === null || cents < 0) return null;
-      out.set(number, cents);
+      out.set(key, cents);
     }
     return out;
   };
@@ -220,7 +238,7 @@ function openUseCredit(credit: CreditOnAccount): void {
       return;
     }
     for (const b of credit.open) {
-      if ((w.get(b.invoice.number) ?? 0) > b.remaining) {
+      if ((w.get(documentKey(b.invoice)) ?? 0) > b.remaining) {
         said.textContent = `${b.invoice.number} owes ${booksMoney(b.remaining)}.`;
         return;
       }
@@ -233,7 +251,7 @@ function openUseCredit(credit: CreditOnAccount): void {
       return;
     }
     go.disabled = true;
-    const targets = [...new Set(made.map((a) => a.to))].join(", ");
+    const targets = [...new Set(made.map((a) => documentNumberOf(a.to)))].join(", ");
     void keepAllocations(
       [...(state.ledger.creditAllocations ?? []), ...made],
       `${booksMoney(sum)} of ${credit.contact}'s credit used on ${targets}`,
@@ -253,6 +271,8 @@ function openUseCredit(credit: CreditOnAccount): void {
 }
 
 /** Whether a credit note has been used in part, and so cannot also be applied whole. */
-export function usedInPart(number: string): boolean {
-  return (state.ledger.creditAllocations ?? []).some((a) => a.from === number);
+export function usedInPart(note: Invoice): boolean {
+  const index = new DocumentIndex(state.ledger.invoices ?? []);
+  const key = documentKey(note);
+  return (state.ledger.creditAllocations ?? []).some((a) => resolveAllocation(index, a)?.from === key);
 }

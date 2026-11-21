@@ -5,6 +5,8 @@ import type { Invoice, InvoiceAssignment, InvoiceBalance, InvoiceKind } from "./
 import { splitPartId } from "./splits.js";
 import type { Splits } from "./splits.js";
 import type { Transaction } from "./types.js";
+import { DocumentIndex, documentKey, settlesInDirection } from "./document-key.js";
+import type { DocumentKey } from "./document-key.js";
 
 /**
  * What is still owing on each invoice, counting split parts as payments.
@@ -18,8 +20,9 @@ export function invoiceBalancesFor(options: {
   invoices: readonly Invoice[];
   transactions: readonly Transaction[];
   splits: Splits;
+  /** Bank line or part id to the document it settles, by key or, in older books, bare number. */
   assignments: ReadonlyMap<string, string>;
-  /** Credit note number to the invoice it credits, as nominated by a person. */
+  /** Credit note to the invoice it credits, as nominated by a person. */
   credits?: Readonly<Record<string, string>>;
   /** Parts of credits used against other documents. */
   allocations?: readonly CreditAllocation[];
@@ -28,7 +31,7 @@ export function invoiceBalancesFor(options: {
    * receipt against a USD invoice. Left out, amounts are taken as they are.
    */
   inCurrency?: (amount: number, transaction: Transaction, invoice: Invoice) => number;
-}): Map<string, InvoiceBalance> {
+}): Map<DocumentKey, InvoiceBalance> {
   const { invoices, transactions, splits, assignments } = options;
   const byId = new Map(transactions.map((t) => [t.id, t]));
   for (const [id, parts] of Object.entries(splits)) {
@@ -44,13 +47,14 @@ export function invoiceBalancesFor(options: {
   }
 
   const paid: InvoiceAssignment[] = [];
-  const documents = options.inCurrency === undefined ? null : new Map(invoices.map((i) => [i.number, i]));
-  for (const [transactionId, invoiceNumber] of assignments) {
+  const documents = new DocumentIndex(invoices);
+  for (const [transactionId, ref] of assignments) {
     const transaction = byId.get(transactionId);
     if (transaction === undefined) continue;
-    const invoice = documents?.get(invoiceNumber);
-    const amount = invoice !== undefined && options.inCurrency !== undefined ? options.inCurrency(transaction.amount, transaction, invoice) : transaction.amount;
-    paid.push({ invoiceNumber, amount });
+    const invoice = documents.resolve(ref, (d) => settlesInDirection(d, transaction.amount));
+    if (invoice === undefined) continue;
+    const amount = options.inCurrency !== undefined ? options.inCurrency(transaction.amount, transaction, invoice) : transaction.amount;
+    paid.push({ document: documentKey(invoice), amount });
   }
   return invoiceBalances(invoices, paid, undefined, options.credits ?? {}, options.allocations ?? []);
 }
@@ -77,7 +81,7 @@ export function invoiceBalancesFor(options: {
  */
 export interface CandidateOptions {
   invoices: readonly Invoice[];
-  balances: ReadonlyMap<string, InvoiceBalance>;
+  balances: ReadonlyMap<DocumentKey, InvoiceBalance>;
   /** How far either side of the invoice date to look. Defaults to 180 days. */
   windowDays?: number;
   /** How many to return. Defaults to 6. */
@@ -101,7 +105,7 @@ export function invoiceCandidates(
   for (const invoice of invoices) {
     if (invoice.kind !== kind) continue;
 
-    const owing = balances.get(invoice.number)?.remaining ?? invoice.total;
+    const owing = balances.get(documentKey(invoice))?.remaining ?? invoice.total;
     // Nothing left to settle. It stays visible on the invoice list, but it is
     // not what this receipt is for.
     if (owing <= 0) continue;
@@ -207,7 +211,11 @@ export interface Numbering {
 }
 
 export function nextInvoiceNumber(kind: InvoiceKind, existing: readonly Invoice[], numbering?: Numbering): string {
+  // Only this kind's own series. A bill carries its supplier's number, and
+  // counting on from those made the next sale INV-1234568 after a supplier's
+  // A1234567 was loaded.
   const numbered = existing
+    .filter((i) => i.kind === kind)
     .map((i) => splitInvoiceNumber(i.number))
     .filter((n): n is NumberedInvoice => n !== null);
   if (numbering !== undefined && (numbering.prefix !== undefined || numbering.next !== undefined)) {
@@ -221,9 +229,15 @@ export function nextInvoiceNumber(kind: InvoiceKind, existing: readonly Invoice[
     return prefix + String(value).padStart(width, "0");
   }
   const prefix = invoicePrefix(kind);
-  if (numbered.length === 0) return `${prefix}0001`;
+  // Within the kind, the standard prefix's own series where there is one.
+  // Otherwise a sale carries on from however the business numbered its sales
+  // ("0012", "SI-0012"), as before -- but never a bill: every bill number not
+  // made here is a supplier's own, and none of them is this series.
+  const own = numbered.filter((n) => n.prefix.toLowerCase() === prefix.toLowerCase());
+  const series = own.length > 0 || kind === "purchase" ? own : numbered;
+  if (series.length === 0) return `${prefix}0001`;
 
-  const highest = numbered.reduce((best, n) => (n.value > best.value ? n : best));
-  const width = Math.max(...numbered.map((n) => n.digits.length));
+  const highest = series.reduce((best, n) => (n.value > best.value ? n : best));
+  const width = Math.max(...series.map((n) => n.digits.length));
   return prefix + String(highest.value + 1).padStart(width, "0");
 }

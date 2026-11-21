@@ -34,7 +34,7 @@ test("what a person accepted is kept", () => {
     transactions: [txn("a", 10000)],
     accepted: { a: "INV-1" },
   });
-  assert.equal(map.get("a"), "INV-1");
+  assert.equal(map.get("a"), "sales:INV-1");
 });
 
 test("an accepted assignment beats what the matcher would have said", () => {
@@ -44,7 +44,7 @@ test("an accepted assignment beats what the matcher would have said", () => {
     transactions: [txn("a", 10000)],
     accepted: { a: "INV-2" },
   });
-  assert.equal(map.get("a"), "INV-2");
+  assert.equal(map.get("a"), "sales:INV-2");
 });
 
 test("a refusal is not an assignment", () => {
@@ -63,7 +63,7 @@ test("the matcher fills in what nobody has answered", () => {
     invoices: [invoice("INV-1", 10000)],
     transactions: [txn("a", 10000)],
   });
-  assert.equal(map.get("a"), "INV-1");
+  assert.equal(map.get("a"), "sales:INV-1");
 });
 
 test("a payment whose parts settle invoices is not also claimed whole", () => {
@@ -77,8 +77,8 @@ test("a payment whose parts settle invoices is not also claimed whole", () => {
     splits: { pay: [{ amount: 15100 }, { amount: 4900 }] },
     accepted: { "pay:1": "INV-1", "pay:2": "INV-2" },
   });
-  assert.equal(map.get("pay:1"), "INV-1");
-  assert.equal(map.get("pay:2"), "INV-2");
+  assert.equal(map.get("pay:1"), "sales:INV-1");
+  assert.equal(map.get("pay:2"), "sales:INV-2");
   assert.equal(map.has("pay"), false, "the parent is not claimed as well");
 });
 
@@ -90,7 +90,7 @@ test("a split whose parts settle nothing is still matchable as a whole", () => {
     transactions: [txn("pay", 20000)],
     splits: { pay: [{ amount: 15100 }, { amount: 4900 }] },
   });
-  assert.equal(map.get("pay"), "INV-3");
+  assert.equal(map.get("pay"), "sales:INV-3");
 });
 
 test("an invoice the source system still shows outstanding is not matched", () => {

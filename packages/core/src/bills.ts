@@ -8,6 +8,8 @@ import type { CreditAllocation } from "./invoices.js";
 import type { Invoice, InvoiceBalance, InvoiceKind } from "./invoices.js";
 import { taxTypeFromRate } from "./posting.js";
 import type { PostedJournal, PostedLine } from "./posting.js";
+import { DocumentIndex, documentKey } from "./document-key.js";
+import type { DocumentKey } from "./document-key.js";
 
 /**
  * Bills: what is owed to suppliers, and when it falls due.
@@ -54,7 +56,8 @@ export function documentStatus(balance: InvoiceBalance, today: IsoDate): Documen
 
 /** One payment against a document, dated, for balances on a past day. */
 export interface DatedPayment {
-  invoiceNumber: string;
+  /** The document it paid, by key: a sale and a bill can share a number. */
+  document: DocumentKey;
   date: IsoDate;
   /** Signed as the bank had it; only the size is used. */
   amount: Cents;
@@ -143,12 +146,18 @@ export function agedReport(options: {
       i.issued <= asAt &&
       (options.include === undefined || options.include(i)),
   );
-  const byNumber = new Map(docs.map((d) => [d.number, d]));
+  // One kind only from here, so a number is unique among `docs`: the index
+  // turns keys, and bare numbers in older books, into this kind's own number,
+  // and leaves out a payment, credit or allocation that is the other kind's.
+  const index = new DocumentIndex(docs);
+  const numberOf = (ref: string): string | undefined => index.resolve(ref)?.number;
 
   const paid = new Map<string, Cents>();
   for (const p of options.payments) {
     if (p.date > asAt) continue;
-    paid.set(p.invoiceNumber, (paid.get(p.invoiceNumber) ?? 0) + Math.abs(p.amount));
+    const doc = index.get(p.document);
+    if (doc === undefined) continue;
+    paid.set(doc.number, (paid.get(doc.number) ?? 0) + Math.abs(p.amount));
   }
   for (const doc of docs) {
     const outside = (doc.paidOutside ?? [])
@@ -161,17 +170,21 @@ export function agedReport(options: {
   // in the books on the day asked about.
   const credited = new Map<string, Cents>();
   const applied = new Set<string>();
-  for (const [note, target] of Object.entries(credits)) {
-    const source = byNumber.get(note);
-    if (source === undefined || target === "" || !byNumber.has(target)) continue;
-    applied.add(note);
+  for (const [noteRef, targetRef] of Object.entries(credits)) {
+    const source = index.resolve(noteRef);
+    const target = targetRef === "" ? undefined : numberOf(targetRef);
+    if (source === undefined || target === undefined) continue;
+    applied.add(source.number);
     credited.set(target, (credited.get(target) ?? 0) + Math.abs(source.total));
   }
   const used = new Map<string, Cents>();
   for (const a of options.allocations ?? []) {
-    if (a.date > asAt || !byNumber.has(a.from) || !byNumber.has(a.to) || a.amount <= 0) continue;
-    used.set(a.from, (used.get(a.from) ?? 0) + a.amount);
-    credited.set(a.to, (credited.get(a.to) ?? 0) + a.amount);
+    if (a.date > asAt || a.amount <= 0) continue;
+    const from = numberOf(a.from);
+    const to = numberOf(a.to);
+    if (from === undefined || to === undefined) continue;
+    used.set(from, (used.get(from) ?? 0) + a.amount);
+    credited.set(to, (credited.get(to) ?? 0) + a.amount);
   }
 
   const contacts = new Map<string, AgedContact>();
@@ -350,6 +363,7 @@ export function outsidePaymentJournals(
     ];
     return {
       transactionId: `${invoice.number}:paid:${index + 1}`,
+      document: documentKey(invoice),
       date: payment.date,
       narration: `${invoice.number} ${invoice.contact} paid${payment.note ? `: ${payment.note}` : ""}`,
       lines,
@@ -408,6 +422,7 @@ function writtenOff(
   }
   return {
     transactionId: `${invoice.number}:paid:${index + 1}`,
+    document: documentKey(invoice),
     date: payment.date,
     narration: `${invoice.number} ${invoice.contact} written off as a bad debt`,
     lines,

@@ -14,7 +14,7 @@ const docs = [
   doc("INV-3", 25_000, "2026-09-01", { due: "2026-09-20" }),
   doc("INV-9", 5_000, "2026-09-01", { contact: "Other Co" }),
 ];
-const receipts = [{ invoiceNumber: "INV-1", amount: 15_000 }];
+const receipts = [{ document: "INV-1", amount: 15_000 }];
 
 test("credit on account: a credit note's and an overpayment's, and what could take it", () => {
   const balances = invoiceBalances(docs, receipts);
@@ -35,14 +35,14 @@ test("proposed oldest due first, drawing on the oldest credit first", () => {
   const [acme] = creditsOnAccount(balances.values(), "sales");
   const proposed = proposeAllocations(acme, undefined, "2026-10-01");
   assert.deepEqual(proposed.map((a) => [a.from, a.to, a.amount]), [
-    ["INV-1", "INV-2", 5_000],
-    ["CN-1", "INV-2", 15_000],
-    ["CN-1", "INV-3", 15_000],
+    ["sales:INV-1", "sales:INV-2", 5_000],
+    ["sales:CN-1", "sales:INV-2", 15_000],
+    ["sales:CN-1", "sales:INV-3", 15_000],
   ]);
   assert.equal(allocationProblem(proposed, balances), null);
   // Asked for less on one: only that much.
-  const some = proposeAllocations(acme, new Map([["INV-2", 2_000], ["INV-3", 0]]), "2026-10-01");
-  assert.deepEqual(some.map((a) => [a.from, a.to, a.amount]), [["INV-1", "INV-2", 2_000]]);
+  const some = proposeAllocations(acme, new Map([["sales:INV-2", 2_000], ["sales:INV-3", 0]]), "2026-10-01");
+  assert.deepEqual(some.map((a) => [a.from, a.to, a.amount]), [["sales:INV-1", "sales:INV-2", 2_000]]);
 });
 
 test("used, the credit and the documents settle, and what is left stays on account", () => {
@@ -52,18 +52,18 @@ test("used, the credit and the documents settle, and what is left stays on accou
     { from: "CN-1", to: "INV-3", amount: 10_000, date: "2026-10-01" },
   ];
   const b = invoiceBalances(docs, receipts, undefined, {}, allocations);
-  assert.equal(b.get("INV-1").remaining, 0);
-  assert.equal(b.get("INV-1").status, "paid");
-  assert.equal(b.get("INV-2").remaining, 0);
-  assert.equal(b.get("INV-2").status, "paid");
-  assert.equal(b.get("INV-3").remaining, 15_000);
-  assert.equal(b.get("CN-1").remaining, -5_000, "5,000 of the credit note still to use");
+  assert.equal(b.get("sales:INV-1").remaining, 0);
+  assert.equal(b.get("sales:INV-1").status, "paid");
+  assert.equal(b.get("sales:INV-2").remaining, 0);
+  assert.equal(b.get("sales:INV-2").status, "paid");
+  assert.equal(b.get("sales:INV-3").remaining, 15_000);
+  assert.equal(b.get("sales:CN-1").remaining, -5_000, "5,000 of the credit note still to use");
   assert.equal(creditsOnAccount(b.values(), "sales")[0].available, 5_000);
 });
 
 test("the aged report counts a credit used from its date, and the total is unchanged by it", () => {
   const allocations = [{ from: "CN-1", to: "INV-2", amount: 20_000, date: "2026-10-01" }];
-  const payments = [{ invoiceNumber: "INV-1", date: "2026-07-15", amount: 15_000 }];
+  const payments = [{ document: "sales:INV-1", date: "2026-07-15", amount: 15_000 }];
   const before = agedReport({ invoices: docs, kind: "sales", payments, allocations, asAt: "2026-09-30" });
   const after = agedReport({ invoices: docs, kind: "sales", payments, allocations, asAt: "2026-10-31" });
   assert.equal(before.total, after.total, "receivables are the same: only which document owes moved");

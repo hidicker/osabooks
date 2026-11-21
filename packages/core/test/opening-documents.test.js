@@ -114,8 +114,8 @@ test("a carried-forward invoice owes what the report said, and its receipt clear
     id: "r1", date: "2025-04-20", account: "BNZ 01", amount: 30000, otherParty: "Rimu Cafe",
     particulars: "", code: "", reference: "INV-0012", description: "", currency: "NZD", source: "bank",
   };
-  const balances = invoiceBalances([carried], [{ invoiceNumber: "INV-0012", amount: 30000 }]);
-  assert.equal(balances.get("INV-0012").remaining, 0, "paid in full, though the invoice was for more");
+  const balances = invoiceBalances([carried], [{ document: "INV-0012", amount: 30000 }]);
+  assert.equal(balances.get("sales:INV-0012").remaining, 0, "paid in full, though the invoice was for more");
 
   const journals = postLedger({
     transactions: [receipt], codeOf: () => "200 Sales",

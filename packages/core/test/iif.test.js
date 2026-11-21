@@ -79,7 +79,7 @@ test("the books: an invoice part paid, a card charge, a transfer, a journal", ()
 
 test("an entry's class goes with its bank lines and its document", () => {
   const books = parseIifBooks(FILE, null);
-  assert.deepEqual([...books.classOf.invoices], [["1001", "Shop"]]);
+  assert.deepEqual([...books.classOf.invoices], [["sales:1001", "Shop"]]);
   assert.equal(books.classOf.transactions.size, 0);
 });
 

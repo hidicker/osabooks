@@ -1,7 +1,9 @@
 import type { Cents } from "./money.js";
 import type { IsoDate } from "./dates.js";
 import type { CreditAllocation, InvoiceBalance, InvoiceKind } from "./invoices.js";
-import { isCreditNote, isPosted } from "./invoices.js";
+import { isCreditNote, isPosted, resolveAllocation } from "./invoices.js";
+import { DocumentIndex, documentKey, documentNumberOf, storedFor } from "./document-key.js";
+import type { DocumentKey } from "./document-key.js";
 import { contactKey } from "./contacts.js";
 
 /**
@@ -51,7 +53,7 @@ export function creditsOnAccount(
     const doc = balance.invoice;
     if (doc.kind !== kind || !isPosted(doc)) continue;
     if (isCreditNote(doc)) {
-      if ((linked[doc.number] ?? "") !== "") continue;
+      if ((storedFor(linked, doc) ?? "") !== "") continue;
       if (balance.remaining < 0) entry(doc.contact).sources.push({ balance, available: -balance.remaining });
     } else if (balance.remaining < 0) {
       entry(doc.contact).sources.push({ balance, available: -balance.remaining });
@@ -77,18 +79,19 @@ export function creditsOnAccount(
  */
 export function proposeAllocations(
   credit: CreditOnAccount,
-  wanted: ReadonlyMap<string, Cents> | undefined,
+  wanted: ReadonlyMap<DocumentKey, Cents> | undefined,
   date: IsoDate,
 ): CreditAllocation[] {
-  const left = credit.sources.map((s) => ({ number: s.balance.invoice.number, available: s.available }));
+  const left = credit.sources.map((s) => ({ key: documentKey(s.balance.invoice), available: s.available }));
   const out: CreditAllocation[] = [];
   for (const target of credit.open) {
-    let need = Math.min(wanted?.get(target.invoice.number) ?? target.remaining, target.remaining);
+    const to = documentKey(target.invoice);
+    let need = Math.min(wanted?.get(to) ?? target.remaining, target.remaining);
     for (const source of left) {
       if (need <= 0) break;
       const take = Math.min(need, source.available);
       if (take <= 0) continue;
-      out.push({ from: source.number, to: target.invoice.number, amount: take, date });
+      out.push({ from: source.key, to, amount: take, date });
       source.available -= take;
       need -= take;
     }
@@ -99,27 +102,38 @@ export function proposeAllocations(
 /** What is wrong with putting these allocations in, in words, or null. */
 export function allocationProblem(
   allocations: readonly CreditAllocation[],
-  balances: ReadonlyMap<string, InvoiceBalance>,
+  balances: ReadonlyMap<DocumentKey, InvoiceBalance>,
 ): string | null {
-  const from = new Map<string, Cents>();
-  const to = new Map<string, Cents>();
+  const index = new DocumentIndex([...balances.values()].map((b) => b.invoice));
+  const from = new Map<DocumentKey, Cents>();
+  const to = new Map<DocumentKey, Cents>();
   for (const a of allocations) {
     if (!Number.isInteger(a.amount) || a.amount <= 0) return "Each amount more than nothing.";
-    const source = balances.get(a.from);
-    const target = balances.get(a.to);
+    const fromDoc = index.resolve(a.from);
+    const toDoc = index.resolve(a.to);
+    const pair = resolveAllocation(index, a);
+    if (pair === undefined) {
+      // Both there, but not of one kind: a customer's credit against a bill.
+      if (fromDoc !== undefined && toDoc !== undefined) {
+        return `${fromDoc.number} and ${toDoc.number} are not the same ${fromDoc.kind === "sales" ? "customer's" : "supplier's"}.`;
+      }
+      return "A document named is not in these books.";
+    }
+    const source = balances.get(pair.from);
+    const target = balances.get(pair.to);
     if (source === undefined || target === undefined) return "A document named is not in these books.";
-    if (contactKey(source.invoice.contact) !== contactKey(target.invoice.contact) || source.invoice.kind !== target.invoice.kind) {
-      return `${a.from} and ${a.to} are not the same ${source.invoice.kind === "sales" ? "customer's" : "supplier's"}.`;
+    if (contactKey(source.invoice.contact) !== contactKey(target.invoice.contact)) {
+      return `${source.invoice.number} and ${target.invoice.number} are not the same ${source.invoice.kind === "sales" ? "customer's" : "supplier's"}.`;
     }
     if (a.date < source.invoice.issued || a.date < target.invoice.issued) return "A credit is used no earlier than both documents' dates.";
-    from.set(a.from, (from.get(a.from) ?? 0) + a.amount);
-    to.set(a.to, (to.get(a.to) ?? 0) + a.amount);
+    from.set(pair.from, (from.get(pair.from) ?? 0) + a.amount);
+    to.set(pair.to, (to.get(pair.to) ?? 0) + a.amount);
   }
-  for (const [number, amount] of from) {
-    if (amount > -(balances.get(number)?.remaining ?? 0)) return `More than the credit left on ${number}.`;
+  for (const [key, amount] of from) {
+    if (amount > -(balances.get(key)?.remaining ?? 0)) return `More than the credit left on ${documentNumberOf(key)}.`;
   }
-  for (const [number, amount] of to) {
-    if (amount > (balances.get(number)?.remaining ?? 0)) return `More than ${number} still owes.`;
+  for (const [key, amount] of to) {
+    if (amount > (balances.get(key)?.remaining ?? 0)) return `More than ${documentNumberOf(key)} still owes.`;
   }
   return null;
 }
