@@ -25,9 +25,10 @@ import {
   isPosted,
   localToday,
   documentKey,
+  isForeign,
 } from "@nzosa/core";
 import type { DocumentStatus, Entity, Invoice, InvoiceBalance, OutsidePayment } from "@nzosa/core";
-import { booksCountry, booksMoney, noSalesTax, sayTax } from "../country.js";
+import { booksCountry, booksCurrency, booksMoney, noSalesTax, sayTax } from "../country.js";
 import { openPaymentFile } from "./payment-file-ui.js";
 import { creditOnAccountSection } from "./credit-ui.js";
 import { openQuickEntry } from "./quick-entry.js";
@@ -555,7 +556,11 @@ function billsBankFile(): void {
   }
   const contacts = state.ledger.contacts ?? [];
   const payer = entityName(state.entityFilter || open[0]?.bill.entityId) || entityName(billEntities()[0]?.id);
-  const dueBy = (date: string): boolean[] => open.map((r) => (r.bill.due ?? r.bill.issued) <= date);
+  // A bill in another currency is listed, never ticked: the bank file pays
+  // its own currency only, and leaves it out with the reason.
+  const home = booksCurrency();
+  const foreign = (bill: Invoice): boolean => isForeign(bill.currency, home);
+  const dueBy = (date: string): boolean[] => open.map((r) => !foreign(r.bill) && (r.bill.due ?? r.bill.issued) <= date);
   const country = booksCountry().id === "au" ? "au" : "nz";
   openPaymentFile({
     title: "Bills to pay: a file for the bank",
@@ -572,12 +577,16 @@ function billsBankFile(): void {
         name: bill.contact,
         account: findContact(contacts, bill.contact)?.bankAccount ?? "",
         amount: balance.remaining,
+        // Owing in the bill's own currency, so said: the file refuses one not its own.
+        currency: bill.currency || home,
         // Their statement: the number on their own invoice. Ours: our bill number.
         reference: bill.reference.trim() !== "" ? bill.reference : bill.number,
         ourParticulars: bill.contact,
         ourReference: bill.number,
       },
-      detail: `${bill.number}${bill.reference.trim() !== "" ? ` (${bill.reference})` : ""}, due ${bill.due ?? bill.issued}`,
+      detail:
+        `${bill.number}${bill.reference.trim() !== "" ? ` (${bill.reference})` : ""}, due ${bill.due ?? bill.issued}` +
+        (foreign(bill) ? `, in ${bill.currency.toUpperCase()}: not for this file` : ""),
       ticked: dueBy(now)[i] === true,
     })),
   });
