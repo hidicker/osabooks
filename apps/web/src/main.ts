@@ -6,6 +6,7 @@ import { INBOX_FRESH_HOURS, readMorning, restoreMorning } from "./nightly.js";
 import { watchForSuggestions } from "./suggested-inbox.js";
 import { redraw, registerPages, showPage } from "./app.js";
 import type { PageName } from "./app.js";
+import { pageAfterReload } from "./reload-onto.js";
 import { applyModules } from "./modules.js";
 import {
   dismissLoading,
@@ -185,6 +186,10 @@ async function init(): Promise<void> {
   // before anything is loaded, or the books that open are this browser's own
   // copy and the person appears not to be signed in at all.
   await sessionFromUrl();
+
+  // Read at once, so it is used by this start or by none: left for later, a
+  // start that never got as far would carry it to some other reload.
+  const onto = pageAfterReload();
 
   // An outside AI app asking to connect: answered on a screen of its own.
   if (await connectInterrupts()) return;
@@ -455,6 +460,15 @@ async function init(): Promise<void> {
     // asks what it needs and hands over to Setup with the answers in. Once
     // there are transactions, Reconcile is the page you actually live on.
     if (state.ledger.transactions.length === 0) state.page = "migration";
+
+    // A reload that asked to come back to its page (a two-factor code given on
+    // the Books page), with what to say there.
+    if (onto !== null && document.querySelector(`[data-page="${CSS.escape(onto.page)}"]`) !== null) {
+      state.page = onto.page as PageName;
+      if (onto.message !== undefined) {
+        state.startupMessage = state.startupMessage ? `${onto.message} ${state.startupMessage}` : onto.message;
+      }
+    }
 
     // The books online that should have opened, and the server would not
     // open: said, and the Books page shown, where the code is asked for.

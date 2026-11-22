@@ -9,6 +9,7 @@ import {
   type Authenticator,
 } from "../cloud.js";
 import { usingOwnProject } from "../cloud-config.js";
+import { reloadOnto } from "../reload-onto.js";
 import { askOnPage, note } from "../ui.js";
 
 /**
@@ -103,7 +104,9 @@ export async function codeAskedFor(): Promise<HTMLElement | null> {
     said(answer, "Checking…");
     void giveCode(which.id, code.value).then((result) => {
       if (result.ok) {
-        location.reload();
+        // Back to the Books page, where the code was asked for, rather than
+        // the first page a reload opens on.
+        reloadOnto("books", "Code accepted. Your books are open.");
         return;
       }
       go.disabled = false;
