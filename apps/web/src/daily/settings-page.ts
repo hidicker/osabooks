@@ -7,7 +7,9 @@ import { $, state } from "../state.js";
 import { save as saveLedger } from "../store.js";
 import type { BookSettings } from "../store.js";
 import { note } from "../ui.js";
+import { cloudConfigured } from "../cloud-config.js";
 import { remindersPanel } from "./reminders-ui.js";
+import { twoFactorOffered } from "./two-factor-ui.js";
 import { renderLockDates } from "./lock-dates.js";
 
 /**
@@ -58,22 +60,38 @@ function groups(): { title: string; rows: Row[] }[] {
           where: [{ page: "setup", label: "Initial set-up" }],
         },
         {
+          name: "Where the books are kept",
+          what: "In this browser, in a folder on this computer, online on this site, or online in a Supabase project of your own. Moved, backed up and restored from the Books page.",
+          where: [{ page: "books", label: "Books" }],
+        },
+        {
           name: "Users",
           what: "Online books can be shared: invite an accountant to them. Books kept in this browser are yours alone.",
           where: [{ page: "books", label: "Books" }],
         },
+        ...(cloudConfigured() && twoFactorOffered()
+          ? [{
+              name: "Two-factor sign-in",
+              what: "A code from an authenticator app when you sign in on a new computer or browser. Set up for your account, and required for everybody in books you own, on the Books page.",
+              where: [{ page: "books", label: "Books" }],
+            }]
+          : []),
         {
-          name: "Connected apps",
-          what: "Bank feeds, and these books added to your AI app, such as Claude or ChatGPT (MCP).",
+          name: "Bank feeds",
+          what: `${nz ? "The bank feed (Akahu) and Wise" : "Wise"} bring transactions in, and can fetch new ones each time OsaBooks opens. Bank files are loaded on the same page.`,
+          where: [{ page: "import", label: "Bank import" }],
+        },
+        {
+          name: "AI",
+          what: "Your own AI key or provider, and what AI does here: suggestions on Reconcile and the accounts check. Or these books added to your AI app, such as Claude or ChatGPT (MCP).",
           where: [
-            { page: "import", label: "Bank import" },
-            { page: "connector", label: "Add books to your AI app (MCP)" },
             { page: "aisetup", label: "AI set-up" },
+            { page: "connector", label: "Add books to your AI app (MCP)" },
           ],
         },
         {
           name: "Email settings",
-          what: "What the invoice, statement and reminder emails say. They are sent from your own email program, so its name and reply address are yours.",
+          what: "What the invoice, statement and reminder emails say. Invoices and statements are sent from your own email program, so its name and reply address are yours. Online books send payment reminders by themselves each morning, from the entity's email (Reminders, below).",
           where: [{ page: "contacts", label: "Customers & vendors", module: "contacts" }],
         },
         { name: "Modules", what: "Which parts of the app these books use.", where: [{ page: "apps", label: "Modules" }] },
@@ -144,7 +162,7 @@ function groups(): { title: string; rows: Row[] }[] {
         },
         {
           name: "Lock dates",
-          what: "Lock the books up to a date, so filed periods stay as they were filed.",
+          what: "Lock the books up to a date, so filed periods stay as they were filed. For online books, anything changed in a locked period anyway is listed here for the owner and the accountant.",
           status: "here",
         },
         {
@@ -179,8 +197,8 @@ function groups(): { title: string; rows: Row[] }[] {
           status: "here",
         },
         {
-          name: "Exporting",
-          what: "A backup of everything, and the reports as CSV or Excel.",
+          name: "Backup and exporting",
+          what: "A backup of everything, wherever the books are kept, and restoring from one; and the reports as CSV or Excel.",
           where: [{ page: "books", label: "Books" }, { page: "reports", label: "Reports" }],
         },
       ],
@@ -214,7 +232,7 @@ function groups(): { title: string; rows: Row[] }[] {
           what: nz
             ? "The employer's IRD number and size (how soon each payday is filed), the accounts pay runs post to, each employee's pay frequency, pay items, leave and public holidays."
             : country.id === "us"
-              ? "The employer's state and unemployment rate, each employee's W-4 and pay frequency, or a payroll service's register."
+              ? "The employer's state and unemployment rate, each employee's W-4, pay frequency and local income tax rate, or a payroll service's register."
               : "The accounts pay runs post to, each employee's pay frequency, pay items and leave.",
           where: country.id === "au"
             ? [{ page: "aupayroll", label: "Payroll", module: "aupayroll" }]
