@@ -18,8 +18,8 @@ test("a credit note on its own is not overpaid", () => {
   // of them read as overpaid the moment it arrived. Both of the real ones on
   // these books were mislabelled that way.
   const balances = invoiceBalances([doc("CN-0154", -15000), doc("CN-0134", -500)], []);
-  assert.equal(balances.get("CN-0154").status, "credit note");
-  assert.equal(balances.get("CN-0134").status, "credit note");
+  assert.equal(balances.get("sales:CN-0154").status, "credit note");
+  assert.equal(balances.get("sales:CN-0134").status, "credit note");
 });
 
 test("a credit note settles the invoice it is pointed at", () => {
@@ -29,7 +29,7 @@ test("a credit note settles the invoice it is pointed at", () => {
     undefined,
     { "CN-0154": "INV-0100" },
   );
-  const invoice = balances.get("INV-0100");
+  const invoice = balances.get("sales:INV-0100");
   assert.equal(invoice.credited, 15000, "the credit is recorded against it");
   assert.equal(invoice.remaining, 0, "and it is no longer owing");
   assert.equal(invoice.status, "paid");
@@ -42,18 +42,18 @@ test("a part credit leaves the rest owing", () => {
     undefined,
     { "CN-0134": "INV-0100" },
   );
-  assert.equal(balances.get("INV-0100").remaining, 14500);
-  assert.equal(balances.get("INV-0100").status, "part paid");
+  assert.equal(balances.get("sales:INV-0100").remaining, 14500);
+  assert.equal(balances.get("sales:INV-0100").status, "part paid");
 });
 
 test("money and a credit note settle an invoice between them", () => {
   const balances = invoiceBalances(
     [doc("INV-0100", 15000), doc("CN-0134", -500)],
-    [{ invoiceNumber: "INV-0100", amount: 14500 }],
+    [{ document: "INV-0100", amount: 14500 }],
     undefined,
     { "CN-0134": "INV-0100" },
   );
-  const invoice = balances.get("INV-0100");
+  const invoice = balances.get("sales:INV-0100");
   assert.equal(invoice.assigned, 14500);
   assert.equal(invoice.credited, 500);
   assert.equal(invoice.remaining, 0);
@@ -65,9 +65,9 @@ test("an unlinked credit note changes no invoice", () => {
   // Guessing from the contact and the amount would settle the wrong invoice
   // quietly, which is worse than leaving it unapplied.
   const balances = invoiceBalances([doc("INV-0100", 15000), doc("CN-0154", -15000)], []);
-  assert.equal(balances.get("INV-0100").credited, 0);
-  assert.equal(balances.get("INV-0100").remaining, 15000);
-  assert.equal(balances.get("INV-0100").status, "unpaid");
+  assert.equal(balances.get("sales:INV-0100").credited, 0);
+  assert.equal(balances.get("sales:INV-0100").remaining, 15000);
+  assert.equal(balances.get("sales:INV-0100").status, "unpaid");
 });
 
 test("a credit note naming an invoice that is not there is ignored", () => {
@@ -77,7 +77,7 @@ test("a credit note naming an invoice that is not there is ignored", () => {
     undefined,
     { "CN-9999": "INV-0100" },
   );
-  assert.equal(balances.get("INV-0100").credited, 0, "the note itself is not in the books");
+  assert.equal(balances.get("sales:INV-0100").credited, 0, "the note itself is not in the books");
 });
 
 test("an empty nomination is not a link", () => {
@@ -87,7 +87,7 @@ test("an empty nomination is not a link", () => {
     undefined,
     { "CN-0134": "" },
   );
-  assert.equal(balances.get("INV-0100").credited, 0);
+  assert.equal(balances.get("sales:INV-0100").credited, 0);
 });
 
 test("two credit notes can be applied to one invoice", () => {
@@ -97,8 +97,8 @@ test("two credit notes can be applied to one invoice", () => {
     undefined,
     { "CN-0134": "INV-0100", "CN-0154": "INV-0100" },
   );
-  assert.equal(balances.get("INV-0100").credited, 1500);
-  assert.equal(balances.get("INV-0100").remaining, 13500);
+  assert.equal(balances.get("sales:INV-0100").credited, 1500);
+  assert.equal(balances.get("sales:INV-0100").remaining, 13500);
 });
 
 test("a credit note paid out in cash is settled, not overpaid", () => {
@@ -106,8 +106,8 @@ test("a credit note paid out in cash is settled, not overpaid", () => {
   // in the same direction the note itself runs.
   const balances = invoiceBalances(
     [doc("CN-0154", -15000)],
-    [{ invoiceNumber: "CN-0154", amount: -15000 }],
+    [{ document: "CN-0154", amount: -15000 }],
   );
-  assert.equal(balances.get("CN-0154").remaining, 0);
-  assert.equal(balances.get("CN-0154").status, "credit note");
+  assert.equal(balances.get("sales:CN-0154").remaining, 0);
+  assert.equal(balances.get("sales:CN-0154").status, "credit note");
 });

@@ -5,6 +5,8 @@ import { parseDate } from "./dates.js";
 import { findHeaderRow, normaliseHeader, parseCsvRecords } from "./csv.js";
 import type { ReadonlyCsvRecord } from "./csv.js";
 import { ColumnReader } from "./importers/shared.js";
+import { DocumentIndex, documentKey, settlesInDirection } from "./document-key.js";
+import type { DocumentKey } from "./document-key.js";
 
 /**
  * Invoices, and the lines they are made of.
@@ -623,7 +625,11 @@ export interface InvoiceBalance {
 
 /** One bank line assigned to one invoice. */
 export interface InvoiceAssignment {
-  invoiceNumber: string;
+  /**
+   * The document it settles: its key (document-key.ts), or a bare number as
+   * books saved before keys hold it, told apart by the money's direction.
+   */
+  document: string;
   /** Signed as the bank had it; the direction is taken from the invoice kind. */
   amount: Cents;
 }
@@ -636,9 +642,12 @@ export interface InvoiceAssignment {
  * settled, as at its date.
  */
 export interface CreditAllocation {
-  /** The credit note, or the overpaid document, the credit comes from. */
+  /**
+   * The credit note, or the overpaid document, the credit comes from: its
+   * key, or the bare number older books hold. Both are always of one kind.
+   */
   from: string;
-  /** The document it is used against. */
+  /** The document it is used against, as `from` is written. */
   to: string;
   amount: Cents;
   date: IsoDate;
@@ -704,7 +713,8 @@ export function invoiceBalances(
   /** True for an invoice imported from elsewhere, whose `paid` means something. */
   imported: (invoice: Invoice) => boolean = (invoice) => invoice.paid !== 0 || invoice.outstanding !== 0,
   /**
-   * Credit note number to the invoice it credits.
+   * Credit note to the invoice it credits, each by key or, in older books,
+   * by bare number.
    *
    * Nominated by a person, because the accounting system's export does not
    * carry the link: the reference is free text, and on real books it says
@@ -715,39 +725,47 @@ export function invoiceBalances(
   credits: Readonly<Record<string, string>> = {},
   /** Parts of credits used against other documents. */
   allocations: readonly CreditAllocation[] = [],
-): Map<string, InvoiceBalance> {
-  const assigned = new Map<string, Cents>();
+): Map<DocumentKey, InvoiceBalance> {
+  const index = new DocumentIndex(invoices);
+  const assigned = new Map<DocumentKey, Cents>();
   for (const item of assignments) {
+    const key = index.resolveKey(item.document, (d) => settlesInDirection(d, item.amount));
+    if (key === undefined) continue;
     // A receipt is positive and a bill payment negative; an invoice is owed in
     // one direction only, so the magnitude is what reduces it.
-    assigned.set(item.invoiceNumber, (assigned.get(item.invoiceNumber) ?? 0) + Math.abs(item.amount));
+    assigned.set(key, (assigned.get(key) ?? 0) + Math.abs(item.amount));
   }
 
   // What each invoice has been credited, from the credit notes pointed at it.
-  const byNumber = new Map(invoices.map((invoice) => [invoice.number, invoice]));
-  const credited = new Map<string, Cents>();
-  for (const [note, target] of Object.entries(credits)) {
-    const source = byNumber.get(note);
-    if (source === undefined || target === "") continue;
-    credited.set(target, (credited.get(target) ?? 0) + Math.abs(source.total));
+  // A note and what it credits are of one kind: a sale's credit note credits a sale.
+  const credited = new Map<DocumentKey, Cents>();
+  for (const [noteRef, targetRef] of Object.entries(credits)) {
+    const note = index.resolve(noteRef, isCreditNote);
+    if (note === undefined || targetRef === "") continue;
+    const target = index.resolveKey(targetRef, (d) => d.kind === note.kind);
+    if (target === undefined) continue;
+    credited.set(target, (credited.get(target) ?? 0) + Math.abs(note.total));
   }
   // Credit used from a note or an overpaid document, and where it went.
-  const used = new Map<string, Cents>();
+  const used = new Map<DocumentKey, Cents>();
   for (const a of allocations) {
-    if (!byNumber.has(a.from) || !byNumber.has(a.to) || a.amount <= 0) continue;
-    used.set(a.from, (used.get(a.from) ?? 0) + a.amount);
-    credited.set(a.to, (credited.get(a.to) ?? 0) + a.amount);
+    if (a.amount <= 0) continue;
+    const pair = resolveAllocation(index, a);
+    if (pair === undefined) continue;
+    used.set(pair.from, (used.get(pair.from) ?? 0) + a.amount);
+    credited.set(pair.to, (credited.get(pair.to) ?? 0) + a.amount);
   }
 
-  const out = new Map<string, InvoiceBalance>();
+  const out = new Map<DocumentKey, InvoiceBalance>();
   for (const invoice of invoices) {
-    const paid = assigned.get(invoice.number) ?? 0;
-    const off = credited.get(invoice.number) ?? 0;
+    const key = documentKey(invoice);
+    const paid = assigned.get(key) ?? 0;
+    const off = credited.get(key) ?? 0;
     const outside = paidOutsideTotal(invoice);
     // A credit note is measured as itself. Subtracting what it is "owed"
     // reported every one of them as overpaid before any money had moved.
     const from = invoice.broughtForward ?? invoice.total;
-    const spent = used.get(invoice.number) ?? 0;
+    const spent = used.get(key) ?? 0;
     const remaining = isCreditNote(invoice)
       ? from + paid + outside + spent
       : from - paid - off - outside + spent;
@@ -760,7 +778,7 @@ export function invoiceBalances(
           : paid === 0 && off === 0 && outside === 0
             ? "unpaid"
             : "part paid";
-    out.set(invoice.number, {
+    out.set(key, {
       invoice,
       assigned: paid,
       remaining,
@@ -771,6 +789,25 @@ export function invoiceBalances(
     });
   }
   return out;
+}
+
+/**
+ * The two documents a credit allocation joins, by key. They are always of one
+ * kind and one contact, which is what tells a bare number in older books apart.
+ */
+export function resolveAllocation(
+  index: DocumentIndex,
+  allocation: Pick<CreditAllocation, "from" | "to">,
+): { from: DocumentKey; to: DocumentKey } | undefined {
+  for (const kind of ["sales", "purchase"] as const) {
+    const same = (d: Invoice): boolean => d.kind === kind;
+    const from = index.resolve(allocation.from, same);
+    const to = index.resolve(allocation.to, same);
+    if (from !== undefined && to !== undefined && from.kind === to.kind) {
+      return { from: documentKey(from), to: documentKey(to) };
+    }
+  }
+  return undefined;
 }
 
 /**

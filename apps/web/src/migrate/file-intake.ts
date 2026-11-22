@@ -1,6 +1,6 @@
 import { looksLikeBankFile } from "../daily/bank-columns.js";
 import { chosenStartDate } from "./onboarding-state.js";
-import { filedKey, isCreditNote, xeroNumberOf } from "@nzosa/core";
+import { documentKey, filedKey, isCreditNote, storedFor, xeroNumberOf } from "@nzosa/core";
 import { redraw, showPage } from "../app.js";
 import { asCsvText, invoiceBalanceMap, recomputeVariance, saveManualJournals, record, syncExpenseClaims } from "../books.js";
 import { checkBankBalances, handleFiles } from "../daily/bank-import.js";
@@ -778,7 +778,7 @@ async function creditNotesByNumber(): Promise<number> {
   let made = 0;
   const same = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();
   for (const note of documents) {
-    if (!isCreditNote(note) || links[note.number] !== undefined) continue;
+    if (!isCreditNote(note) || storedFor(links, note) !== undefined) continue;
     const credit = Math.abs(note.total);
     const candidates = documents.filter(
       (d) =>
@@ -786,7 +786,7 @@ async function creditNotesByNumber(): Promise<number> {
         d.kind === note.kind &&
         same(d.contact, note.contact) &&
         d.issued <= note.issued &&
-        (balances.get(d.number)?.remaining ?? 0) >= credit,
+        (balances.get(documentKey(d))?.remaining ?? 0) >= credit,
     );
     // By number, as a supplier writes it: PC Complete's "720-2".
     const number = xeroNumberOf(note.number);
@@ -799,13 +799,13 @@ async function creditNotesByNumber(): Promise<number> {
       note.reference.trim() === ""
         ? []
         : candidates.filter(
-            (d) => same(d.reference, note.reference) && (balances.get(d.number)?.remaining ?? 0) === credit,
+            (d) => same(d.reference, note.reference) && (balances.get(documentKey(d))?.remaining ?? 0) === credit,
           );
     // Or, with neither -- Xero leaves a credit note's number and reference
     // blank as readily as a bill's -- the one document of that contact still
     // owing exactly the credit: OpenAI's credit of 37.69 and its one bill of
     // 37.69 open at the start.
-    const byAmount = candidates.filter((d) => (balances.get(d.number)?.remaining ?? 0) === credit);
+    const byAmount = candidates.filter((d) => (balances.get(documentKey(d))?.remaining ?? 0) === credit);
     const first = byNumber.length > 0 ? byNumber : byReference.length > 0 ? byReference : byAmount;
     // Or, where none of those settles it, Xero's own figures: a document it
     // calls settled whose payments fall short of its total by exactly the
@@ -818,7 +818,7 @@ async function creditNotesByNumber(): Promise<number> {
         : candidates.filter((d) => d.outstanding === 0 && d.total - d.paid === credit);
     const only = fits[0];
     if (fits.length !== 1 || only === undefined) continue;
-    links[note.number] = only.number;
+    links[documentKey(note)] = documentKey(only);
     made += 1;
   }
   if (made === 0) return 0;

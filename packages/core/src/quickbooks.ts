@@ -1,3 +1,5 @@
+import { documentKey } from "./document-key.js";
+import type { DocumentKey } from "./document-key.js";
 import { findHeaderRow, parseCsvRecords } from "./csv.js";
 import { parseDate } from "./dates.js";
 import { parseAmount } from "./money.js";
@@ -487,7 +489,7 @@ export interface QuickBooksPayment {
   /** The bank or card line. */
   transaction: Transaction;
   /** Who it was applied to, oldest first; a part with no number is what was left over. */
-  parts: { invoiceNumber: string | null; amount: Cents; code: string; note: string }[];
+  parts: { invoiceNumber: string | null; document: DocumentKey | null; amount: Cents; code: string; note: string }[];
 }
 
 export interface QuickBooksBooks {
@@ -718,6 +720,7 @@ export function quickBooksBooksFrom(
       } else {
         parts.push({
           invoiceNumber: one.invoice.number,
+          document: documentKey(one.invoice),
           amount: direction * take,
           code: label(pay.control),
           note: `Payment, ${one.invoice.number}`,
@@ -730,7 +733,7 @@ export function quickBooksBooksFrom(
     }
     if (parts.length === 0) continue;
     if (rest > 0) {
-      parts.push({ invoiceNumber: null, amount: direction * rest, code: label(pay.control), note: "Not applied to a document" });
+      parts.push({ invoiceNumber: null, document: null, amount: direction * rest, code: label(pay.control), note: "Not applied to a document" });
     }
     payments.push({ transaction: pay.transaction, parts });
   }

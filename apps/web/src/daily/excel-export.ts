@@ -26,6 +26,8 @@ import {
   plClassForType,
   splitAccountLabel,
   signedBox15,
+  documentNumberOf,
+  documentKey,
 } from "@nzosa/core";
 import type {
   Entity,
@@ -1052,7 +1054,7 @@ function buildUnusualTransactionsSheet(ctx: SheetContext): string {
       const isSettled = inv.paid >= inv.total;
       const matchedTxs: string[] = [];
       for (const [txId, num] of assignments.entries()) {
-        if (num === inv.number) matchedTxs.push(txId);
+        if (num === documentKey(inv)) matchedTxs.push(txId);
       }
 
       rowsXml.push(`<row r="${rIdx}">
@@ -2138,8 +2140,8 @@ function buildRawDecisionsSheet(ctx: SheetContext): string {
       ${textCell(`E${rIdx}`, tx?.otherParty ?? "", 4)}
       ${textCell(`F${rIdx}`, "", 5)}
       ${tx ? numCell(`G${rIdx}`, tx.amount / 100, 6) : textCell(`G${rIdx}`, "", 6)}
-      ${textCell(`H${rIdx}`, invNum, 5)}
-      ${textCell(`I${rIdx}`, `Matched to invoice ${invNum}`, 4)}
+      ${textCell(`H${rIdx}`, documentNumberOf(invNum), 5)}
+      ${textCell(`I${rIdx}`, `Matched to invoice ${documentNumberOf(invNum)}`, 4)}
     </row>`);
     rIdx++;
   }
@@ -2166,13 +2168,13 @@ function buildRawDecisionsSheet(ctx: SheetContext): string {
     rowsXml.push(`<row r="${rIdx}">
       ${numCell(`A${rIdx}`, count++, 7)}
       ${textCell(`B${rIdx}`, "Credit Note Allocation", 5)}
-      ${textCell(`C${rIdx}`, cnNum, 5)}
+      ${textCell(`C${rIdx}`, documentNumberOf(cnNum), 5)}
       ${textCell(`D${rIdx}`, "", 5)}
       ${textCell(`E${rIdx}`, "", 4)}
       ${textCell(`F${rIdx}`, "", 5)}
       ${textCell(`G${rIdx}`, "", 6)}
-      ${textCell(`H${rIdx}`, invNum, 5)}
-      ${textCell(`I${rIdx}`, `Credit note applied against invoice ${invNum}`, 4)}
+      ${textCell(`H${rIdx}`, documentNumberOf(invNum), 5)}
+      ${textCell(`I${rIdx}`, `Credit note applied against invoice ${documentNumberOf(invNum)}`, 4)}
     </row>`);
     rIdx++;
   }

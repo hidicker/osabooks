@@ -12,8 +12,10 @@ import { filedByPeriod, filedKey,
   expenseClaimsFromJournals,
   localToday,
   localStamp,
+  documentKey,
 } from "@nzosa/core";
 import type { CarriesGst } from "@nzosa/core";
+import type { DocumentKey } from "@nzosa/core";
 import { appendEvent, makeEvent } from "./events.js";
 import type { EventKind } from "./events.js";
 import { knownCodes, suggest, transferCandidates } from "./reconcile.js";
@@ -437,7 +439,7 @@ export function invoicesToMatch(): Invoice[] {
   return invoicesInPlay().filter((i) => isPosted(i) && i.receipt !== true);
 }
 
-export function invoiceAssignments(): Map<string, string> {
+export function invoiceAssignments(): Map<string, DocumentKey> {
   // Cached against the ledger it was built from, because this is asked for on
   // every render and the matching is not cheap. The rules themselves are in
   // core, where the ordering that stops a payment being counted twice is
@@ -1038,7 +1040,7 @@ export function recomputeVariance(): void {
 export function varianceInput(basis: "cash" | "accruals" = gstBasis()): VarianceInput {
   const accruals = basis === "accruals";
   const nz = booksCountry().id === "nz";
-  const large = accruals ? new Set<string>() : largeSalesOnInvoice();
+  const large = accruals ? new Set<DocumentKey>() : largeSalesOnInvoice();
   return {
     transactions: accountingLines(),
     splits: accountingSplitParts(),
@@ -1083,10 +1085,10 @@ export function varianceInput(basis: "cash" | "accruals" = gstBasis()): Variance
       ? { accrualDocuments: accrualDocumentLines({ paidEarly: nz }) }
       : large.size > 0
         ? {
-            accrualDocuments: accrualDocumentLines({ only: (doc) => large.has(doc.number) }),
+            accrualDocuments: accrualDocumentLines({ only: (doc) => large.has(documentKey(doc)) }),
             documentSettles: (id: string) => {
-              const settled = settlementOf(id);
-              return settled !== undefined && large.has(settled.number) ? settled : undefined;
+              const key = invoiceAssignments().get(id);
+              return key !== undefined && large.has(key) ? settlementOf(id) : undefined;
             },
           }
         : {}),
@@ -1120,7 +1122,7 @@ export function gstBasis(): "cash" | "accruals" {
 function accrualDocumentLines(options: { only?: (invoice: Invoice) => boolean; paidEarly?: boolean } = {}): AccrualDocumentLine[] {
   const known = knownCodes(state.rules, state.ledger.overrides ?? {});
   const out: AccrualDocumentLine[] = [];
-  const payments = options.paidEarly === true ? documentPayments() : new Map<string, { date: string; amount: number }[]>();
+  const payments = options.paidEarly === true ? documentPayments() : new Map<DocumentKey, { date: string; amount: number }[]>();
   for (const raw of invoicesInPlay()) {
     if (!documentIsPosted(raw) || !documentCounts(raw)) continue;
     if (options.only !== undefined && !options.only(raw)) continue;
@@ -1129,7 +1131,7 @@ function accrualDocumentLines(options: { only?: (invoice: Invoice) => boolean; p
     // on it due when it was paid. That share of each line is dated then; the
     // rest on the day of issue.
     const total = Math.abs(raw.total);
-    const early = (payments.get(raw.number) ?? []).filter((p) => p.date < doc.issued);
+    const early = (payments.get(documentKey(raw)) ?? []).filter((p) => p.date < doc.issued);
     const shares: { date: string; share: number }[] = [];
     let left = 1;
     for (const p of early) {
@@ -1155,20 +1157,20 @@ function accrualDocumentLines(options: { only?: (invoice: Invoice) => boolean; p
 }
 
 /** Each document's payments, with their dates: bank lines settling it and payments outside the bank. */
-function documentPayments(): Map<string, { date: string; amount: number }[]> {
+function documentPayments(): Map<DocumentKey, { date: string; amount: number }[]> {
   const byId = new Map(state.ledger.transactions.map((t) => [t.id, t]));
-  const out = new Map<string, { date: string; amount: number }[]>();
-  const add = (number: string, date: string, amount: number): void => {
-    const list = out.get(number) ?? [];
+  const out = new Map<DocumentKey, { date: string; amount: number }[]>();
+  const add = (key: DocumentKey, date: string, amount: number): void => {
+    const list = out.get(key) ?? [];
     list.push({ date, amount });
-    out.set(number, list);
+    out.set(key, list);
   };
-  for (const [id, number] of invoiceAssignments()) {
+  for (const [id, key] of invoiceAssignments()) {
     const t = byId.get(id);
-    if (t !== undefined) add(number, t.date, t.amount);
+    if (t !== undefined) add(key, t.date, t.amount);
   }
   for (const doc of invoicesInPlay()) {
-    for (const p of doc.paidOutside ?? []) if (p.writeOff !== true) add(doc.number, p.date, p.amount);
+    for (const p of doc.paidOutside ?? []) if (p.writeOff !== true) add(documentKey(doc), p.date, p.amount);
   }
   for (const list of out.values()) list.sort((a, b) => a.date.localeCompare(b.date));
   return out;
@@ -1179,20 +1181,20 @@ function documentPayments(): Map<string, { date: string; amount: number }[]> {
  * $225,000 is counted when invoiced, not as it is paid, unless it was paid in
  * full within 365 days of the invoice. The sales it covers, by number.
  */
-function largeSalesOnInvoice(): Set<string> {
-  const out = new Set<string>();
+function largeSalesOnInvoice(): Set<DocumentKey> {
+  const out = new Set<DocumentKey>();
   if (booksCountry().id !== "nz") return out;
   const payments = documentPayments();
   for (const raw of invoicesInPlay()) {
     if (raw.kind !== "sales" || !documentIsPosted(raw)) continue;
     const total = Math.abs(accountingDocument(raw).total);
     if (total <= 22_500_000) continue;
-    const paid = payments.get(raw.number) ?? [];
+    const paid = payments.get(documentKey(raw)) ?? [];
     const sum = paid.reduce((n, p) => n + Math.abs(p.amount), 0);
     const last = paid[paid.length - 1]?.date;
     const yearOn = new Date(Date.parse(`${raw.issued}T00:00:00Z`) + 365 * 86_400_000).toISOString().slice(0, 10);
     const paidInAYear = sum >= Math.abs(raw.total) && last !== undefined && last <= yearOn;
-    if (!paidInAYear) out.add(raw.number);
+    if (!paidInAYear) out.add(documentKey(raw));
   }
   return out;
 }
@@ -1280,15 +1282,15 @@ export function registeredForGst(): (account: string, code: string) => boolean {
  * side, and how much of the document carries GST.
  */
 function settlementOf(transactionId: string): Settlement | undefined {
-  const number = invoiceAssignments().get(transactionId);
-  if (number === undefined || number === "") return undefined;
-  const invoice = invoicesInPlay().find((i) => i.number === number);
+  const key = invoiceAssignments().get(transactionId);
+  if (key === undefined) return undefined;
+  const invoice = invoicesInPlay().find((i) => documentKey(i) === key);
   if (invoice === undefined || invoice.total === 0) return undefined;
   const taxedGross = invoice.lines.filter((l) => l.tax !== 0).reduce((sum, l) => sum + l.gross, 0);
   return {
     side: invoice.kind === "sales" ? "sales" : "purchases",
     taxable: Math.min(1, Math.max(0, taxedGross / invoice.total)),
-    number,
+    number: invoice.number,
   };
 }
 
@@ -1465,12 +1467,11 @@ function claimCarriesGst(): CarriesGst {
 export function datedInvoicePayments(): DatedPayment[] {
   const byId = new Map(state.ledger.transactions.map((t) => [t.id, t]));
   const out: DatedPayment[] = [];
-  for (const [id, number] of invoiceAssignments()) {
-    if (number === "") continue;
+  for (const [id, document] of invoiceAssignments()) {
     const colon = id.lastIndexOf(":");
     const direct = byId.get(id);
     if (direct !== undefined) {
-      out.push({ invoiceNumber: number, date: direct.date, amount: direct.amount, ...(direct.currency ? { currency: direct.currency } : {}) });
+      out.push({ document, date: direct.date, amount: direct.amount, ...(direct.currency ? { currency: direct.currency } : {}) });
       continue;
     }
     if (colon < 0) continue;
@@ -1478,7 +1479,7 @@ export function datedInvoicePayments(): DatedPayment[] {
     const index = Number(id.slice(colon + 1)) - 1;
     const part = parent === undefined ? undefined : (state.ledger.splits ?? {})[parent.id]?.[index];
     if (parent !== undefined && part !== undefined) {
-      out.push({ invoiceNumber: number, date: parent.date, amount: part.amount, ...(parent.currency ? { currency: parent.currency } : {}) });
+      out.push({ document, date: parent.date, amount: part.amount, ...(parent.currency ? { currency: parent.currency } : {}) });
     }
   }
   return out;
@@ -1523,9 +1524,9 @@ function otherPurchasesFor(period: { from: string; to: string }): OtherPurchase[
 }
 
 /** Sales paid other than through a bank line -- cash at the counter -- for Box 5. */
-function otherSalesFor(period: { from: string; to: string }, counted: ReadonlySet<string> = new Set()): OtherPurchase[] {
+function otherSalesFor(period: { from: string; to: string }, counted: ReadonlySet<DocumentKey> = new Set()): OtherPurchase[] {
   // A sale already counted when invoiced is not counted again as it is paid.
-  return outsideSales(invoicesInPlay().filter((i) => !counted.has(i.number)), period, documentCounts);
+  return outsideSales(invoicesInPlay().filter((i) => !counted.has(documentKey(i))), period, documentCounts);
 }
 
 /**
@@ -1541,7 +1542,7 @@ function documentCounts(doc: Invoice): boolean {
   return entity === undefined || entity.gstRegistered !== false;
 }
 
-export function invoiceBalanceMap(): Map<string, InvoiceBalance> {
+export function invoiceBalanceMap(): Map<DocumentKey, InvoiceBalance> {
   // Owing in each document's own currency: a payment in another is turned into it.
   const inCurrency = paymentInDocumentCurrency();
   return invoiceBalancesFor({
@@ -1565,12 +1566,12 @@ function exchangeJournals(): PostedJournal[] {
   const accounts = exchangeAccounts();
   if (accounts === null) return [];
   const rates = fxRates();
-  const foreignDocs = new Map(invoicesInPlay().filter((i) => isForeign(i.currency, books)).map((i) => [i.number, i]));
+  const foreignDocs = new Map(invoicesInPlay().filter((i) => isForeign(i.currency, books)).map((i) => [documentKey(i), i]));
   const payments: DocumentPayment[] = [];
   if (foreignDocs.size > 0) {
     const byId = new Map(state.ledger.transactions.map((t) => [t.id, t]));
-    for (const [id, number] of invoiceAssignments()) {
-      const invoice = foreignDocs.get(number);
+    for (const [id, key] of invoiceAssignments()) {
+      const invoice = foreignDocs.get(key);
       if (invoice === undefined) continue;
       const direct = byId.get(id);
       const colon = id.lastIndexOf(":");
@@ -2528,6 +2529,8 @@ function stockCostJournals(): PostedJournal[] {
   if (tracked === null || inventory === undefined || cost === undefined) return [];
   return tracked.costs.map((c) => ({
     transactionId: c.transactionId,
+    // Stock leaves on a sale: the cost goes with that sale's job and class.
+    document: documentKey("sales", c.number),
     date: c.date as IsoDate,
     narration: `Cost of stock sold on ${c.number}`,
     lines: [
@@ -3078,20 +3081,20 @@ export async function saveManualJournals(journals: ManualJournal[], what: string
  * for again, and is offered the nearest line: often one another invoice has.
  */
 export function proposalOpen(
-  proposal: { transactionId: string; invoiceNumber: string },
-  balances: ReadonlyMap<string, { remaining: number }> = invoiceBalanceMap(),
+  proposal: { transactionId: string; document: DocumentKey },
+  balances: ReadonlyMap<DocumentKey, { remaining: number }> = invoiceBalanceMap(),
 ): boolean {
   if (proposalState(proposal) !== "waiting") return false;
-  const balance = balances.get(proposal.invoiceNumber);
+  const balance = balances.get(proposal.document);
   return balance === undefined || balance.remaining > 0;
 }
 
 export function proposalState(proposal: {
   transactionId: string;
-  invoiceNumber: string;
+  document: DocumentKey;
 }): "accepted" | "waiting" | "elsewhere" {
   const held = (state.ledger.invoiceMatches ?? {})[proposal.transactionId];
-  if (held === proposal.invoiceNumber) return "accepted";
   if (held === undefined || held === "") return "waiting";
-  return "elsewhere";
+  // As the books' own assignments read it: a key, or a bare number older books hold.
+  return invoiceAssignments().get(proposal.transactionId) === proposal.document ? "accepted" : "elsewhere";
 }

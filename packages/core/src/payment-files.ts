@@ -29,6 +29,12 @@ export interface BankPayment {
   /** Their account: an NZ account number, or an Australian BSB and account number. */
   account: string;
   amount: Cents;
+  /**
+   * The currency `amount` is in, where it is not the file's own (New Zealand
+   * dollars for an NZ file, Australian for ABA). A domestic file pays in its
+   * own currency only: a US$1,000 bill in it paid NZ$1,000.
+   */
+  currency?: string;
   /** What their statement shows (New Zealand: particulars, code, reference; Australia: the reference). */
   particulars?: string;
   code?: string;
@@ -137,11 +143,17 @@ function sortOut<T>(
   payments: readonly BankPayment[],
   read: (account: string) => T | null,
   accountWord: string,
+  currency: string,
 ): { kept: { payment: BankPayment; account: T }[]; skipped: SkippedPayment[] } {
   const kept: { payment: BankPayment; account: T }[] = [];
   const skipped: SkippedPayment[] = [];
   for (const payment of payments) {
     const name = payment.name.trim() === "" ? "(no name)" : payment.name.trim();
+    const own = (payment.currency ?? "").trim().toUpperCase();
+    if (own !== "" && own !== currency) {
+      skipped.push({ name, why: `in ${own}: pay it from a ${own} account or by international transfer` });
+      continue;
+    }
     if (!Number.isInteger(payment.amount) || payment.amount <= 0) {
       skipped.push({ name, why: "nothing to pay" });
       continue;
@@ -195,7 +207,7 @@ export function nzPaymentFile(options: NzPaymentFileOptions): PaymentFile {
   if (options.format === "asb" && (from.bank !== "12" || Number(from.suffix) > 99)) {
     throw new Error("ASB's file pays from an ASB account, one starting 12 with a two-digit suffix.");
   }
-  const sorted = sortOut(options.payments, nzAccountParts, "NZ bank account");
+  const sorted = sortOut(options.payments, nzAccountParts, "NZ bank account", "NZD");
   const skipped = sorted.skipped;
   // MT9 holds an amount in ten digits: up to $99,999,999.99 a payment.
   const kept = options.format === "asb" ? sorted.kept.filter((k) => {
@@ -381,7 +393,7 @@ export function abaFile(options: AbaOptions): PaymentFile {
   const userName = bankText(options.userName, 26);
   if (userName === "") throw new Error("The account name the bank holds for the paying account.");
 
-  const { kept, skipped } = sortOut(options.payments, auAccountParts, "BSB and account number");
+  const { kept, skipped } = sortOut(options.payments, auAccountParts, "BSB and account number", "AUD");
   const total = kept.reduce((sum, k) => sum + k.payment.amount, 0);
   const remitter = left(bankText(options.remitter, 16), 16);
   const code = options.payroll === true ? "53" : "50";

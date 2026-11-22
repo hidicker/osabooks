@@ -630,6 +630,12 @@ function gstBlock(period: Period): string[] {
     if (one.lateClaims.length > 0) {
       lines.push(`  ${one.lateClaims.length} late claims, sitting in box 9 or box 13.`);
     }
+    if (one.refundsMoved !== undefined) {
+      lines.push(
+        `  Net refunds moved out of boxes 5 and 11, which cannot be negative: ` +
+          `${formatAmount(one.refundsMoved.toBox13)} of GST into box 13, ${formatAmount(one.refundsMoved.toBox9)} into box 9.`,
+      );
+    }
     if (one.missingTaxPoint.length > 0) {
       lines.push(
         `  ${one.missingTaxPoint.length} transactions have no tax point recorded and were`,

@@ -5,7 +5,7 @@ import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { askOnPage, askTextOnPage, note, tellOnPage } from "../ui.js";
 import { taxYearEnd, taxYearOf, taxYearStart } from "../tax-year.js";
-import { classSource, localToday } from "@nzosa/core";
+import { assignedFor, classSource, localToday, withAssignment } from "@nzosa/core";
 
 /**
  * Classes: names, and which bank lines, invoices and journals each is given
@@ -227,7 +227,7 @@ export function renderClasses(): void {
   const all = sources(taxYearStart(year), taxYearEnd(year));
   const shown = all.filter(
     (s) =>
-      (showing === "*" || (assigned[s.id] ?? "") === showing || justGiven.has(s.id)) &&
+      (showing === "*" || (assignedFor(assigned, s.id) ?? "") === showing || justGiven.has(s.id)) &&
       (needle === "" || [s.narration, ...s.accounts].some((text) => text.toLowerCase().includes(needle))),
   );
   if (shown.length === 0) {
@@ -269,11 +269,9 @@ export function renderClasses(): void {
       tr.append(td);
     }
     const cell = document.createElement("td");
-    const pick = select(names, assigned[source.id] ?? "", "No class");
+    const pick = select(names, assignedFor(assigned, source.id) ?? "", "No class");
     pick.addEventListener("change", () => {
-      const next = { ...assigned };
-      if (pick.value === "") delete next[source.id];
-      else next[source.id] = pick.value;
+      const next = withAssignment(assigned, source.id, pick.value);
       justGiven.add(source.id);
       void keep(
         { names, assigned: next },

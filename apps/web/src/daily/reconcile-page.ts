@@ -66,10 +66,14 @@ import {
   splitPartId,
   xeroNumberOf,
   localToday,
+  documentKey,
+  documentNumberOf,
+  settlesInDirection,
 } from "@nzosa/core";
 import type {
   CategoryRule,
   Cents,
+  DocumentKey,
   GstClassification,
   GstSide,
   GstTreatment,
@@ -634,7 +638,8 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
   // A payment that settles an invoice posts to receivables or payables; the
   // GST was on the invoice. Its line said "15% GST on Income" all the same,
   // which reads as tax on the payment.
-  const settlesInvoice = invoiceAssignments().get(one.transaction.id) ?? "";
+  const settled = invoiceAssignments().get(one.transaction.id);
+  const settlesInvoice = settled === undefined ? "" : documentNumberOf(settled);
   reason.textContent = one.confirmed
     ? (one.said ?? "Confirmed")
     : (state.ledger.splits ?? {})[one.transaction.id]
@@ -991,7 +996,8 @@ async function applyPayout(
   const invoiceMatches = { ...(state.ledger.invoiceMatches ?? {}) };
   delete invoiceMatches[transaction.id];
   for (const [index, number] of invoiceOf) {
-    invoiceMatches[splitPartId(transaction.id, index)] = number;
+    // The part that clears receivables: a sale's.
+    invoiceMatches[splitPartId(transaction.id, index)] = documentKey("sales", number);
   }
 
   state.ledger = { ...state.ledger, splits, invoiceMatches };
@@ -1613,7 +1619,9 @@ function invoiceLineFor(
   // which has to be recorded: without it the matcher simply finds the same
   // invoice again on the next render.
   const refused = decided === "";
-  const matched = refused ? undefined : (decided ?? assigned);
+  // As the assignments read it: a key, whether a person recorded it (as a key,
+  // or as a bare number in older books) or the matcher found it.
+  const matched = refused ? undefined : assigned;
   const confirmed = decided !== undefined && decided !== "";
 
   setInvoiceChosen(matched !== undefined);
@@ -1653,8 +1661,8 @@ function invoiceLineFor(
 
   const describe = (invoice: Invoice): string => {
     const owing = Math.max(
-      (balances.get(invoice.number)?.remaining ?? invoice.total) +
-        shareOf(transaction, invoice.number),
+      (balances.get(documentKey(invoice))?.remaining ?? invoice.total) +
+        shareOf(transaction, documentKey(invoice)),
       0,
     );
     const after = owing - paying;
@@ -1677,10 +1685,10 @@ function invoiceLineFor(
         invoice.kind === kind &&
         // Owing before this payment, so a line already matched can be matched
         // again to the invoice it paid -- including one it overpaid.
-        (balances.get(invoice.number)?.remaining ?? invoice.total) +
-          shareOf(transaction, invoice.number) >
+        (balances.get(documentKey(invoice))?.remaining ?? invoice.total) +
+          shareOf(transaction, documentKey(invoice)) >
           0 &&
-        !candidates.some((c) => c.number === invoice.number),
+        !candidates.some((c) => documentKey(c) === documentKey(invoice)),
     )
     .sort((a, b) => b.issued.localeCompare(a.issued))
     .map(describe);
@@ -1689,6 +1697,9 @@ function invoiceLineFor(
   if (options.length === 0) return null;
 
   const numberOf = (text: string): string => text.split(" · ")[0] ?? "";
+  // Only one kind is offered -- sales for money in, bills for money out -- so
+  // a number picked here is that kind's.
+  const keyOf = (number: string): DocumentKey => documentKey(kind, number);
 
   const label = document.createElement("span");
   label.textContent =
@@ -1718,13 +1729,12 @@ function invoiceLineFor(
   tally.className = "invoice-tally";
 
   const owingOn = (number: string): Cents => {
-    const invoice = invoicesInPlay().find(
-      (i) => i.number === number,
-    );
+    const key = keyOf(number);
+    const invoice = invoicesInPlay().find((i) => documentKey(i) === key);
     if (invoice === undefined) return 0;
     return Math.max(
-      (invoiceBalanceMap().get(number)?.remaining ?? invoice.total) +
-        shareOf(transaction, number),
+      (invoiceBalanceMap().get(key)?.remaining ?? invoice.total) +
+        shareOf(transaction, key),
       0,
     );
   };
@@ -1774,7 +1784,7 @@ function invoiceLineFor(
     } catch {
       // Only a convenience.
     }
-    void matchWithFee(transaction, number, feeAccount.value);
+    void matchWithFee(transaction, keyOf(number), feeAccount.value);
   });
 
   const redraw = (): void => {
@@ -1851,13 +1861,13 @@ function invoiceLineFor(
       // one as an overpayment that misstates it.
       const owed = owingOn(only);
       if (owed > 0 && Math.abs(transaction.amount) > owed) {
-        void matchToInvoices(transaction, all);
+        void matchToInvoices(transaction, all.map(keyOf));
         return;
       }
-      void matchToInvoice(transaction, only);
+      void matchToInvoice(transaction, keyOf(only));
       return;
     }
-    void matchToInvoices(transaction, all);
+    void matchToInvoices(transaction, all.map(keyOf));
   });
 
   const openPicker = (): void => {
@@ -1872,7 +1882,7 @@ function invoiceLineFor(
   // a way out.
   if (matched !== undefined) {
     const invoice = (state.ledger.invoices ?? []).find(
-      (i) => i.number === matched,
+      (i) => documentKey(i) === matched,
     );
     const label2 = document.createElement("button");
     label2.type = "button";
@@ -1880,7 +1890,7 @@ function invoiceLineFor(
     label2.title = "Click to match it to a different invoice";
 
     if (invoice) {
-      const owing = invoiceBalanceMap().get(invoice.number)?.remaining ?? 0;
+      const owing = invoiceBalanceMap().get(documentKey(invoice))?.remaining ?? 0;
       const part = Math.abs(transaction.amount) < invoice.total;
       label2.textContent =
         `Matched to ${invoice.number} — ${invoice.contact} ${formatAmount(invoice.total)}` +
@@ -1890,7 +1900,7 @@ function invoiceLineFor(
             : ` · part payment, now settled`
           : "");
     } else {
-      label2.textContent = `Matched to ${matched}`;
+      label2.textContent = `Matched to ${documentNumberOf(matched)}`;
     }
 
     // Found by the matcher rather than chosen by a person. Both settle the
@@ -1954,18 +1964,18 @@ function invoiceLineFor(
  */
 async function matchToInvoice(
   transaction: Transaction,
-  number: string,
+  key: DocumentKey,
 ): Promise<void> {
-  const invoice = (state.ledger.invoices ?? []).find(
-    (i) => i.number === number,
-  );
+  const invoice = (state.ledger.invoices ?? []).find((i) => documentKey(i) === key);
+  const number = documentNumberOf(key);
   // Captured before the change, because that is the only moment it exists.
   const wasMatched =
     (state.ledger.invoiceMatches ?? {})[transaction.id] ?? null;
   const wasCodedBefore = (state.ledger.overrides ?? {})[transaction.id];
   const invoiceMatches = {
     ...(state.ledger.invoiceMatches ?? {}),
-    [transaction.id]: number,
+    // Stored by key: a sale and a bill can share a number.
+    [transaction.id]: key,
   };
   const overrides = { ...(state.ledger.overrides ?? {}) };
 
@@ -2011,7 +2021,7 @@ async function matchToInvoice(
     wasMatched === null
       ? null
       : { number: wasMatched, override: wasCodedBefore },
-    { number, override: overrides[transaction.id] },
+    { number: key, override: overrides[transaction.id] },
     transaction.id,
   );
   reclassify();
@@ -2048,11 +2058,11 @@ async function matchToInvoice(
  */
 async function matchToInvoices(
   transaction: Transaction,
-  numbers: readonly string[],
+  keys: readonly DocumentKey[],
 ): Promise<void> {
   const invoices = invoicesInPlay();
-  const chosen = numbers
-    .map((number) => invoices.find((i) => i.number === number))
+  const chosen = keys
+    .map((key) => invoices.find((i) => documentKey(i) === key))
     .filter((i): i is Invoice => i !== undefined);
   if (chosen.length === 0) return;
 
@@ -2061,12 +2071,12 @@ async function matchToInvoices(
   let left = Math.abs(transaction.amount);
 
   const parts: SplitPart[] = [];
-  const assigned: string[] = [];
+  const assigned: Invoice[] = [];
   for (const invoice of chosen) {
     if (left <= 0) break;
     const owing = Math.max(
-      (balances.get(invoice.number)?.remaining ?? invoice.total) +
-        shareOf(transaction, invoice.number),
+      (balances.get(documentKey(invoice))?.remaining ?? invoice.total) +
+        shareOf(transaction, documentKey(invoice)),
       0,
     );
     const take = Math.min(owing, left);
@@ -2080,7 +2090,7 @@ async function matchToInvoices(
         ? { code: codeFromInvoice(invoice) as string }
         : {}),
     });
-    assigned.push(invoice.number);
+    assigned.push(invoice);
     left -= take;
   }
 
@@ -2106,8 +2116,8 @@ async function matchToInvoices(
   const invoiceMatches = { ...(state.ledger.invoiceMatches ?? {}) };
   // The payment itself no longer settles one invoice; its parts do.
   delete invoiceMatches[transaction.id];
-  assigned.forEach((number, index) => {
-    invoiceMatches[splitPartId(transaction.id, index)] = number;
+  assigned.forEach((invoice, index) => {
+    invoiceMatches[splitPartId(transaction.id, index)] = documentKey(invoice);
   });
 
   state.ledger = { ...state.ledger, splits, invoiceMatches };
@@ -2115,10 +2125,10 @@ async function matchToInvoices(
   await record(
     "invoiceMatch",
     `${transaction.date} ${formatAmount(transaction.amount)} settles ` +
-      `${assigned.join(", ")}` +
+      `${assigned.map((i) => i.number).join(", ")}` +
       (left > 0 ? `, with ${formatAmount(sign * left)} left over` : ""),
     before,
-    { split: parts, matches: assigned },
+    { split: parts, matches: assigned.map((i) => documentKey(i)) },
     transaction.id,
   );
   reclassify();
@@ -2134,10 +2144,10 @@ async function matchToInvoices(
  *       -3.20  Merchant fees
  *     = 96.80  the deposit
  */
-async function matchWithFee(transaction: Transaction, number: string, feeCode: string): Promise<void> {
-  const invoice = invoicesInPlay().find((i) => i.number === number);
+async function matchWithFee(transaction: Transaction, key: DocumentKey, feeCode: string): Promise<void> {
+  const invoice = invoicesInPlay().find((i) => documentKey(i) === key);
   if (invoice === undefined || transaction.amount <= 0) return;
-  const owing = Math.max((invoiceBalanceMap().get(number)?.remaining ?? invoice.total) + shareOf(transaction, number), 0);
+  const owing = Math.max((invoiceBalanceMap().get(key)?.remaining ?? invoice.total) + shareOf(transaction, key), 0);
   const fee = owing - transaction.amount;
   if (fee <= 0) return;
   const parts: SplitPart[] = [
@@ -2160,14 +2170,14 @@ async function matchWithFee(transaction: Transaction, number: string, feeCode: s
   const splits = { ...(state.ledger.splits ?? {}), [transaction.id]: parts };
   const invoiceMatches = { ...(state.ledger.invoiceMatches ?? {}) };
   delete invoiceMatches[transaction.id];
-  invoiceMatches[splitPartId(transaction.id, 0)] = invoice.number;
+  invoiceMatches[splitPartId(transaction.id, 0)] = key;
   state.ledger = { ...state.ledger, splits, invoiceMatches };
   state.persistent = await save(state.ledger);
   await record(
     "invoiceMatch",
     `${transaction.date} ${formatAmount(transaction.amount)} settles ${invoice.number}, with a fee of ${formatAmount(fee)}`,
     before,
-    { split: parts, matches: [invoice.number] },
+    { split: parts, matches: [key] },
     transaction.id,
   );
   reclassify();
@@ -2182,13 +2192,13 @@ async function matchWithFee(transaction: Transaction, number: string, feeCode: s
  * Asking what an invoice owes *before* this payment means adding its own share
  * back, or re-matching a line reads the invoice as already paid by it.
  */
-function shareOf(transaction: Transaction, number: string): number {
+function shareOf(transaction: Transaction, key: DocumentKey): number {
   const assigned = invoiceAssignments();
-  if (assigned.get(transaction.id) === number) return Math.abs(transaction.amount);
+  if (assigned.get(transaction.id) === key) return Math.abs(transaction.amount);
   const parts = (state.ledger.splits ?? {})[transaction.id] ?? [];
   return parts.reduce(
     (sum, part, index) =>
-      assigned.get(splitPartId(transaction.id, index)) === number
+      assigned.get(splitPartId(transaction.id, index)) === key
         ? sum + Math.abs(part.amount)
         : sum,
     0,
@@ -2215,12 +2225,12 @@ export async function settleInvoicesExactly(transaction: Transaction, said: read
   // the next settling from Xero matched it again -- every time the books
   // opened, the coding chosen on Coding reconciliation was overwritten.
   if ((state.ledger.invoiceMatches ?? {})[transaction.id] === "") return false;
-  const numbers = resolveSettlement(transaction, said);
-  if (numbers === null) return false;
+  const keys = resolveSettlement(transaction, said);
+  if (keys === null) return false;
   // One is a match of its own: the split that settles several needs two parts
   // or more, and given one it did nothing at all.
-  if (numbers.length === 1) await matchToInvoice(transaction, numbers[0] as string);
-  else await matchToInvoices(transaction, numbers);
+  if (keys.length === 1) await matchToInvoice(transaction, keys[0] as DocumentKey);
+  else await matchToInvoices(transaction, keys);
   return true;
 }
 
@@ -2243,22 +2253,24 @@ export async function settleInvoicesExactly(transaction: Transaction, said: read
  * payment already against it can take another while it still owes as much:
  * an invoice paid in two instalments.
  */
-export function resolveSettlement(transaction: Transaction, said: readonly string[]): string[] | null {
+export function resolveSettlement(transaction: Transaction, said: readonly string[]): DocumentKey[] | null {
   if (said.length === 0) return null;
   const invoices = invoicesInPlay();
   const balances = invoiceBalanceMap();
-  const owingOn = (invoice: { number: string; total: number }): number =>
-    Math.max(balances.get(invoice.number)?.remaining ?? invoice.total, 0);
+  const owingOn = (invoice: Invoice): number =>
+    Math.max(balances.get(documentKey(invoice))?.remaining ?? invoice.total, 0);
   const kind = transaction.amount < 0 ? "purchase" : "sales";
   const paying = Math.abs(transaction.amount);
-  const usable = (i: Invoice, taken: readonly string[]): boolean =>
-    i.kind === kind && i.issued <= transaction.date && owingOn(i) > 0 && !taken.includes(i.number);
+  const usable = (i: Invoice, taken: readonly DocumentKey[]): boolean =>
+    i.kind === kind && i.issued <= transaction.date && owingOn(i) > 0 && !taken.includes(documentKey(i));
 
-  const numbers: string[] = [];
+  // By key: the number Xero names is the document this money settles -- a bill
+  // payment naming INV-0012 is the supplier's INV-0012, not the sale.
+  const numbers: DocumentKey[] = [];
   for (const number of said) {
-    const exact = number === "" ? undefined : invoices.find((i) => i.number === number);
+    const exact = number === "" ? undefined : invoices.find((i) => i.number === number && settlesInDirection(i, transaction.amount));
     if (exact !== undefined) {
-      numbers.push(exact.number);
+      numbers.push(documentKey(exact));
       continue;
     }
     const open = invoices
@@ -2275,11 +2287,11 @@ export function resolveSettlement(transaction: Transaction, said: readonly strin
       pick = exactly.length === 1 ? exactly[0] : theirs.length === 1 ? theirs[0] : undefined;
     }
     if (pick === undefined) return null;
-    numbers.push(pick.number);
+    numbers.push(documentKey(pick));
   }
   let owing = 0;
-  for (const number of numbers) {
-    const invoice = invoices.find((i) => i.number === number);
+  for (const key of numbers) {
+    const invoice = invoices.find((i) => documentKey(i) === key);
     if (invoice === undefined) return null;
     owing += owingOn(invoice);
   }
@@ -2382,7 +2394,7 @@ async function refuseInvoice(transactionId: string): Promise<void> {
   state.persistent = await savePart(state.ledger, "invoiceMatches");
   await record(
     "invoiceMatch",
-    `Not an invoice payment${before ? ` (was ${before})` : ""}`,
+    `Not an invoice payment${before ? ` (was ${documentNumberOf(before)})` : ""}`,
     before,
     "",
     transactionId,
@@ -2399,7 +2411,7 @@ async function unmatchInvoice(transactionId: string): Promise<void> {
   state.persistent = await savePart(state.ledger, "invoiceMatches");
   await record(
     "invoiceMatch",
-    `Unmatched ${before ?? ""}`,
+    `Unmatched ${before === undefined ? "" : documentNumberOf(before)}`,
     before ?? null,
     null,
     transactionId,

@@ -1,4 +1,4 @@
-import { convert, isForeign, rateOn, spreadsheetCell, localToday } from "@nzosa/core";
+import { convert, documentKey, isForeign, rateOn, spreadsheetCell, localToday } from "@nzosa/core";
 import { accountingDocument, fxRates } from "../fx-books.js";
 import { redraw } from "../app.js";
 import {
@@ -74,21 +74,37 @@ function inBooksCurrency(invoices: Invoice[], payments: DatedPayment[]): { invoi
   const books = booksCurrency();
   if (!invoices.some((i) => isForeign(i.currency, books))) return { invoices, payments };
   const rates = fxRates();
-  const byNumber = new Map(invoices.map((i) => [i.number, i]));
+  const byKey = new Map(invoices.map((i) => [documentKey(i), i]));
+  // Each document's payments in date order, so the one that settles it in
+  // full takes what is left of its booked total, as the exchange journals do
+  // (core fx.ts): converted one by one, a document paid in parts still showed
+  // a cent or two owing here once paid.
+  const order = payments.map((p, i) => ({ p, i })).sort((a, b) => a.p.date.localeCompare(b.p.date) || a.i - b.i);
+  const sofar = new Map<string, { settled: number; booked: number }>();
+  const converted = new Map<number, DatedPayment>();
+  for (const { p, i } of order) {
+    const invoice = byKey.get(p.document);
+    if (invoice === undefined || !isForeign(invoice.currency, books)) continue;
+    const paidIn = (p.currency || books).toUpperCase();
+    const size = Math.abs(p.amount);
+    const inDocument =
+      paidIn === invoice.currency.toUpperCase()
+        ? size
+        : Math.round(convert(size, rateOn(rates, paidIn, p.date, books) ?? 1) / (rateOn(rates, invoice.currency, p.date, books) ?? 1));
+    const issue = rateOn(rates, invoice.currency, invoice.issued, books) ?? 1;
+    const owed = Math.abs(invoice.broughtForward ?? invoice.total);
+    const before = sofar.get(documentKey(invoice)) ?? { settled: 0, booked: 0 };
+    const after = before.settled + inDocument;
+    const booked =
+      before.settled < owed && after >= owed
+        ? convert(owed, issue) - before.booked + convert(after - owed, issue)
+        : convert(inDocument, issue);
+    sofar.set(documentKey(invoice), { settled: after, booked: before.booked + booked });
+    converted.set(i, { ...p, amount: Math.sign(p.amount || 1) * booked });
+  }
   return {
     invoices: invoices.map(accountingDocument),
-    payments: payments.map((p) => {
-      const invoice = byNumber.get(p.invoiceNumber);
-      if (invoice === undefined || !isForeign(invoice.currency, books)) return p;
-      const paidIn = (p.currency || books).toUpperCase();
-      const size = Math.abs(p.amount);
-      const inDocument =
-        paidIn === invoice.currency.toUpperCase()
-          ? size
-          : Math.round(convert(size, rateOn(rates, paidIn, p.date, books) ?? 1) / (rateOn(rates, invoice.currency, p.date, books) ?? 1));
-      const issue = rateOn(rates, invoice.currency, invoice.issued, books) ?? 1;
-      return { ...p, amount: Math.sign(p.amount || 1) * convert(inDocument, issue) };
-    }),
+    payments: payments.map((p, i) => converted.get(i) ?? p),
   };
 }
 

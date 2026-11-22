@@ -130,24 +130,57 @@ export function accountingSplits(
   return out;
 }
 
-/** A document in the books' currency, at its date's rate: what the accounts book when it is raised. */
+/**
+ * Amounts converted one by one, then made to add up to `total`: whatever the
+ * rounding left over goes to the largest, as a split line's parts give theirs
+ * to the last. Only where the amounts added up to begin with -- a document
+ * whose own lines disagree with its total is shown as that, not hidden here.
+ */
+function convertedToTotal(amounts: readonly Cents[], originalTotal: Cents, total: Cents, rate: number): Cents[] {
+  const each = amounts.map((a) => convert(a, rate));
+  if (each.length === 0 || amounts.reduce((s, a) => s + a, 0) !== originalTotal) return each;
+  const left = total - each.reduce((s, a) => s + a, 0);
+  if (left === 0) return each;
+  let largest = 0;
+  amounts.forEach((a, i) => {
+    if (Math.abs(a) > Math.abs(amounts[largest] ?? 0)) largest = i;
+  });
+  each[largest] = (each[largest] ?? 0) + left;
+  return each;
+}
+
+/**
+ * A document in the books' currency, at its date's rate: what the accounts book when it is raised.
+ *
+ * The total and the GST are converted as they stand, and the lines are made
+ * to add up to them. Converted one by one, three lines of US$3.33 at 1.5 came
+ * to 15.00 against a total of 14.99, and the invoice's journal did not
+ * balance: about one foreign document in three, out by a cent or two.
+ */
 export function accountingInvoice(invoice: Invoice, books: string, rates: FxRates): Invoice {
   if (!isForeign(invoice.currency, books)) return invoice;
   const rate = rateOn(rates, invoice.currency, invoice.issued, books);
   if (rate === null) return invoice;
   const at = (cents: Cents): Cents => convert(cents, rate);
+  const total = at(invoice.total);
+  const tax = at(invoice.tax);
+  const paid = at(invoice.paid);
+  const gross = convertedToTotal(invoice.lines.map((l) => l.gross), invoice.total, total, rate);
+  const taxes = convertedToTotal(invoice.lines.map((l) => l.tax), invoice.tax, tax, rate);
   return {
     ...invoice,
     currency: books,
-    total: at(invoice.total),
-    tax: at(invoice.tax),
-    paid: at(invoice.paid),
-    outstanding: at(invoice.outstanding),
+    total,
+    tax,
+    paid,
+    // What the file said is still owing, kept consistent with the two above
+    // where it was to begin with.
+    outstanding: invoice.outstanding === invoice.total - invoice.paid ? total - paid : at(invoice.outstanding),
     ...(invoice.broughtForward !== undefined ? { broughtForward: at(invoice.broughtForward) } : {}),
-    lines: invoice.lines.map((l) => {
-      const gross = at(l.gross);
-      const tax = at(l.tax);
-      return { ...l, gross, tax, net: gross - tax };
+    lines: invoice.lines.map((l, i) => {
+      const g = gross[i] ?? at(l.gross);
+      const t = taxes[i] ?? at(l.tax);
+      return { ...l, gross: g, tax: t, net: g - t };
     }),
     // Paid outside the bank lines, at the rate on the day it was paid.
     ...(invoice.paidOutside !== undefined
@@ -188,7 +221,21 @@ export function realisedFxJournals(
   },
 ): PostedJournal[] {
   const out: PostedJournal[] = [];
+  // Each document's payments in the order they were made, with what they have
+  // settled and booked so far: the payment that settles it in full clears
+  // exactly what the document booked. Worked one by one, a document paid in
+  // parts left a cent or two in receivables once it was paid.
+  const docOf = (invoice: Invoice): string => `${invoice.kind}:${invoice.number}`;
+  const sofar = new Map<string, { settled: Cents; booked: Cents }>();
+  const byDocument = new Map<string, DocumentPayment[]>();
   for (const p of payments) {
+    const list = byDocument.get(docOf(p.invoice)) ?? [];
+    list.push(p);
+    byDocument.set(docOf(p.invoice), list);
+  }
+  // Stable: payments on one day keep the order they were given in.
+  const ordered = [...byDocument.values()].flatMap((list) => [...list].sort((a, b) => a.date.localeCompare(b.date)));
+  for (const p of ordered) {
     const invoice = p.invoice;
     if (!isForeign(invoice.currency, books)) continue;
     const issueRate = rateOn(rates, invoice.currency, invoice.issued, books);
@@ -197,8 +244,19 @@ export function realisedFxJournals(
     if (issueRate === null || payRate === null || docRateThen === null || docRateThen === 0) continue;
     const paid = convert(p.amount, payRate);
     // How much of the document it settled, in the document's currency.
-    const settled = isForeign(p.currency, invoice.currency) ? paid / docRateThen : p.amount;
-    const booked = convert(Math.round(settled), issueRate);
+    const settled = Math.round(isForeign(p.currency, invoice.currency) ? paid / docRateThen : p.amount);
+    const before = sofar.get(docOf(invoice)) ?? { settled: 0, booked: 0 };
+    // What the document was booked at, as accountingInvoice books it.
+    const owed = Math.abs(invoice.broughtForward ?? invoice.total);
+    const owedBooked = convert(owed, issueRate);
+    const after = before.settled + settled;
+    const booked =
+      before.settled < owed && after >= owed
+        ? // This one settles it: the rest of what was booked, and anything
+          // paid beyond the document at its own rate.
+          owedBooked - before.booked + convert(after - owed, issueRate)
+        : convert(settled, issueRate);
+    sofar.set(docOf(invoice), { settled: after, booked: before.booked + booked });
     const residual = booked - paid;
     if (residual === 0) continue;
     const sales = invoice.kind === "sales";

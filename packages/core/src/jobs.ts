@@ -2,7 +2,10 @@ import type { Cents } from "./money.js";
 import type { IsoDate } from "./dates.js";
 import type { PostedJournal } from "./posting.js";
 import type { ClassAssignments } from "./classes.js";
-import { classSource } from "./classes.js";
+import { assignedFor, classSource } from "./classes.js";
+import { documentKey } from "./document-key.js";
+import type { DocumentKey } from "./document-key.js";
+import type { Invoice } from "./invoices.js";
 
 /**
  * Jobs: work done for a customer -- a build, a contract, an event -- and what
@@ -63,7 +66,7 @@ export function jobProfits(
   for (const journal of journals) {
     if (range !== undefined && (journal.date < range.from || journal.date > range.to)) continue;
     const source = classSource(journal);
-    const id = held.assigned[source];
+    const id = assignedFor(held.assigned, source);
     const tally = id === undefined ? undefined : byId.get(id);
     if (tally === undefined) continue;
     for (const line of journal.lines) {
@@ -96,7 +99,7 @@ export function jobAssignments(held: JobsHeld): ClassAssignments {
   return out;
 }
 
-/** The source key a document is given to a job under: its posting's own. */
-export function documentSource(number: string): string {
-  return number;
+/** The source key a document is given to a job under: its posting's own, its key. */
+export function documentSource(document: Pick<Invoice, "kind" | "number">): DocumentKey {
+  return documentKey(document);
 }
