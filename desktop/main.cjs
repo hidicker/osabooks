@@ -19,6 +19,7 @@ const { join } = require("node:path");
 const { pathToFileURL } = require("node:url");
 const edition = require("./edition.json");
 const { startUpdates } = require("./updates.cjs");
+const { isSignInStart, openSignInWindow } = require("./sign-in.cjs");
 
 // Fixed, because the browser keeps a few settings per address.
 const PORT = edition.port;
@@ -76,9 +77,20 @@ function openWindow() {
   window.on("page-title-updated", (event) => event.preventDefault());
 
   // Anything that is not the app opens in the person's own browser, not here:
-  // links in guides, a bank's sign-in, a donation page.
+  // links in guides, a bank's sign-in, a donation page. Except a sign-in at
+  // one of the edition's own services, which has to come back to this window
+  // to finish (sign-in.cjs).
   const isApp = (url) => url.startsWith(`${ORIGIN}/`) || url === ORIGIN;
   window.webContents.setWindowOpenHandler(({ url }) => {
+    if (isSignInStart(url, edition.connect ?? [])) {
+      openSignInWindow(window, url, (fragment) => {
+        if (window === null) return;
+        // The app finishes on hashchange, as it does in a browser tab.
+        void window.webContents.executeJavaScript(`location.hash = ${JSON.stringify(fragment)}`);
+        window.focus();
+      });
+      return { action: "deny" };
+    }
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
