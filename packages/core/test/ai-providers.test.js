@@ -115,6 +115,14 @@ test("a refusal says what the provider said", async () => {
   await assert.rejects(() => listModels("anthropic", "sk-ant-bad", fetcher), /invalid x-api-key/);
 });
 
+test("a key refused outright says to change the key, keeping the provider's words", async () => {
+  const { fetcher } = fake([{ status: 401, body: { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } } }]);
+  await assert.rejects(
+    () => askModel("anthropic", "sk-ant-bad", "claude-haiku-5-5", "hi", fetcher),
+    (error) => /^Anthropic did not accept the AI key \("invalid x-api-key"\)\./.test(error.message) && /AI set-up/.test(error.message),
+  );
+});
+
 test("a Claude key for several workspaces is explained as what to do, not as a header", async () => {
   const { fetcher } = fake([{ status: 400, body: { type: "error", error: { type: "invalid_request_error",
     message: "This API key is not scoped to a workspace, so this request must include the anthropic-workspace-id header with the ID of the workspace to use." } } }]);
