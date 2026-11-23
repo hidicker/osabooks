@@ -108,7 +108,7 @@ export async function offerGstLock(periodEnd: string): Promise<void> {
   const open = unconfirmedThrough(periodEnd);
   if (open > 0) {
     await tellOnPage(
-      `Marked as filed. To lock GST up to ${periodEnd} as well, confirm the ${open} line${open === 1 ? "" : "s"} ` +
+      `Recorded here as filed. To lock GST up to ${periodEnd} as well, confirm the ${open} line${open === 1 ? "" : "s"} ` +
         "still waiting on Reconcile up to that date, then set the GST lock under Lock dates.",
     );
     return;
