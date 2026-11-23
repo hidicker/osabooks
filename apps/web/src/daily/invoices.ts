@@ -1,4 +1,4 @@
-import { accountingDocument, documentMoney } from "../fx-books.js";
+import { accountingDocument, documentMoney, owingInBooks } from "../fx-books.js";
 import { bookSettings, numberingFor } from "../book-settings.js";
 import { moduleOn } from "../modules.js";
 import { creditOnAccountSection, usedInPart } from "./credit-ui.js";
@@ -1331,9 +1331,9 @@ async function creditLimitAllows(built: Invoice, existing: Invoice | undefined):
   for (const balance of invoiceBalanceMap().values()) {
     const other = balance.invoice;
     if (other === existing || other.kind !== "sales" || !isPosted(other)) continue;
-    if (other.contact.trim().toLowerCase() === built.contact.trim().toLowerCase()) owed += balance.remaining;
+    if (other.contact.trim().toLowerCase() === built.contact.trim().toLowerCase()) owed += owingInBooks(other, balance.remaining);
   }
-  const after = owed + built.total - built.paid;
+  const after = owed + owingInBooks(built, built.total - built.paid);
   if (after <= limit) return true;
   return await askOnPage(
     `${built.contact} would owe ${booksMoney(after)}, over their credit limit of ${booksMoney(limit)}.\n\nSave it anyway?`,

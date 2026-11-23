@@ -1,4 +1,4 @@
-import { documentMoney } from "../fx-books.js";
+import { documentMoney, owingInBooks } from "../fx-books.js";
 import { redraw, showPage } from "../app.js";
 import {
   bankLabel,
@@ -208,7 +208,7 @@ function summary(
   const open = rows.filter((r) => ["Awaiting payment", "Part paid", "Overdue"].includes(r.status));
   const overdue = rows.filter((r) => r.status === "Overdue");
   const soon = open.filter((r) => r.bill.due !== null && r.bill.due >= now && daysBetween(now, r.bill.due) <= 7);
-  const sum = (list: typeof rows): number => list.reduce((s, r) => s + Math.max(0, r.balance.remaining), 0);
+  const sum = (list: typeof rows): number => list.reduce((s, r) => s + Math.max(0, owingInBooks(r.bill, r.balance.remaining)), 0);
   for (const [value, label] of [
     [money(sum(open)), `owing on ${open.length} bill${open.length === 1 ? "" : "s"}`],
     [money(sum(overdue)), `overdue on ${overdue.length}`],

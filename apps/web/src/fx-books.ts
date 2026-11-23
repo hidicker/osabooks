@@ -94,6 +94,24 @@ export function exchangeAccounts(): { realised: { code: string; name: string }; 
 }
 
 /** A document's amount as it is written: its own currency named where that is not the books'. */
+/**
+ * What is owing on a document, in the books' currency: converted at its own
+ * rate, as the aged report converts it. As it is where it is in the books'
+ * currency, or where no rate is held to convert it.
+ */
+export function owingInBooks(invoice: Invoice, owing: number): number {
+  if (!isForeign(invoice.currency, booksCurrency()) || invoice.total === 0) return owing;
+  const converted = accountingDocument(invoice);
+  if (converted.currency === invoice.currency) return owing;
+  return Math.round((owing * converted.total) / invoice.total);
+}
+
+/** Amounts in each currency, said together: the books' own as booksMoney, others with their code. */
+export function moneyByCurrency(sums: readonly { currency: string; owing: number }[], books: string): string {
+  if (sums.length === 0) return booksMoney(0);
+  return sums.map((s) => documentMoney({ currency: s.currency || books }, s.owing)).join(" and ");
+}
+
 export function documentMoney(invoice: Pick<Invoice, "currency">, cents: number): string {
   const books = booksCurrency();
   return isForeign(invoice.currency, books) ? `${invoice.currency.toUpperCase()} ${formatAmount(cents)}` : booksMoney(cents);

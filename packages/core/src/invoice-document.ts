@@ -86,6 +86,11 @@ export interface InvoiceDocumentOptions {
   taxIdLabel?: string;
   /** What the due date is called: "Due" by default, "Valid until" on a quote. */
   dueLabel?: string;
+  /**
+   * The books' own currency. A statement or reminder line in another is
+   * written with its code, and totals are given for each currency.
+   */
+  currency?: string;
   /** The colour of headings and rules, as "#rrggbb"; a deep blue by default. */
   accent?: string;
   /**
@@ -357,6 +362,37 @@ export interface StatementLine {
   /** What is still owing on it. */
   owing: Cents;
   reference: string;
+  /** Its currency, where it is not the books' own: its amounts are written with the code. */
+  currency?: string;
+}
+
+/** An amount in a line's currency: with its code where that is not the books'. */
+function lineMoney(cents: Cents, currency: string | undefined, books: string | undefined): string {
+  const code = (currency ?? "").trim().toUpperCase();
+  const own = code === "" || books === undefined || code === books.trim().toUpperCase();
+  return own ? formatAmount(cents) : `${formatAmount(cents, code)} ${code}`;
+}
+
+/**
+ * Lines' owing added up in each currency, never across them: US$800 and
+ * NZ$300 are not $1,100 of anything (code review of 20 November, 1.5).
+ */
+export function owingByCurrency(lines: readonly Pick<StatementLine, "owing" | "currency">[], books?: string): { currency: string; owing: Cents }[] {
+  const sums = new Map<string, Cents>();
+  for (const l of lines) {
+    const code = (l.currency ?? "").trim().toUpperCase() || (books ?? "").trim().toUpperCase();
+    sums.set(code, (sums.get(code) ?? 0) + l.owing);
+  }
+  const own = (books ?? "").trim().toUpperCase();
+  return [...sums.entries()]
+    .map(([currency, owing]) => ({ currency, owing }))
+    .sort((a, b) => (a.currency === own ? -1 : b.currency === own ? 1 : a.currency.localeCompare(b.currency)));
+}
+
+/** Totals in each currency, said together: "300.00 and 800.00 USD". */
+export function owingSaid(sums: readonly { currency: string; owing: Cents }[], books?: string): string {
+  if (sums.length === 0) return formatAmount(0);
+  return sums.map((s) => lineMoney(s.owing, s.currency, books)).join(" and ");
 }
 
 /**
@@ -389,12 +425,17 @@ export function customerStatement(
       `<td>${date(l.issued)}</td>` +
       `<td>${l.due === null ? "" : date(l.due)}</td>` +
       `<td>${escapeHtml(l.reference)}</td>` +
-      `<td class="n">${formatAmount(l.total)}</td>` +
-      `<td class="n">${formatAmount(l.owing)}</td>` +
+      `<td class="n">${lineMoney(l.total, l.currency, options.currency)}</td>` +
+      `<td class="n">${lineMoney(l.owing, l.currency, options.currency)}</td>` +
       "</tr>"
     );
   });
-  const owing = open.reduce((sum, l) => sum + l.owing, 0);
+  // Totals for each currency; ageing only where everything is in one.
+  const sums = owingByCurrency(open, options.currency);
+  const oneCurrency = sums.length <= 1;
+  const totals = sums.length === 0
+    ? `<tr class="due"><td colspan="5" class="n">Total owing</td><td class="n">${formatAmount(0)}</td></tr>`
+    : sums.map((s) => `<tr class="due"><td colspan="5" class="n">Total owing${oneCurrency ? "" : ` in ${escapeHtml(s.currency)}`}</td><td class="n">${lineMoney(s.owing, s.currency, options.currency)}</td></tr>`).join("\n");
   const aging = ["Current", "1–30 days", "31–60 days", "61–90 days", "Over 90 days"];
   return `<!doctype html>
 <html lang="${escapeHtml(options.lang ?? "en-NZ")}">
@@ -422,12 +463,14 @@ export function customerStatement(
       : `<table>
     <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th>Reference</th><th class="n">Amount</th><th class="n">Owing</th></tr></thead>
     <tbody>${rows.join("\n")}</tbody>
-    <tfoot><tr class="due"><td colspan="5" class="n">Total owing</td><td class="n">${formatAmount(owing)}</td></tr></tfoot>
+    <tfoot>${totals}</tfoot>
   </table>
-  <table>
+  ${oneCurrency
+    ? `<table>
     <thead><tr>${aging.map((a) => `<th class="n">${a}</th>`).join("")}</tr></thead>
-    <tbody><tr>${buckets.map((b) => `<td class="n">${formatAmount(b)}</td>`).join("")}</tr></tbody>
+    <tbody><tr>${buckets.map((b) => `<td class="n">${lineMoney(b, sums[0]?.currency, options.currency)}</td>`).join("")}</tr></tbody>
   </table>`
+    : ""}`
   }
   ${supplier.payTo ? `<div class="pay"><span class="k-block">Payment</span>${asLines(supplier.payTo)}</div>` : ""}
   ${options.note ? `<div class="note">${asLines(options.note)}</div>` : ""}
@@ -484,7 +527,8 @@ export function collectionLetter(
   const late = lines
     .filter((l) => l.owing > 0 && (dueOf(l)) < asAt)
     .sort((a, b) => a.issued.localeCompare(b.issued));
-  const owing = late.reduce((sum, l) => sum + l.owing, 0);
+  // Added up in each currency, never across them.
+  const sums = owingByCurrency(late, options.currency);
   const days = (from: string): number =>
     Math.round((Date.parse(`${asAt}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
   const said = REMINDER[stage];
@@ -495,9 +539,12 @@ export function collectionLetter(
       `<td>${date(l.issued)}</td>` +
       `<td>${l.due === null ? "" : date(l.due)}</td>` +
       `<td class="n">${days(dueOf(l))}</td>` +
-      `<td class="n">${formatAmount(l.owing)}</td>` +
+      `<td class="n">${lineMoney(l.owing, l.currency, options.currency)}</td>` +
       "</tr>",
   );
+  const pastDue = sums.length === 0
+    ? `<tr class="due"><td colspan="4" class="n">Past due</td><td class="n">${formatAmount(0)}</td></tr>`
+    : sums.map((s) => `<tr class="due"><td colspan="4" class="n">Past due${sums.length > 1 ? ` in ${escapeHtml(s.currency)}` : ""}</td><td class="n">${lineMoney(s.owing, s.currency, options.currency)}</td></tr>`).join("\n");
   return `<!doctype html>
 <html lang="${escapeHtml(options.lang ?? "en-NZ")}">
 <head>
@@ -518,14 +565,14 @@ export function collectionLetter(
     </div>
   </div>
   <div class="to"><span class="k-block">To</span>${escapeHtml(customer)}</div>
-  <p>${escapeHtml(said.words(formatAmount(owing)))}</p>
+  <p>${escapeHtml(said.words(owingSaid(sums, options.currency)))}</p>
   ${
     late.length === 0
       ? '<p class="note">Nothing is past due.</p>'
       : `<table>
     <thead><tr><th>Invoice</th><th>Date</th><th>Due</th><th class="n">Days late</th><th class="n">Owing</th></tr></thead>
     <tbody>${rows.join("\n")}</tbody>
-    <tfoot><tr class="due"><td colspan="4" class="n">Past due</td><td class="n">${formatAmount(owing)}</td></tr></tfoot>
+    <tfoot>${pastDue}</tfoot>
   </table>`
   }
   ${supplier.payTo ? `<div class="pay"><span class="k-block">Payment</span>${asLines(supplier.payTo)}</div>` : ""}
