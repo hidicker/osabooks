@@ -166,9 +166,10 @@ export {
   ownerRenamed,
   renameOwnerInModel,
   sameEntityBanks,
+  gstFilers,
   BUSINESS_STRUCTURES,
 } from "./entities.js";
-export type { Owner, EarlierOwners, EntityKind, BusinessStructure } from "./entities.js";
+export type { Owner, EarlierOwners, EntityKind, BusinessStructure, GstFiler } from "./entities.js";
 
 export {
   accountEntityKey,

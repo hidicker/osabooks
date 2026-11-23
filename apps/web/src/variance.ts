@@ -105,6 +105,12 @@ export interface VarianceInput {
    * stand in for every payment that settles one.
    */
   documentSettles?: (transactionId: string) => Settlement | undefined;
+  /**
+   * One owner's share, as a percentage, where the owners each file for their
+   * own share: every line of the return is taken at this share. Unset, the
+   * whole return.
+   */
+  sharePercent?: number;
 }
 
 /** One line of an invoice or bill as the return takes it on the accruals basis. */
@@ -272,7 +278,10 @@ export function computeOurReturns(input: VarianceInput, from: string, to: string
       // adjustments there, and only there (a BAS and a Korean return read
       // these boxes their own way).
       refundsAsAdjustments: booksCountry().id === "nz",
-      adjustments: input.debitAdjustments?.(period) ?? 0,
+      ...(input.sharePercent !== undefined ? { sharePercent: input.sharePercent } : {}),
+      // The lines are shared out by the return itself; an adjustment is a
+      // figure of the whole, so the share is taken of it here.
+      adjustments: Math.round(((input.debitAdjustments?.(period) ?? 0) * (input.sharePercent ?? 100)) / 100),
       otherPurchases: input.otherPurchases?.(period) ?? [],
       otherSales: input.otherSales?.(period) ?? [],
     }),

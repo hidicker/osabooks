@@ -1,5 +1,5 @@
 import { redraw } from "../app.js";
-import { filedKey } from "@nzosa/core";
+import { sameRegistration } from "@nzosa/core";
 import { allMyirCards } from "./myir-cards.js";
 import { asCsvText, entityBankAccounts, recomputeVariance, record, varianceInput } from "../books.js";
 import { gstSummaryReturns } from "@nzosa/core";
@@ -631,8 +631,11 @@ export async function keepIrdRecord(
     const { returns } = gstSummaryReturns(held.record.periods, { account: held.record.accountId });
     // By period and registration: a co-owner's return for the same period is
     // a return of its own, not a second copy of the first.
-    const heldPeriods = new Set(state.filed.map((f) => filedKey(f)));
-    const fresh = returns.filter((r) => !heldPeriods.has(filedKey(r)));
+    // The same registration however it was written: a share already marked as
+    // filed under the owner's GST number is the one myIR names by its account.
+    const fresh = returns.filter(
+      (r) => !state.filed.some((f) => f.periodEnd === r.periodEnd && sameRegistration(f.registration, r.registration)),
+    );
     if (fresh.length > 0) {
       state.filed = [...state.filed, ...fresh].sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
       state.ledger = { ...state.ledger, filedReturns: state.filed };

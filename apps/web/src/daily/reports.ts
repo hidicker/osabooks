@@ -57,6 +57,8 @@ import { allLines } from "../ai.js";
 import {
   accountEntityKey,
   filedReturnFromOurs,
+  gstFilers,
+  sameRegistration,
   formatGstReturn,
   gstOutcomeLabel,
   gstReturnBoxRows,
@@ -112,6 +114,7 @@ import {
 } from "@nzosa/core";
 import type {
   GstReturnResult,
+  FiledReturn,
   AgentStatement,
   AgentStatementLine,
   ReadAgentLine,
@@ -3208,6 +3211,11 @@ async function removeAgentStatement(statement: AgentStatement): Promise<void> {
 
 /** Which GST return period is open, and which half of it is showing. */
 let gstPeriodChoice = "";
+/**
+ * Whose return is showing, where the entity's owners each file for their own
+ * share: an owner's name, or empty for the whole entity's.
+ */
+let gstFilerChoice = "";
 let gstReturnTab: "return" | "transactions" = "return";
 /** When a box was clicked, which lines the Transactions tab narrows to. */
 let gstBoxFocus: "sales" | "purchases" | "late" | null = null;
@@ -3246,12 +3254,30 @@ function renderGstReturn(body: HTMLElement, year: number): void {
     body.append(note("No GST periods in this year hold any transactions."));
     return;
   }
-  const result = chosenGstReturn(year) ?? returns[returns.length - 1];
-  if (result === undefined) return;
-  gstPeriodChoice = result.period.to;
+  const whole = chosenGstReturn(year) ?? returns[returns.length - 1];
+  if (whole === undefined) return;
+  gstPeriodChoice = whole.period.to;
   const today = localToday();
   const entity = reportingEntity();
-  const filed = state.filed.find((f) => f.periodEnd === result.period.to);
+  // Where the owners each file for their own share: the whole entity's return,
+  // or one owner's share of it, filed under their own GST number.
+  const filers = entity === undefined ? [] : gstFilers(entity, whole.period.to);
+  const filer = filers.find((f) => f.owner === gstFilerChoice);
+  if (filer === undefined) gstFilerChoice = "";
+  const result =
+    filer === undefined
+      ? whole
+      : (computeOurReturns({ ...varianceInput(), sharePercent: filer.percent }, whole.period.from, whole.period.to).find(
+          (r) => r.period.to === whole.period.to,
+        ) ?? whole);
+  const filed =
+    filer !== undefined
+      ? filer.gstNumber === undefined
+        ? undefined
+        : state.filed.find((f) => f.periodEnd === result.period.to && sameRegistration(f.registration, filer.gstNumber))
+      : filers.length > 0
+        ? undefined
+        : state.filed.find((f) => f.periodEnd === result.period.to);
   const money = (cents: Cents): string =>
     booksMoney(cents);
 
@@ -3285,12 +3311,30 @@ function renderGstReturn(body: HTMLElement, year: number): void {
     controls.append(button);
   }
   body.append(controls);
+  if (filers.length > 0) {
+    const whose = document.createElement("div");
+    whose.className = "page-actions gst-filers";
+    for (const [value, caption] of [["", `Whole of ${entity?.name ?? "the entity"}`], ...filers.map((f) => [f.owner, `${f.owner}'s share (${f.percent}%)`])] as const) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = caption;
+      button.className = gstFilerChoice === value ? "primary" : "";
+      button.addEventListener("click", () => {
+        gstFilerChoice = value;
+        redraw("reports");
+      });
+      whose.append(button);
+    }
+    body.append(whose);
+  }
 
   // --- the heading: whose, which period, when, and which way the money goes ---
   const status = document.createElement("p");
   status.className = "gst-return-status";
   status.textContent =
-    filed !== undefined
+    filer === undefined && filers.length > 0
+      ? "Each owner files their own share"
+      : filed !== undefined
       ? /^filed$/i.test(filed.status.trim())
         ? "Filed"
         : `Filed (${filed.status})`
@@ -3305,11 +3349,15 @@ function renderGstReturn(body: HTMLElement, year: number): void {
   heading.className = "gst-return-head";
   const who = document.createElement("div");
   const name = document.createElement("h3");
-  name.textContent = `${entity?.name ?? "GST return"} · ${result.period.from} to ${result.period.to}`;
+  name.textContent =
+    `${entity?.name ?? "GST return"}` +
+    (filer !== undefined ? ` · ${filer.owner}'s share (${filer.percent}%)` : "") +
+    ` · ${result.period.from} to ${result.period.to}`;
   const sub = document.createElement("p");
   sub.className = "gst-return-sub";
+  const gstNumberShown = filer !== undefined ? filer.gstNumber : filers.length > 0 ? undefined : entity?.gstNumber;
   sub.textContent =
-    (entity?.gstNumber ? `GST number ${entity.gstNumber} · ` : "") +
+    (gstNumberShown ? `GST number ${gstNumberShown} · ` : "") +
     // The date the law names, and the working day it can still be done on
     // where that date is a weekend or a public holiday.
     (result.period.payBy !== undefined && result.period.payBy !== result.period.due
@@ -3372,6 +3420,35 @@ function renderGstReturn(body: HTMLElement, year: number): void {
   }
 
   // --- filing ---
+  if (filer === undefined && filers.length > 0) {
+    // Nobody files the whole: each owner files their share, each said here.
+    const said = filers.map((f) => {
+      const theirs =
+        f.gstNumber === undefined
+          ? undefined
+          : state.filed.find((r) => r.periodEnd === result.period.to && sameRegistration(r.registration, f.gstNumber));
+      return `${f.owner} (${f.percent}%): ${
+        f.gstNumber === undefined ? "no GST number yet" : theirs !== undefined ? "filed" : result.period.to < today ? "not recorded as filed" : "period not ended"
+      }`;
+    });
+    body.append(
+      note(
+        `Each owner files their own share of this return, under their own GST number: choose one above to see it and file it. ${said.join("; ")}.` +
+          (filers.some((f) => f.gstNumber === undefined) ? " GST numbers are set in the entity's Settings, on Entities & accounts." : ""),
+      ),
+    );
+    return;
+  }
+  if (filer !== undefined && filer.gstNumber === undefined) {
+    body.append(note(`Add ${filer.owner}'s GST number in ${entity?.name ?? "the entity"}'s Settings, on Entities & accounts, to record this share as filed.`));
+    return;
+  }
+  // A share is kept as filed under the owner's own registration, beside the
+  // other owners' for the same period.
+  const asFiled = (status?: string): FiledReturn =>
+    filer?.gstNumber !== undefined
+      ? { ...filedReturnFromOurs(result, status), registration: filer.gstNumber }
+      : filedReturnFromOurs(result, status);
   if (filed === undefined && result.period.to < today) {
     const actions = document.createElement("div");
     actions.className = "page-actions";
@@ -3393,7 +3470,7 @@ function renderGstReturn(body: HTMLElement, year: number): void {
       ) {
         return;
       }
-      await recordFiledReturn(filedReturnFromOurs(result));
+      await recordFiledReturn(asFiled());
       redraw("reports");
       await offerGstLock(result.period.to);
     });

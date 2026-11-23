@@ -40,6 +40,12 @@ export interface Entity {
    * Their returns together are the property's.
    */
   gstByOwners?: boolean;
+  /**
+   * Where each owner files for their own share (`gstByOwners`): the GST
+   * number each files under, by owner name. Each owner's return is their
+   * share of the entity's, filed under their own number.
+   */
+  ownerGstNumbers?: Record<string, string>;
   /** What the user calls it. */
   name: string;
   /** Optional longer description, e.g. a legal name or address. */
@@ -308,9 +314,40 @@ export function renameOwnerInModel(model: EntityModel, from: string, to: string)
         const { [from]: number, ...rest } = e.holderIrd;
         next.holderIrd = { ...rest, [to]: number! };
       }
+      if (e.ownerGstNumbers !== undefined && e.ownerGstNumbers[from] !== undefined) {
+        const { [from]: number, ...rest } = e.ownerGstNumbers;
+        next.ownerGstNumbers = { ...rest, [to]: number! };
+      }
       return next;
     }),
   };
+}
+
+/** One owner filing GST for their share of an entity. */
+export interface GstFiler {
+  owner: string;
+  /** Their share, 0 to 100, on the period's last day. */
+  percent: number;
+  /** The GST number they file under, where it has been given. */
+  gstNumber?: string;
+}
+
+/**
+ * Who files the entity's GST for a period ending `periodEnd`, where its
+ * owners each file for their own share: each owner and their share, taken on
+ * the period's last day. Empty where the entity files one return of its own.
+ */
+export function gstFilers(
+  entity: Pick<Entity, "gstByOwners" | "owners" | "earlierOwners" | "ownerGstNumbers">,
+  periodEnd: IsoDate,
+): GstFiler[] {
+  if (entity.gstByOwners !== true) return [];
+  const owners = ownersOn(entity, periodEnd).filter((o) => o.percent > 0);
+  if (owners.length < 2) return [];
+  return owners.map((o) => {
+    const gstNumber = entity.ownerGstNumbers?.[o.name]?.trim();
+    return gstNumber ? { owner: o.name, percent: o.percent, gstNumber } : { owner: o.name, percent: o.percent };
+  });
 }
 
 /** Everyone who has owned a share at any time, the current owners first. */
