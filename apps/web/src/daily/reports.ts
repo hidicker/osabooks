@@ -3,6 +3,7 @@ import { attachmentsControl } from "./attachments-ui.js";
 import { renderDashboard } from "./dashboard-report.js";
 import { renderXeroCheck } from "./xero-check-report.js";
 import { comparing, drawPeriodControls, earlierRange, periodFileName, periodHeading, reportRange } from "./report-period.js";
+import { depreciationStillToPost } from "@nzosa/core";
 import { bestAccountMatch, cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell, localToday, documentKey, documentNumberOf } from "@nzosa/core";
 import type { IsoDate, OpeningBalances, OwingDocument, XeroHistoryEntry } from "@nzosa/core";
 import { manualJournalHistory } from "@nzosa/core";
@@ -45,7 +46,7 @@ import {
   invoiceAssignments,
 } from "../books.js";
 import { renderBetweenReport } from "./between-report.js";
-import { currencyWarnings } from "../fx-books.js";
+import { accountingLines, currencyWarnings } from "../fx-books.js";
 import { monthlyColumns, rankedBars, statTiles } from "../charts.js";
 import { combobox } from "../combobox.js";
 import { $, state } from "../state.js";
@@ -2042,6 +2043,78 @@ function balanceSheetCsv(year: number): { text: string; name: string } {
   };
 }
 
+/** Whether the estimate of depreciation still to post is added. Off until asked for. */
+let withDepreciationEstimate = false;
+
+/**
+ * Depreciation the year in progress will still carry, to a report's end,
+ * where there is any: the months not yet ended, never past the financial
+ * year's end. Only for the books' own postings -- the one basis that carries
+ * depreciation -- and for all entities or books of one, since the register
+ * does not say whose each asset is.
+ */
+function depreciationEstimateFor(to: string): { amount: number; to: string } | null {
+  if ($<HTMLSelectElement>("report-basis").value !== "posted") return null;
+  const entities = state.ledger.entities?.entities ?? [];
+  if (state.entityFilter !== "" && entities.length > 1) return null;
+  const estimate = depreciationStillToPost(state.ledger.assets ?? [], {
+    today: localToday(),
+    to,
+    // The lines the depreciation is posted from, so what counts as already
+    // posted is what was.
+    transactions: accountingLines(),
+    ...depreciationRules(),
+  });
+  return estimate.amount === 0 ? null : estimate;
+}
+
+/**
+ * The switch that adds the estimate, and, when on, the lines it adds: the
+ * estimate itself and the figure it changes, both marked as not posted.
+ */
+function depreciationEstimateRows(
+  body: HTMLElement,
+  estimate: { amount: number; to: string },
+  money: (cents: number) => string,
+  lines: { estimateLabel: string; figureLabel: string; figure: number },
+): void {
+  const box = document.createElement("label");
+  box.className = "report-estimate-switch";
+  const tick = document.createElement("input");
+  tick.type = "checkbox";
+  tick.checked = withDepreciationEstimate;
+  tick.addEventListener("change", () => {
+    withDepreciationEstimate = tick.checked;
+    redraw("reports");
+  });
+  box.append(tick, ` Add depreciation still to post this year, estimated to ${daySaid(estimate.to)}`);
+  body.append(box);
+  if (!withDepreciationEstimate) return;
+  const table = document.createElement("table");
+  table.className = "report-table report-estimate";
+  const tbody = document.createElement("tbody");
+  for (const [label, cents, cls] of [
+    [lines.estimateLabel, -estimate.amount, ""],
+    [lines.figureLabel, lines.figure - estimate.amount, "report-net"],
+  ] as const) {
+    const tr = document.createElement("tr");
+    if (cls !== "") tr.className = cls;
+    const name = document.createElement("td");
+    name.className = "report-name";
+    name.textContent = label;
+    tr.append(name, amountCell(money(cents)));
+    tbody.append(tr);
+  }
+  table.append(tbody);
+  body.append(table);
+  body.append(
+    note(
+      "An estimate from the asset register for the months not yet ended. It is not posted, and is in no return; " +
+        "each month's depreciation is posted once the month ends, and the whole year's at the year end.",
+    ),
+  );
+}
+
 function renderBalanceSheet(body: HTMLElement, year: number): void {
   const { asAt, position, journals, opening, currentAccounts, sheet, earlierAt, earlier } = balanceSheetFor(year);
   const { basis, fromImport } = position;
@@ -2219,6 +2292,17 @@ function renderBalanceSheet(body: HTMLElement, year: number): void {
 
   table.append(head, tbody);
   body.append(table);
+
+  // As on the profit and loss: a sheet dated past today, with the year's
+  // depreciation still to post estimated, where asked for.
+  const estimate = depreciationEstimateFor(asAt);
+  if (estimate !== null) {
+    depreciationEstimateRows(body, estimate, money, {
+      estimateLabel: "Accumulated depreciation still to post, estimated",
+      figureLabel: "Net assets with the estimate",
+      figure: sheet.netAssets,
+    });
+  }
 
   if (currentAccounts) {
     body.append(
@@ -5210,6 +5294,11 @@ export function renderReportsPage(): void {
     option.selected = String(year) === chosenYear;
     yearSelect.append(option);
   }
+  // No year at all: books with nothing in them, or whose only document was
+  // voided. The reports below need a year and drew a blank page; said instead.
+  if (years.length === 0 && ["journal", "balancesheet", "cashflow"].includes(kindNow)) {
+    body.append(note("Nothing posted yet: no bank line, invoice, journal or pay run is in the books, so there is no year to report on."));
+  }
 
   // The owner list comes from the entities, so it only has people in it once
   // ownership has been set against one.
@@ -5581,6 +5670,17 @@ export function renderReportsPage(): void {
   addRow("Net Profit", money(grouped.netProfit), "report-net", "", undefined, against(grouped.netProfit, priorGrouped?.netProfit));
   table.append(tbody);
   body.append(table);
+
+  // A period running past today carries depreciation only for the months
+  // already ended. The rest of the year's, estimated, where asked for.
+  const estimate = depreciationEstimateFor(reportRange(year).to);
+  if (estimate !== null) {
+    depreciationEstimateRows(body, estimate, money, {
+      estimateLabel: "Depreciation still to post, estimated",
+      figureLabel: "Net Profit with the estimate",
+      figure: grouped.netProfit,
+    });
+  }
 
   if (report.unclassified.length > 0) {
     const h = document.createElement("h3");

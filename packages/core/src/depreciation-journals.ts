@@ -133,6 +133,60 @@ export function depreciationJournals(options: DepreciationJournalsOptions): Post
 }
 
 /** The last day of each of the twelve months from a year's first day. */
+/**
+ * Depreciation the year in progress will carry that is not posted yet, as an
+ * estimate for a report whose period runs past today.
+ *
+ * The year in progress is posted for the months already ended
+ * (`depreciationJournals`), so a full-year report part-way through the year
+ * carries only those. This is the rest, to the report's end -- and never past
+ * the financial year's end, since next year's depreciation turns on what is
+ * bought and sold before then. Nothing is posted: it is said beside the
+ * report, marked as an estimate, and kept out of every return.
+ *
+ * Zero where the report ends before the months still to post, or in a year
+ * already over (posted whole at its end), or with nothing to depreciate.
+ */
+export function depreciationStillToPost(
+  assets: readonly FixedAsset[],
+  options: {
+    today: string;
+    to: string;
+    yearEnd?: FinancialYearOptions;
+    byDays?: boolean;
+    /**
+     * The lines `depreciationJournals` was given. It posts only the years they
+     * reach, so a year in progress with none of them has nothing posted yet,
+     * and the estimate is the whole of it. Absent, the months already ended
+     * are taken as posted.
+     */
+    transactions?: readonly Transaction[];
+  },
+): { amount: number; to: string; byType: { type: string; amount: number }[] } {
+  const yearEnd = options.yearEnd ?? {};
+  const year = financialYearOf(options.today as never, yearEnd);
+  const span = financialYear(year, yearEnd);
+  const to = options.to < span.to ? options.to : span.to;
+  const none = { amount: 0, to, byType: [] };
+  if (assets.length === 0 || to < options.today) return none;
+  const posting =
+    options.transactions === undefined || options.transactions.some((t) => financialYearOf(t.date, yearEnd) === year);
+  // Where the posting stops: the last month end before today, as above.
+  let postedTo: string | null = null;
+  for (const end of monthEndsOfYear(span.from)) {
+    if (!posting || end >= options.today) break;
+    postedTo = end;
+  }
+  const schedule = (end: string): Map<string, number> =>
+    new Map(depreciationSchedule(assets, { from: span.from, to: end } as never, { byDays: options.byDays === true }).byType.map((g) => [g.type, g.depreciation]));
+  const whole = schedule(to);
+  const posted = postedTo === null ? new Map<string, number>() : schedule(postedTo);
+  const byType = [...new Set([...whole.keys(), ...posted.keys()])]
+    .map((type) => ({ type, amount: (whole.get(type) ?? 0) - (posted.get(type) ?? 0) }))
+    .filter((t) => t.amount !== 0);
+  return { amount: byType.reduce((s, t) => s + t.amount, 0), to, byType };
+}
+
 function monthEndsOfYear(start: string): string[] {
   const out: string[] = [];
   const y0 = Number(start.slice(0, 4));
