@@ -1,4 +1,4 @@
-import { accountingInvoice, accountingSplits, accountingTransactions, convert, formatAmount, isForeign, rateOn } from "@nzosa/core";
+import { accountingInvoice, accountingSplits, accountingTransactions, convert, foreignInUse, formatAmount, isForeign, missingRates, rateOn, ratesStartLate } from "@nzosa/core";
 import type { FxRates, Invoice, SplitPart, Transaction } from "@nzosa/core";
 import { booksCurrency, booksMoney } from "./country.js";
 import { state } from "./state.js";
@@ -94,6 +94,31 @@ export function exchangeAccounts(): { realised: { code: string; name: string }; 
 }
 
 /** A document's amount as it is written: its own currency named where that is not the books'. */
+/**
+ * What the reports should say about other currencies before their figures
+ * are believed: amounts with no rate, counted as the books' own; amounts
+ * before the first rate, converted at a later one; and no account to take
+ * exchange differences, so none are posted. Empty where nothing is foreign.
+ */
+export function currencyWarnings(): string[] {
+  const books = booksCurrency();
+  const inUse = foreignInUse(state.ledger.transactions, state.ledger.invoices ?? [], books);
+  if (inUse.size === 0) return [];
+  const rates = fxRates();
+  const out: string[] = [];
+  const missing = missingRates(inUse, rates);
+  if (missing.length > 0) {
+    out.push(`No exchange rates for ${missing.join(", ")}: those amounts are counted in these figures as if they were ${books}. Add rates on Currencies.`);
+  }
+  for (const late of ratesStartLate(inUse, rates)) {
+    out.push(`${late.currency} is used from ${late.from}, and its first rate is for ${late.firstRate}: amounts before then are converted at that later rate. Add a rate for the earlier dates on Currencies.`);
+  }
+  if (exchangeAccounts() === null) {
+    out.push("No account for exchange differences: a foreign document paid at another rate leaves the difference in what is owed. Add the accounts on Currencies.");
+  }
+  return out;
+}
+
 /**
  * What is owing on a document, in the books' currency: converted at its own
  * rate, as the aged report converts it. As it is where it is in the books'

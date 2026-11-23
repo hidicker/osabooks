@@ -45,6 +45,7 @@ import {
   invoiceAssignments,
 } from "../books.js";
 import { renderBetweenReport } from "./between-report.js";
+import { currencyWarnings } from "../fx-books.js";
 import { monthlyColumns, rankedBars, statTiles } from "../charts.js";
 import { combobox } from "../combobox.js";
 import { $, state } from "../state.js";
@@ -5098,6 +5099,16 @@ export function renderReportsPage(): void {
     redraw("reports");
   });
   body.append(back);
+  // Amounts in another currency with no rate to convert them, or before the
+  // first rate held, or no account for exchange differences: said above any
+  // report they reach, not only on Currencies (code review of 20 November,
+  // 1.2, 1.3 and 1.4).
+  for (const said of currencyWarnings()) {
+    const warn = document.createElement("p");
+    warn.className = "variance-note warn";
+    warn.textContent = said;
+    body.append(warn);
+  }
 
   const basisNow = $<HTMLSelectElement>("report-basis").value;
   const kindNow = $<HTMLSelectElement>("report-kind").value;
