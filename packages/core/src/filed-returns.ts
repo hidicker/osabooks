@@ -84,6 +84,17 @@ export interface FiledReturn {
    * year-end corrections that no bank data can contain.
    */
   core: Cents;
+  /**
+   * The period's GST on trading before any net refunds were moved to Box 9 or
+   * Box 13: Box 8 less Box 12, less the GST moved to Box 13, plus the GST
+   * moved to Box 9. Kept only for a return these books produced, which knows
+   * what it moved; a return read from elsewhere cannot tell its moved refunds
+   * from its own corrections, and is compared on `core`.
+   *
+   * Where it is kept, the books are compared on it, so a change inside a
+   * period whose refunds outweighed its sales (Box 8 then 0) is still seen.
+   */
+  trading?: Cents;
 }
 
 export interface FiledReturnProblem {
@@ -308,13 +319,17 @@ export function filedByPeriod(filed: readonly FiledReturn[]): FiledReturn[] {
     }
     const keys = Object.keys(first.boxes) as (keyof FiledBoxes)[];
     const boxes = Object.fromEntries(keys.map((k) => [k, group.reduce((s, r) => s + r.boxes[k], 0)])) as unknown as FiledBoxes;
-    out.push({
+    const merged: FiledReturn = {
       ...first,
       boxes,
       lines: group.flatMap((r) => r.lines),
       core: group.reduce((s, r) => s + r.core, 0),
       status: `${group.length} returns filed, one per registration (${group.map((r) => r.registration ?? "?").join(", ")})`,
-    });
+    };
+    // Added up only where every return kept it; otherwise all on `core`.
+    if (group.every((r) => r.trading !== undefined)) merged.trading = group.reduce((s, r) => s + (r.trading ?? 0), 0);
+    else delete merged.trading;
+    out.push(merged);
   }
   return out.sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
 }

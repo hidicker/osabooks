@@ -57,6 +57,7 @@ import { unresolvedNote } from "../widgets.js";
 import { allLines } from "../ai.js";
 import {
   accountEntityKey,
+  filedDifference,
   filedReturnFromOurs,
   gstFilers,
   sameRegistration,
@@ -3513,12 +3514,12 @@ function renderGstReturn(body: HTMLElement, year: number): void {
     actions.append(mark);
     body.append(actions);
   } else if (filed !== undefined) {
-    const difference = result.boxes.box8 - result.boxes.box12 - filed.core;
+    const { difference } = filedDifference(filed, result);
     body.append(
       note(
         difference === 0
           ? "Filed, and the books still agree with the return as filed."
-          : `Filed. The books now differ from it by ${money(difference)} (Box 8 less Box 12); ` +
+          : `Filed. The books now differ from it by ${money(difference)} (GST on sales less GST on purchases); ` +
               "the GST reconciliation shows the lines behind that.",
       ),
     );

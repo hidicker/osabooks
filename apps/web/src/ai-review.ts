@@ -8,6 +8,7 @@ import {
   accountTreatment,
   emptyEntityModel,
   entityOfAccount,
+  filedDifference,
   formatAmount,
   ir10Summary,
   ownersOf,
@@ -620,7 +621,10 @@ function gstBlock(period: Period): string[] {
       lines.push(
         `  filed (${filed.status}, ${filed.basis}): box8 ${money(filed.boxes.box8)}, ` +
           `box12 ${money(filed.boxes.box12)}, net ${money(filed.core)}` +
-          ` — difference ${money(core - filed.core)}`,
+          ` — difference ${money(filedDifference(filed, one).difference)}` +
+          (filed.trading !== undefined && filed.trading !== filed.core
+            ? ` (on ${money(filed.trading)}, the net before refunds were moved to box 9 or 13)`
+            : ""),
       );
     }
 
