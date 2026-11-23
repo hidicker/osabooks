@@ -34,8 +34,11 @@ export function headersFrom(htaccess) {
   const always = [...htaccess.matchAll(/^\s*Header always set ([\w-]+) "([^"]*)"/gm)].map((m) => `  ${m[1]}: ${m[2]}`);
   if (!always.some((h) => h.startsWith("  Content-Security-Policy:"))) throw new Error("The .htaccess has no page policy to carry over.");
   // As .htaccess sets for html, js and css: asked about before reuse, so a
-  // new build is the one that loads.
-  const fresh = ["/", "/*.html", "/*.js", "/*.css"].flatMap((path) => [path, "  Cache-Control: no-cache, must-revalidate"]);
+  // new build is the one that loads. With the pages served at addresses of
+  // their own, without ".html": the home page, the consent screen, Pro's
+  // admin page, and /privacy and /terms as Cloudflare serves them.
+  const pages = ["/home/", "/oauth/consent/", "/admin/", "/privacy", "/terms"];
+  const fresh = ["/", ...pages, "/*.html", "/*.js", "/*.css"].flatMap((path) => [path, "  Cache-Control: no-cache, must-revalidate"]);
   return ["/*", ...always, "", ...fresh, ""].join("\n");
 }
 

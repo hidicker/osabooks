@@ -16,6 +16,11 @@ export function moved(): boolean {
   return MOVED_TO !== "";
 }
 
+/** Whether this browser holds books of its own: worth backing up before going on. */
+export function keptInBrowser(ledger: { transactions: unknown[]; invoices?: unknown[]; contacts?: unknown[] }): boolean {
+  return ledger.transactions.length > 0 || (ledger.invoices ?? []).length > 0 || (ledger.contacts ?? []).length > 0;
+}
+
 /** The notice across the top, with the backup and the way on. */
 export function movedNotice(backUp: () => Promise<void>): HTMLElement {
   const box = document.createElement("div");
@@ -31,10 +36,17 @@ export function movedNotice(backUp: () => Promise<void>): HTMLElement {
   save.textContent = "Back up these books";
   save.addEventListener("click", () => {
     save.disabled = true;
-    void backUp().finally(() => {
-      save.disabled = false;
-      save.textContent = "Backed up: back up again";
-    });
+    // Said backed up only when it was.
+    void backUp()
+      .then(() => {
+        save.textContent = "Backed up: back up again";
+      })
+      .catch(() => {
+        save.textContent = "The backup did not save: try again";
+      })
+      .finally(() => {
+        save.disabled = false;
+      });
   });
   const go = document.createElement("a");
   go.href = MOVED_TO;

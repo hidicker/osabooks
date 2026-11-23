@@ -30,7 +30,7 @@ import { codingReconciliationWaiting, unmatchedReferenceWaiting } from "../migra
 import { bankLinkState, setupSteps } from "../migrate/setup-wizard.js";
 import { $, state } from "../state.js";
 import { amountCell, nameCell, note } from "../ui.js";
-import { banksNeedingOwner, emptyEntityModel, overdrawnCurrentAccounts, owedBetween, gstDueDate, gstPeriods, isCreditNote, isPosted, matchInvoices, overdueTasks, endedWithMoneyLeft, grantOpen, reportsDue, localToday } from "@nzosa/core";
+import { banksNeedingOwner, emptyEntityModel, overdrawnCurrentAccounts, owedBetween, gstDueDate, gstPeriods, isCreditNote, isPosted, matchInvoices, storedFor, overdueTasks, endedWithMoneyLeft, grantOpen, reportsDue, localToday } from "@nzosa/core";
 import type { IsoDate } from "@nzosa/core";
 import { booksLocale, moneyPlaces, signedMoney } from "../country.js";
 import { booksCountry, noSalesTax } from "../country.js";
@@ -453,7 +453,7 @@ export function actionItems(): ActionItem[] {
   const balances = invoiceBalanceMap();
   const credits = state.ledger.creditNotes ?? {};
   const unassigned = [...balances.values()].filter(
-    (b) => isCreditNote(b.invoice) && (credits[b.invoice.number] ?? "") === "",
+    (b) => isCreditNote(b.invoice) && (storedFor(credits, b.invoice) ?? "") === "",
   ).length;
   // Rental properties' jobs and issues past their due date.
   const model = state.ledger.entities ?? emptyEntityModel();

@@ -159,3 +159,14 @@ test("a job given the sale does not take the bill of the same number", () => {
   const columns = profitAndLossByClass(journals, { "INV-0012": "Shop" }, counts, { from: "2026-01-01", to: "2026-12-31" });
   assert.deepEqual(columns.map((c) => c.name), ["Shop"]);
 });
+
+test("an allocation in older books whose bare numbers fit a sale and a bill alike is not guessed at (Antigravity review)", async () => {
+  const { resolveAllocation } = await import("../dist/index.js");
+  const saleNote = doc("sales", "CN-1", -10_000);
+  const billNote = doc("purchase", "CN-1", -10_000);
+  const index = new DocumentIndex([sale, bill, saleNote, billNote]);
+  assert.equal(resolveAllocation(index, { from: "CN-1", to: "INV-0012" }), undefined);
+  // By key, or where only one kind fits, as before.
+  assert.deepEqual(resolveAllocation(index, { from: "sales:CN-1", to: "sales:INV-0012" }), { from: "sales:CN-1", to: "sales:INV-0012" });
+  assert.deepEqual(resolveAllocation(new DocumentIndex([sale, saleNote, bill]), { from: "CN-1", to: "INV-0012" }), { from: "sales:CN-1", to: "sales:INV-0012" });
+});

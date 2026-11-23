@@ -58,6 +58,9 @@ test("a registration is the same however it is written", () => {
   // Two GST accounts under one IRD number are two registrations.
   assert.equal(sameRegistration("049-091-850-GST001", "049-091-850-GST002"), false);
   assert.equal(sameRegistration("049-091-850-gst001", "049-091-850-GST001"), true);
+  // The same account with the IRD number written two ways.
+  assert.equal(sameRegistration("049-091-850-GST001", "49-091-850-GST001"), true);
+  assert.equal(sameRegistration("049-091-850-GST001", "49-091-851-GST001"), false);
 });
 
 test("each owner's return is their share of every line, and adds up as the form does", () => {

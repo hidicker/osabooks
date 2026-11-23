@@ -69,8 +69,10 @@ function openSignInWindow(parent, url, onReturn) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // Not "persist:": kept in memory only, so no sign-in outlives the window.
-      partition: "sign-in",
+      // Not "persist:": kept in memory only. And a new one each time: one
+      // name was one session for as long as the program ran, so a second
+      // sign-in found the first one's cookies.
+      partition: `sign-in-${require("node:crypto").randomUUID()}`,
     },
   });
   signIn.on("page-title-updated", (event) => event.preventDefault());
@@ -85,7 +87,7 @@ function openSignInWindow(parent, url, onReturn) {
     if (back) return;
     back = true;
     onReturn(fragment);
-    signIn.close();
+    if (!signIn.isDestroyed()) signIn.close();
   };
   // The service answers the sign-in with a redirect, so the return is seen
   // here before anything is fetched from it.
@@ -95,7 +97,8 @@ function openSignInWindow(parent, url, onReturn) {
     if (/^https:\/\//.test(other)) void shell.openExternal(other);
     return { action: "deny" };
   });
-  if (mayShow(url)) void signIn.loadURL(url);
+  // A load stopped on purpose (the return caught above) rejects: not an error.
+  if (mayShow(url)) signIn.loadURL(url).catch(() => {});
   else signIn.close();
   return signIn;
 }

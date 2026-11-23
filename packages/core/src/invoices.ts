@@ -799,15 +799,20 @@ export function resolveAllocation(
   index: DocumentIndex,
   allocation: Pick<CreditAllocation, "from" | "to">,
 ): { from: DocumentKey; to: DocumentKey } | undefined {
+  // Both kinds tried, and taken only when one fits: older books' bare numbers
+  // that fit a sale and a bill alike are not guessed at.
+  const fits: { from: DocumentKey; to: DocumentKey }[] = [];
   for (const kind of ["sales", "purchase"] as const) {
     const same = (d: Invoice): boolean => d.kind === kind;
     const from = index.resolve(allocation.from, same);
     const to = index.resolve(allocation.to, same);
     if (from !== undefined && to !== undefined && from.kind === to.kind) {
-      return { from: documentKey(from), to: documentKey(to) };
+      const pair = { from: documentKey(from), to: documentKey(to) };
+      // A key names its own kind whichever kind is asked for: one fit, found twice.
+      if (!fits.some((f) => f.from === pair.from && f.to === pair.to)) fits.push(pair);
     }
   }
-  return undefined;
+  return fits.length === 1 ? fits[0] : undefined;
 }
 
 /**

@@ -2353,6 +2353,9 @@ async function saveCreditNote(note: Invoice, target: string): Promise<void> {
   if (bare !== undefined && documentKey(bare) === documentKey(note)) delete after[note.number];
   delete after[documentKey(note)];
   if (target !== "") after[documentKey(note)] = target;
+  // A bare number left because another kind's note shares it: taken away
+  // here by an empty link under this note's key, which is read before it.
+  else if (after[note.number] !== undefined) after[documentKey(note)] = "";
 
   state.ledger = { ...state.ledger, creditNotes: after };
   state.persistent = await savePart(state.ledger);

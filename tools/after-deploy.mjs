@@ -120,6 +120,23 @@ async function redirect(from, to) {
 if (target === "app" || target === "both") {
   await site(APP, "The app");
   await page(`${APP}/home/`, /OsaBooks/);
+  // Every link on the home page to OsaBooks's own sites answers: its "Try
+  // the demo" links once pointed at the old address's folder.
+  await check("the home page's links answer", async () => {
+    const html = await (await get(`${APP}/home/`, { follow: true })).text();
+    const links = new Set();
+    for (const [, href] of html.matchAll(/<a[^>]*\shref="([^"#]+)"/g)) {
+      const url = new URL(href, `${APP}/home/`);
+      if (/(^|\.)osabooks\.app$/.test(url.hostname)) links.add(url.toString());
+    }
+    const broken = [];
+    for (const link of links) {
+      const response = await get(link, { follow: true });
+      if (response.status !== 200) broken.push(`${link} (${response.status})`);
+    }
+    if (broken.length > 0) throw new Error(broken.join(", "));
+    return `${links.size} links`;
+  });
   await page(`${APP}/oauth/consent/`, /Connect an AI app to OsaBooks/);
   await page(`${APP}/oauth/consent/go.js`);
   await check("osabooks.mcpb is the extension", async () => {
