@@ -2,6 +2,7 @@ import type { Cents } from "./money.js";
 import type { IsoDate } from "./dates.js";
 import type { PostedJournal, PostedLine } from "./posting.js";
 import type { EmployeeDetails } from "./employee-details.js";
+import { nextWorkingDay } from "./nz-holidays.js";
 
 /**
  * Payroll: PAYE and the other deductions, the payday filing file, and the
@@ -1244,8 +1245,8 @@ export function payrollJournal(run: PayRun, accounts: PayrollAccounts): PostedJo
 /**
  * What a month's pay runs owe Inland Revenue, by the month of the payday --
  * the figures an employer deductions report gives, and what is paid by the
- * 20th of the next month (for an employer deducting less than $500,000 a
- * year; a larger one pays twice a month).
+ * 20th of the next month, or 15 January for December (for an employer
+ * deducting less than $500,000 a year; a larger one pays twice a month).
  */
 export interface EmployerDeductionsMonth {
   /** The month, as YYYY-MM. */
@@ -1260,20 +1261,32 @@ export interface EmployerDeductionsMonth {
   kiwiSaverEmployerNet: Cents;
   esct: Cents;
   total: Cents;
-  /** The 20th of the next month. */
+  /** The 20th of the next month; December's, 15 January. */
   due: IsoDate;
+  /** The day it can be paid by: the due date, or the next working day after it. */
+  payBy: IsoDate;
   runs: number;
+}
+
+/**
+ * When a month's employer deductions are due: the 20th of the next month,
+ * except December's, due 15 January -- Inland Revenue's holiday exception,
+ * as for a GST period ending 30 November.
+ */
+export function employerDeductionsDue(month: string): IsoDate {
+  const [y, m] = month.split("-").map(Number) as [number, number];
+  if (m === 12) return `${String(y + 1).padStart(4, "0")}-01-15` as IsoDate;
+  return new Date(Date.UTC(y, m, 20)).toISOString().slice(0, 10) as IsoDate;
 }
 
 export function employerDeductionsByMonth(runs: readonly PayRun[]): EmployerDeductionsMonth[] {
   const byMonth = new Map<string, EmployerDeductionsMonth>();
   for (const run of runs) {
     const month = run.payDate.slice(0, 7);
-    const [y, m] = month.split("-").map(Number) as [number, number];
-    const next = new Date(Date.UTC(y, m, 20)).toISOString().slice(0, 10) as IsoDate;
+    const due = employerDeductionsDue(month);
     const held = byMonth.get(month) ?? {
       month, paye: 0, childSupport: 0, studentLoan: 0, kiwiSaverEmployee: 0,
-      kiwiSaverEmployerNet: 0, esct: 0, total: 0, due: next, runs: 0,
+      kiwiSaverEmployerNet: 0, esct: 0, total: 0, due, payBy: nextWorkingDay(due), runs: 0,
     };
     held.paye += run.totalPaye - (run.totalDonationCredits ?? 0) + (run.totalPriorPaye ?? 0);
     held.childSupport += run.totalChildSupport;
