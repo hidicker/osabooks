@@ -886,11 +886,13 @@ export function reviewPrompt(year: number): string {
       ? [
           "Manual and year-end adjustments",
           "- Each manual journal listed above: whether what its narration and notes say it does is",
-          "  what its lines do, whether the treatment is right, and what it rests on (the files",
-          "  attached in Xero, where the history names them). Say which you would ask the person who",
-          "  posted it about, and what you would ask.",
+          "  what its lines do, whether the treatment is right, and what it rests on" +
+            // Xero's history names its attachments; books from elsewhere have none.
+            (xeroChangesBlock(periodOf(year)).length > 0 ? " (the files attached in Xero, where the history names them)." : "."),
+          "  Say which you would ask the person who posted it about, and what you would ask.",
           "- Anything changed after the fact in the history: journals edited or voided after posting,",
-          "  a GST return's boxes changed before filing, a year's lock date moved back. Say what each",
+          // The country's own return: no GST in the United States, VAT in Korea.
+          `  ${tax === null ? "a sales tax return" : `a ${tax} return`} changed before filing, a year's lock date moved back. Say what each`,
           "  suggests was corrected, and whether the books show the correction.",
           "",
         ]
