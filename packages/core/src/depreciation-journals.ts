@@ -149,7 +149,19 @@ export function depreciationJournals(options: DepreciationJournalsOptions): Post
  */
 export function depreciationStillToPost(
   assets: readonly FixedAsset[],
-  options: { today: string; to: string; yearEnd?: FinancialYearOptions; byDays?: boolean },
+  options: {
+    today: string;
+    to: string;
+    yearEnd?: FinancialYearOptions;
+    byDays?: boolean;
+    /**
+     * The lines `depreciationJournals` was given. It posts only the years they
+     * reach, so a year in progress with none of them has nothing posted yet,
+     * and the estimate is the whole of it. Absent, the months already ended
+     * are taken as posted.
+     */
+    transactions?: readonly Transaction[];
+  },
 ): { amount: number; to: string; byType: { type: string; amount: number }[] } {
   const yearEnd = options.yearEnd ?? {};
   const year = financialYearOf(options.today as never, yearEnd);
@@ -157,10 +169,12 @@ export function depreciationStillToPost(
   const to = options.to < span.to ? options.to : span.to;
   const none = { amount: 0, to, byType: [] };
   if (assets.length === 0 || to < options.today) return none;
+  const posting =
+    options.transactions === undefined || options.transactions.some((t) => financialYearOf(t.date, yearEnd) === year);
   // Where the posting stops: the last month end before today, as above.
   let postedTo: string | null = null;
   for (const end of monthEndsOfYear(span.from)) {
-    if (end >= options.today) break;
+    if (!posting || end >= options.today) break;
     postedTo = end;
   }
   const schedule = (end: string): Map<string, number> =>

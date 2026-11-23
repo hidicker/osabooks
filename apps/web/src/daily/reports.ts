@@ -46,7 +46,7 @@ import {
   invoiceAssignments,
 } from "../books.js";
 import { renderBetweenReport } from "./between-report.js";
-import { currencyWarnings } from "../fx-books.js";
+import { accountingLines, currencyWarnings } from "../fx-books.js";
 import { monthlyColumns, rankedBars, statTiles } from "../charts.js";
 import { combobox } from "../combobox.js";
 import { $, state } from "../state.js";
@@ -2057,7 +2057,14 @@ function depreciationEstimateFor(to: string): { amount: number; to: string } | n
   if ($<HTMLSelectElement>("report-basis").value !== "posted") return null;
   const entities = state.ledger.entities?.entities ?? [];
   if (state.entityFilter !== "" && entities.length > 1) return null;
-  const estimate = depreciationStillToPost(state.ledger.assets ?? [], { today: localToday(), to, ...depreciationRules() });
+  const estimate = depreciationStillToPost(state.ledger.assets ?? [], {
+    today: localToday(),
+    to,
+    // The lines the depreciation is posted from, so what counts as already
+    // posted is what was.
+    transactions: accountingLines(),
+    ...depreciationRules(),
+  });
   return estimate.amount === 0 ? null : estimate;
 }
 

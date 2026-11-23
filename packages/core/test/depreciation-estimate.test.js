@@ -32,6 +32,18 @@ test("the year's depreciation still to post: posted months plus the estimate are
   assert.equal(posted + estimate.amount, whole);
 });
 
+test("a year in progress with no lines yet has nothing posted: the estimate is all of it", () => {
+  const today = "2026-11-24";
+  const posted = depreciationJournals({ assets: [van], transactions: [line("2026-03-01")], chart, today })
+    .filter((j) => j.date >= "2026-04-01" && j.lines.some((l) => l.accountCode === "416"));
+  assert.equal(posted.length, 0, "no line in the year, so nothing posted in it");
+  const estimate = depreciationStillToPost([van], { today, to: "2027-03-31", transactions: [line("2026-03-01")] });
+  const whole = depreciationStillToPost([van], { today: "2026-04-01", to: "2027-03-31" });
+  assert.equal(estimate.amount, whole.amount, "the whole year, as nothing of it is posted");
+  const withLines = depreciationStillToPost([van], { today, to: "2027-03-31", transactions: [line("2026-05-01")] });
+  assert.ok(withLines.amount < estimate.amount, "with a line in the year, the months ended are posted");
+});
+
 test("never past the financial year's end", () => {
   const estimate = depreciationStillToPost([van], { today: "2026-11-24", to: "2027-12-31" });
   assert.equal(estimate.to, "2027-03-31");

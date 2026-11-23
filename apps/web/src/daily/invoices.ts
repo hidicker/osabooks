@@ -1984,6 +1984,30 @@ export function renderInvoices(): void {
     body.append(wideTable(draftTable));
   }
 
+  // Voided: taken back out of the books, and kept in sight, as Xero keeps
+  // them, so a number missing from the run can be found and what happened read.
+  const voided = invoices.filter((i) => ["voided", "deleted"].includes(i.status.trim().toLowerCase()));
+  if (voided.length > 0) {
+    const voidHeading = document.createElement("h3");
+    voidHeading.textContent = `Voided (${voided.length})`;
+    body.append(voidHeading);
+    body.append(note("Not in the books and not owing. History says who voided each, and can undo it."));
+    const voidTable = document.createElement("table");
+    voidTable.className = "report-table owner-table match-table";
+    const voidHead = document.createElement("thead");
+    voidHead.innerHTML = "<tr><th>Invoice</th><th>Date</th><th>Total</th><th></th></tr>";
+    const voidBody = document.createElement("tbody");
+    for (const invoice of [...voided].sort((x, y) => y.issued.localeCompare(x.issued))) {
+      if (!hit(`${invoice.number} ${invoice.contact} ${invoice.reference}`)) continue;
+      const tr = document.createElement("tr");
+      tr.append(invoiceCell(invoice, invoice.number), nameCell(invoice.issued), amountCell(documentMoney(invoice, invoice.total)));
+      tr.append(editInvoiceCell(invoice));
+      voidBody.append(tr);
+    }
+    voidTable.append(voidHead, voidBody);
+    body.append(wideTable(voidTable));
+  }
+
   // Quotes (estimates): offered to a customer, in no books until made an
   // invoice. Listed so they can be found, sent and made into one.
   const quotes = invoices.filter((i) => isEstimate(i));
