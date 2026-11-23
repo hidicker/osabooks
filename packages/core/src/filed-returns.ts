@@ -319,6 +319,32 @@ export function filedByPeriod(filed: readonly FiledReturn[]): FiledReturn[] {
   return out.sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
 }
 
+/**
+ * The IRD number a registration is under, as digits without leading zeros:
+ * `049-091-850-GST001`, `49-091-850` and `49091850` are all `49091850`.
+ * Empty when there is none.
+ */
+export function registrationIrd(registration: string | undefined): string {
+  const number = (registration ?? "").split(/-?gst/i)[0] ?? "";
+  return number.replace(/\D/g, "").replace(/^0+/, "");
+}
+
+/**
+ * Whether two returns were filed under the same registration. myIR names the
+ * account (`123-456-789-GST001`); a return filed or marked as filed from
+ * these books has only the GST number it was filed under. Those are the same
+ * registration when the IRD numbers are. Two myIR accounts are compared
+ * whole, as a person can hold two GST accounts under one IRD number.
+ */
+export function sameRegistration(a: string | undefined, b: string | undefined): boolean {
+  if ((a ?? "") === (b ?? "")) return true;
+  if (a === undefined || b === undefined || a === "" || b === "") return false;
+  const account = /gst\d+$/i;
+  if (account.test(a) && account.test(b)) return a.toUpperCase() === b.toUpperCase();
+  const ird = registrationIrd(a);
+  return ird !== "" && ird === registrationIrd(b);
+}
+
 /** Two filed returns are the same return when the period and the registration are. */
 export function filedKey(one: Pick<FiledReturn, "periodEnd" | "registration">): string {
   return `${one.periodEnd}|${one.registration ?? ""}`;

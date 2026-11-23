@@ -984,6 +984,62 @@ export function renderEntities(): void {
       gstWrap.append(ratio);
     }
 
+    // Co-owners who each register for their own share, rather than together:
+    // each files their share of this entity's return under their own number.
+    const ownerGst = document.createElement("div");
+    ownerGst.className = "entity-owner-gst";
+    ownerGst.hidden = noSalesTax() || !reportsNetOfGst(entity) || (entity.owners ?? []).length < 2;
+    if (!ownerGst.hidden) {
+      const byOwnersWrap = document.createElement("label");
+      byOwnersWrap.className = "entity-gst";
+      const byOwners = document.createElement("input");
+      byOwners.type = "checkbox";
+      byOwners.checked = entity.gstByOwners === true;
+      byOwnersWrap.title = sayTax(
+        "Each owner is registered for GST for their own share and files a return of their own: the GST return then shows each owner's share, to file under their own GST number.",
+      );
+      byOwnersWrap.append(byOwners, document.createTextNode(` ${sayTax("Each owner files GST for their own share")}`));
+      byOwners.addEventListener("change", () => {
+        const live = state.ledger.entities ?? emptyEntityModel();
+        void saveEntities(
+          { ...live, entities: live.entities.map((e) => (e.id === entity.id ? { ...e, gstByOwners: byOwners.checked } : e)) },
+          sayTax(`${entity.name}: ${byOwners.checked ? "each owner files GST for their own share" : "one GST return for the entity"}`),
+        );
+      });
+      ownerGst.append(byOwnersWrap);
+      if (entity.gstByOwners === true) {
+        for (const owner of entity.owners ?? []) {
+          const wrap = document.createElement("label");
+          wrap.className = "entity-billing-field";
+          const caption = document.createElement("span");
+          caption.textContent = sayTax(`${owner.name}'s GST number (${owner.percent}%)`);
+          const input = document.createElement("input");
+          input.value = entity.ownerGstNumbers?.[owner.name] ?? "";
+          input.placeholder = "e.g. 123-456-789";
+          input.addEventListener("change", () => {
+            const live = state.ledger.entities ?? emptyEntityModel();
+            const value = input.value.trim();
+            void saveEntities(
+              {
+                ...live,
+                entities: live.entities.map((e) => {
+                  if (e.id !== entity.id) return e;
+                  const numbers = { ...(e.ownerGstNumbers ?? {}) };
+                  if (value === "") delete numbers[owner.name];
+                  else numbers[owner.name] = value;
+                  const { ownerGstNumbers: _drop, ...rest } = e;
+                  return Object.keys(numbers).length > 0 ? { ...rest, ownerGstNumbers: numbers } : rest;
+                }),
+              },
+              sayTax(`${entity.name}: ${owner.name}'s GST number ${value === "" ? "removed" : "set"}`),
+            );
+          });
+          wrap.append(caption, input);
+          ownerGst.append(wrap);
+        }
+      }
+    }
+
     // Only a residential property is caught by the interest limitation rules,
     // so only one is asked. Exempt means its interest is claimed in full in
     // every year, including the year to 31 March 2025 when others got 80%.
@@ -1114,7 +1170,7 @@ export function renderEntities(): void {
     const head = document.createElement("div");
     head.className = "entity-head";
     head.append(name, summary, settingsButton, menu);
-    settings.append(ownersWrap, kind, structure, ltcWrap, gstWrap, exemptWrap, nonProfitSettings(entity), trustSettings(entity));
+    settings.append(ownersWrap, kind, structure, ltcWrap, gstWrap, ownerGst, exemptWrap, nonProfitSettings(entity), trustSettings(entity));
     row.append(head, settings);
 
     // What goes at the top of an invoice you send somebody. Nothing else in

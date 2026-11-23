@@ -1,6 +1,6 @@
 import { looksLikeBankFile } from "../daily/bank-columns.js";
 import { chosenStartDate } from "./onboarding-state.js";
-import { documentKey, filedKey, isCreditNote, storedFor, xeroNumberOf } from "@nzosa/core";
+import { documentKey, filedKey, isCreditNote, sameRegistration, storedFor, xeroNumberOf } from "@nzosa/core";
 import { redraw, showPage } from "../app.js";
 import { asCsvText, invoiceBalanceMap, recomputeVariance, saveManualJournals, record, syncExpenseClaims } from "../books.js";
 import { checkBankBalances, handleFiles } from "../daily/bank-import.js";
@@ -74,7 +74,9 @@ export async function loadFiledReturns(files: File[]): Promise<void> {
   const { returns, problems } = await readFiledReturns(files);
   // Re-importing a period replaces it rather than adding a second copy.
   // Keyed by period and registration: co-owners file a return each.
-  const byPeriod = new Map(state.filed.map((one) => [filedKey(one), one]));
+  // The same registration however it was written (sameRegistration).
+  const kept = state.filed.filter((f) => !returns.some((r) => r.periodEnd === f.periodEnd && sameRegistration(f.registration, r.registration)));
+  const byPeriod = new Map(kept.map((one) => [filedKey(one), one]));
   for (const one of returns) byPeriod.set(filedKey(one), one);
   state.filed = [...byPeriod.values()].sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
   state.varianceProblems = problems;

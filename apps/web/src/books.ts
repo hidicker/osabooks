@@ -1,5 +1,5 @@
 import { redraw, showPage } from "./app.js";
-import { filedByPeriod, filedKey,
+import { filedByPeriod, filedKey, sameRegistration,
   betweenEntityJournals,
   lineOwners,
   isSeparatePerson,
@@ -1302,7 +1302,11 @@ function settlementOf(transactionId: string): Settlement | undefined {
  * way afterwards.
  */
 export async function recordFiledReturn(one: FiledReturn): Promise<void> {
-  const byPeriod = new Map(state.filed.map((f) => [filedKey(f), f]));
+  // The same registration however it was written: a co-owner's return marked
+  // as filed under their GST number replaces the one myIR's file named by its
+  // account, and leaves the other owner's alone.
+  const kept = state.filed.filter((f) => !(f.periodEnd === one.periodEnd && sameRegistration(f.registration, one.registration)));
+  const byPeriod = new Map(kept.map((f) => [filedKey(f), f]));
   byPeriod.set(filedKey(one), one);
   state.filed = [...byPeriod.values()].sort((a, b) => a.periodEnd.localeCompare(b.periodEnd));
   state.ledger = { ...state.ledger, filedReturns: state.filed };
