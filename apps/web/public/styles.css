@@ -645,7 +645,7 @@
    side of the screen. */
 .ai-menu-items { position: absolute; left: 0; top: calc(100% + 0.3rem); z-index: 30;
   display: flex; flex-direction: column; min-width: 15rem;
-  background: var(--card, #fff); border: 1px solid var(--border);
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
   border-radius: 6px; padding: 0.25rem; box-shadow: 0 6px 20px rgba(0,0,0,0.18); }
 .ai-menu-items button { text-align: left; border: 0; background: transparent;
   padding: 0.45rem 0.6rem; border-radius: 4px; font-size: 0.82rem; color: inherit;
@@ -1825,7 +1825,7 @@ main:has(#page-check:not([hidden])) { max-width: none; }
    choice is right before committing to it. */
 .invoice-gathered { display: inline-flex; gap: 0.3rem; flex-wrap: wrap; }
 .invoice-chip { font-size: 0.75rem; padding: 0.1rem 0.4rem; border: 1px solid var(--border);
-  border-radius: 999px; background: var(--card); cursor: pointer; font-family: inherit; }
+  border-radius: 999px; background: var(--surface); color: var(--text); cursor: pointer; font-family: inherit; }
 .invoice-chip:hover { border-color: #a33; color: #a33; }
 .invoice-tally { font-size: 0.75rem; color: var(--muted); }
 .invoice-tally-exact { color: #1f6f4a; font-weight: 600; }

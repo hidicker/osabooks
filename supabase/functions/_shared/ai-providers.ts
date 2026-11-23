@@ -105,6 +105,15 @@ async function readJson(
           "that key here.",
       );
     }
+    // A key refused outright ("invalid x-api-key", "Incorrect API key") is the
+    // provider's words about a header; what to do about it is change the key.
+    if (response.status === 401) {
+      throw new Error(
+        `${who} did not accept the AI key${said !== undefined && said !== "" ? ` ("${said}")` : ""}. ` +
+          "It may have been mistyped, deleted or revoked: make a new key with the provider, " +
+          "and paste it in on AI set-up.",
+      );
+    }
     throw new Error(said !== undefined && said !== "" ? said : `${who} answered ${response.status}.`);
   }
   return body ?? {};
