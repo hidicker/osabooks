@@ -130,8 +130,15 @@ if (target === "app" || target === "both") {
     if (bytes.length < 100_000 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new Error(`${bytes.length} bytes, not a zip`);
     return `${Math.round(bytes.length / 1024)} KB`;
   });
-  await redirect(`${OLD}/osabooks/`, `${APP}/`);
-  await redirect(`${OLD}/nzosa/`, `${APP}/`);
+  // The old app address holds the moved copy (moved.ts), not a forward: it
+  // offers books kept in a browser there as a backup first.
+  await check(`${OLD}/osabooks/ is the moved copy`, async () => {
+    const response = await get(`${OLD}/osabooks/app.js`);
+    if (response.status !== 200) throw new Error(`answered ${response.status}`);
+    if (!(await response.text()).includes("OsaBooks has moved to")) throw new Error("not the moved copy");
+    return true;
+  });
+  await redirect(`${OLD}/nzosa/`, `${OLD}/osabooks/`);
 
   console.log("The AI connector");
   const connector = `${CLOUD}/functions/v1/mcp/00000000-0000-0000-0000-000000000000`;
@@ -167,7 +174,8 @@ if (target === "app" || target === "both") {
 if (target === "demo" || target === "both") {
   await site(DEMO, "The demo");
   await redirect(`${OLD}/osabooks_demo/`, `${DEMO}/`);
-  await redirect(`${OLD}/nzosa_demo/`, `${DEMO}/`);
+  // Two steps: the oldest name forwards to the old demo, which forwards here.
+  await redirect(`${OLD}/nzosa_demo/`, `${OLD}/osabooks_demo/`);
 }
 
 console.log(`\n${passed} passed, ${failed} failed.`);
