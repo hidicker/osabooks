@@ -71,11 +71,25 @@ export function parseAmount(input: unknown, currency = "NZD"): Cents | null {
     if (marker) text = (crdr[2] ?? "").trim();
   }
 
+  let leadingMinus = false;
   if (text.startsWith("-")) {
     negative = !negative;
+    leadingMinus = true;
     text = text.slice(1).trim();
   } else if (text.startsWith("+")) {
     text = text.slice(1).trim();
+  }
+
+  // A minus at the end, as SAP, some MYOB exports and card statements write a
+  // debit: 12.50- is -12.50. It was stripped with the other symbols below and
+  // the debit read as a credit (code review of 20 November, 12.1). A minus at
+  // both ends is not a number anybody meant.
+  if (/-\s*$/.test(text)) {
+    if (leadingMinus) return null;
+    negative = !negative;
+    text = text.replace(/-\s*$/, "").trim();
+    // Brackets as well, (12.50)-: two ways of saying a sign, refused.
+    if (/^\(.*\)$/.test(text)) return null;
   }
 
   // Strip currency symbols, codes and spaces, keeping digits and separators.
