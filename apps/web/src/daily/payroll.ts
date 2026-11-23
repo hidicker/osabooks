@@ -1670,7 +1670,8 @@ function renderEmployerDeductions(container: HTMLElement): void {
       formatAmount(m.kiwiSaverEmployerNet),
       formatAmount(m.esct),
       formatAmount(m.total),
-      m.due,
+      // The day to pay by: a due date on a weekend or holiday moves on.
+      m.payBy === m.due ? m.due : `${m.payBy} (due ${m.due}, a weekend or holiday)`,
     ];
     cells.forEach((text, i) => {
       const td = document.createElement("td");
@@ -1686,8 +1687,9 @@ function renderEmployerDeductions(container: HTMLElement): void {
     table,
     note(
       "By the month of each payday, as Inland Revenue takes them: due on the 20th of the next " +
-        "month for an employer deducting less than $500,000 a year. A larger employer pays twice " +
-        "a month, on the 20th and on the 5th of the month after.",
+        "month for an employer deducting less than $500,000 a year, and December's on 15 January; " +
+        "a due date on a weekend or public holiday moves to the next working day. A larger employer " +
+        "pays twice a month, on the 20th and on the 5th of the month after (15 January for 16 to 31 December).",
     ),
   );
 }
