@@ -2,7 +2,7 @@
 
 Free, open-source bookkeeping and tax for businesses, rental properties and personal books, in Australia, New Zealand, the United States and South Korea. Bank files in; a coded double-entry ledger, GST returns, income tax figures and financial reports out.
 
-**[Home page](https://nbparagliding.nz/osabooks/home/)** · **[Try the demo](https://nbparagliding.nz/osabooks_demo/)** (sample books in your browser, nothing to install)
+**[Home page](https://osabooks.app/home/)** · **[Try the demo](https://demo.osabooks.app/)** (sample books in your browser, nothing to install)
 
 Help keep this project moving and free: [![Donate a coffee](https://img.shields.io/badge/Donate-a%20coffee-orange?logo=stripe)](https://buy.stripe.com/28EaEX2sY2Ar7vy49pd7q00)
 
@@ -86,7 +86,7 @@ OsaBooks is free software under the GNU Affero General Public Licence, version 3
 ([LICENSE](LICENSE)), with the additional terms in [NOTICE](NOTICE). You may run, study,
 share and change it. If you change it and let other people use your version, including
 over a network, you have to offer them its source too, keep the attribution
-"OsaBooks, by hidicker" with its link to the [OsaBooks home page](https://nbparagliding.nz/osabooks/home/),
+"OsaBooks, by hidicker" with its link to the [OsaBooks home page](https://osabooks.app/home/),
 and call your version something other than OsaBooks. Provided as is, without warranty of any
 kind. You remain responsible for what you file.
 

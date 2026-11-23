@@ -34,12 +34,12 @@ test("only a sign-in at the edition's own service stays in the program", () => {
 
 test("the service sending the person back is recognised by its fragment, wherever it points", () => {
   assert.equal(
-    appReturn("https://nbparagliding.nz/osabooks-pro/#myir=finish&code=abc&state=def"),
+    appReturn("https://pro.osabooks.app/#myir=finish&code=abc&state=def"),
     "myir=finish&code=abc&state=def",
   );
   assert.equal(appReturn("http://127.0.0.1:3216/#myir=failed"), "myir=failed");
-  assert.equal(appReturn("https://nbparagliding.nz/osabooks-pro/#myir=connected"), null);
-  assert.equal(appReturn("https://nbparagliding.nz/osabooks-pro/?myir=finish&code=abc"), null);
+  assert.equal(appReturn("https://pro.osabooks.app/#myir=connected"), null);
+  assert.equal(appReturn("https://pro.osabooks.app/?myir=finish&code=abc"), null);
   assert.equal(appReturn("https://myir.ird.govt.nz/login"), null);
   assert.equal(appReturn("::"), null);
 });

@@ -4,7 +4,7 @@
 // the ones just built. This checks the rest of what people and AI apps reach:
 //   - the app's and the demo's pages and files answer, every demo set of books
 //     among them (a demo ledger left out of git is missed by the deploy);
-//   - the old /nzosa/ addresses still send people on to /osabooks/;
+//   - the old addresses on nbparagliding.nz send people on to osabooks.app;
 //   - the extension download is a real file;
 //   - the AI connector refuses a request with no sign-in, saying where to sign
 //     in, the way Claude and other AI apps expect; and the consent page loads.
@@ -15,7 +15,11 @@ import { readdirSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const SITE = "https://nbparagliding.nz";
+// Each app at an address of its own since 23 November 2026 (Cloudflare),
+// moved off nbparagliding.nz, which forwards.
+const APP = "https://osabooks.app";
+const DEMO = "https://demo.osabooks.app";
+const OLD = "https://nbparagliding.nz";
 const CLOUD = "https://ronancqtbbqmsiatxmfn.supabase.co";
 const target = process.argv[2] ?? "both";
 if (!["app", "demo", "both"].includes(target)) {
@@ -39,7 +43,7 @@ async function get(url, init = {}) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     try {
       const fresh = init.method === undefined || init.method === "GET" ? `${url}${url.includes("?") ? "&" : "?"}check=${Date.now()}` : url;
-      return await fetch(fresh, { redirect: "manual", ...init, headers: { "Cache-Control": "no-cache", "User-Agent": "OsaBooks after-deploy check", ...(init.headers ?? {}) } });
+      return await fetch(fresh, { redirect: init.follow === true ? "follow" : "manual", ...init, headers: { "Cache-Control": "no-cache", "User-Agent": "OsaBooks after-deploy check", ...(init.headers ?? {}) } });
     } catch (error) {
       last = error;
       await new Promise((r) => setTimeout(r, 2000));
@@ -59,8 +63,9 @@ async function check(what, run) {
 
 /** A page that answers 200 with what it should hold. */
 function page(url, holds) {
-  return check(url.replace(SITE, ""), async () => {
-    const response = await get(url);
+  return check(url, async () => {
+    // Followed: Cloudflare serves /privacy.html at /privacy, and forwards.
+    const response = await get(url, { follow: true });
     if (response.status !== 200) throw new Error(`answered ${response.status}`);
     const text = await response.text();
     if (holds !== undefined && !holds.test(text)) throw new Error(`does not hold ${holds}`);
@@ -91,7 +96,7 @@ async function site(base, label) {
   await page(`${base}/privacy.html`, /OsaBooks/);
   await page(`${base}/terms.html`, /OsaBooks/);
   for (const file of demoFiles()) {
-    await check(`${base.replace(SITE, "")}/demo/${file}`, async () => {
+    await check(`${base}/demo/${file}`, async () => {
       const response = await get(`${base}/demo/${file}`);
       if (response.status !== 200) throw new Error(`answered ${response.status}`);
       const text = await response.text();
@@ -103,7 +108,7 @@ async function site(base, label) {
 }
 
 async function redirect(from, to) {
-  await check(`${from.replace(SITE, "")} sends on to ${to.replace(SITE, "")}`, async () => {
+  await check(`${from} sends on to ${to}`, async () => {
     const response = await get(from);
     const where = response.headers.get("location") ?? "";
     if (response.status < 300 || response.status > 308) throw new Error(`answered ${response.status}`);
@@ -113,19 +118,20 @@ async function redirect(from, to) {
 }
 
 if (target === "app" || target === "both") {
-  await site(`${SITE}/osabooks`, "The app");
-  await page(`${SITE}/osabooks/home/`, /OsaBooks/);
-  await page(`${SITE}/osabooks/oauth/consent/`, /Connect an AI app to OsaBooks/);
-  await page(`${SITE}/osabooks/oauth/consent/go.js`);
-  await check("/osabooks/osabooks.mcpb is the extension", async () => {
-    const response = await get(`${SITE}/osabooks/osabooks.mcpb`);
+  await site(APP, "The app");
+  await page(`${APP}/home/`, /OsaBooks/);
+  await page(`${APP}/oauth/consent/`, /Connect an AI app to OsaBooks/);
+  await page(`${APP}/oauth/consent/go.js`);
+  await check("osabooks.mcpb is the extension", async () => {
+    const response = await get(`${APP}/osabooks.mcpb`);
     if (response.status !== 200) throw new Error(`answered ${response.status}`);
     const bytes = new Uint8Array(await response.arrayBuffer());
     // An .mcpb is a zip: it starts PK.
     if (bytes.length < 100_000 || bytes[0] !== 0x50 || bytes[1] !== 0x4b) throw new Error(`${bytes.length} bytes, not a zip`);
     return `${Math.round(bytes.length / 1024)} KB`;
   });
-  await redirect(`${SITE}/nzosa/`, `${SITE}/osabooks/`);
+  await redirect(`${OLD}/osabooks/`, `${APP}/`);
+  await redirect(`${OLD}/nzosa/`, `${APP}/`);
 
   console.log("The AI connector");
   const connector = `${CLOUD}/functions/v1/mcp/00000000-0000-0000-0000-000000000000`;
@@ -159,8 +165,9 @@ if (target === "app" || target === "both") {
 }
 
 if (target === "demo" || target === "both") {
-  await site(`${SITE}/osabooks_demo`, "The demo");
-  await redirect(`${SITE}/nzosa_demo/`, `${SITE}/osabooks_demo/`);
+  await site(DEMO, "The demo");
+  await redirect(`${OLD}/osabooks_demo/`, `${DEMO}/`);
+  await redirect(`${OLD}/nzosa_demo/`, `${DEMO}/`);
 }
 
 console.log(`\n${passed} passed, ${failed} failed.`);

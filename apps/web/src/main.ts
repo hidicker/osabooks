@@ -167,8 +167,11 @@ import {
   ledgerId,
   savesPending,
   cloudBookRefused,
+  ledgerName,
 } from "./store.js";
 import { renderEntityFilter } from "./widgets.js";
+import { MOVED_TO, moved, movedNotice } from "./moved.js";
+import { downloadBackupNow } from "./backup.js";
 
 /**
  * The whole front end.
@@ -477,6 +480,20 @@ async function init(): Promise<void> {
       state.startupMessage =
         `${refused.name} did not open. If you use two-factor sign-in, give the code from your authenticator app ` +
         "on the Books page; otherwise your access to these books may have ended.";
+      state.page = "books";
+    }
+
+    // The copy left at an old address (moved.ts): nothing kept in this
+    // browser, straight on to the new one; books kept here, offered as a
+    // backup to restore there.
+    if (moved()) {
+      const kept =
+        state.ledger.transactions.length > 0 || (state.ledger.invoices ?? []).length > 0 || (state.ledger.contacts ?? []).length > 0;
+      if (!kept) {
+        location.replace(MOVED_TO);
+        return;
+      }
+      document.body.prepend(movedNotice(() => downloadBackupNow(ledgerName())));
       state.page = "books";
     }
 
