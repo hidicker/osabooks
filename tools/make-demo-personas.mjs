@@ -778,9 +778,9 @@ function write(name, built) {
 
   // Payroll, built by the app's own payroll rules: three staff, fortnightly.
   const employees = [
-    { id: "e1", name: "Mere Parata", irdNumber: ird(105_667_100), taxCode: "M", payFrequency: "fortnightly", annualSalary: 5_800_000, kiwiSaverRate: 0.03, kiwiSaverEmployerRate: 0.03, esctRate: 0.3, bankAccount: "03-1354-0456123-000", startDate: "2023-06-01" },
-    { id: "e2", name: "Josh Lee", irdNumber: ird(121_884_200), taxCode: "M SL", payFrequency: "fortnightly", hourlyRate: 2_600, standardHours: 64, kiwiSaverRate: 0.04, kiwiSaverEmployerRate: 0.03, esctRate: 0.175, bankAccount: "12-3192-0012345-001", startDate: "2024-01-15" },
-    { id: "e3", name: "Aroha Smith", irdNumber: ird(130_225_300), taxCode: "M", payFrequency: "fortnightly", hourlyRate: 2_400, standardHours: 40, kiwiSaverRate: 0.03, kiwiSaverEmployerRate: 0.03, esctRate: 0.175, bankAccount: "06-0501-0234567-000", startDate: "2024-11-04" },
+    { id: "e1", name: "Mere Parata", irdNumber: ird(105_667_100), taxCode: "M", payFrequency: "fortnightly", annualSalary: 5_800_000, kiwiSaverRate: 0.03, kiwiSaverEmployerRate: 0.03, esctRate: 0.3, bankAccount: "03-1354-0456122-000", startDate: "2023-06-01" },
+    { id: "e2", name: "Josh Lee", irdNumber: ird(121_884_200), taxCode: "M SL", payFrequency: "fortnightly", hourlyRate: 2_600, standardHours: 64, kiwiSaverRate: 0.04, kiwiSaverEmployerRate: 0.03, esctRate: 0.175, bankAccount: "12-3192-0012340-001", startDate: "2024-01-15" },
+    { id: "e3", name: "Aroha Smith", irdNumber: ird(130_225_300), taxCode: "M", payFrequency: "fortnightly", hourlyRate: 2_400, standardHours: 40, kiwiSaverRate: 0.03, kiwiSaverEmployerRate: 0.03, esctRate: 0.175, bankAccount: "06-0501-0234569-000", startDate: "2024-11-04" },
   ];
   const employerIrd = ird(127_550_000);
   const payRuns = [];

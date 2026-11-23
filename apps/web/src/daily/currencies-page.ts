@@ -5,7 +5,7 @@ import { booksCurrency, booksLocale } from "../country.js";
 import { $, state } from "../state.js";
 import { save, savePart } from "../store.js";
 import { askOnPage, escapeHtml, note, tellOnPage } from "../ui.js";
-import { foreignInUse, missingRates, localToday } from "@nzosa/core";
+import { foreignInUse, missingRates, localToday, minorUnits } from "@nzosa/core";
 import type { Account } from "@nzosa/core";
 import { exchangeAccounts, fxRates } from "../fx-books.js";
 
@@ -215,6 +215,18 @@ export function renderCurrencies(): void {
     warn.className = "variance-note warn";
     warn.textContent = `No rates for ${missing.join(", ")}: those amounts count in the reports as if they were ${books} until rates are added.`;
     body.append(warn);
+  }
+
+  // Amounts are held to two places; a currency with three loses its third
+  // (code review of 20 November, 12.2). Rare here, so said rather than changed.
+  const threePlaces = currencies.filter((c) => minorUnits(c) > 2);
+  if (threePlaces.length > 0) {
+    body.append(
+      note(
+        `${threePlaces.join(", ")} ${threePlaces.length === 1 ? "has" : "have"} three decimal places, and OsaBooks keeps amounts to two: ` +
+          "the third is rounded off, so 12.345 is kept as 12.35.",
+      ),
+    );
   }
 
   if (currencies.length === 0) {

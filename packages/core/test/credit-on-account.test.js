@@ -80,3 +80,26 @@ test("what cannot be allocated", () => {
   assert.match(allocationProblem([{ from: "CN-1", to: "INV-2", amount: 100, date: "2026-07-01" }], balances), /no earlier/);
   assert.match(allocationProblem([{ from: "CN-1", to: "INV-2", amount: 0, date: "2026-10-01" }], balances), /more than nothing/);
 });
+
+test("credit is used only in its own currency (code review 1.5)", () => {
+  const mixed = [
+    doc("CN-US", -50_000, "2026-08-01", { currency: "USD" }),
+    doc("INV-NZ", 50_000, "2026-08-10", { currency: "NZD" }),
+    doc("INV-US", 20_000, "2026-08-12", { currency: "usd" }),
+  ];
+  const balances = invoiceBalances(mixed, []);
+  const credits = creditsOnAccount(balances.values(), "sales");
+  // The US dollar credit offers only the US dollar invoice; the NZ one has no credit of its own.
+  assert.equal(credits.length, 1);
+  assert.equal(credits[0].currency, "USD");
+  assert.deepEqual(credits[0].open.map((b) => b.invoice.number), ["INV-US"]);
+  const proposed = proposeAllocations(credits[0], undefined, "2026-09-01");
+  assert.deepEqual(proposed.map((a) => [a.from, a.to, a.amount]), [["sales:CN-US", "sales:INV-US", 20_000]]);
+  assert.equal(allocationProblem(proposed, balances), null);
+  // Put across by hand, it is refused.
+  const across = [{ from: "sales:CN-US", to: "sales:INV-NZ", amount: 50_000, date: "2026-09-01" }];
+  assert.match(allocationProblem(across, balances) ?? "", /CN-US is in USD and INV-NZ in NZD/);
+  // A document that does not say its currency is not refused for it.
+  const unsaid = invoiceBalances([doc("CN-1", -10_000, "2026-08-01", { currency: "" }), doc("INV-1", 10_000, "2026-08-02", { currency: "NZD" })], []);
+  assert.equal(allocationProblem([{ from: "sales:CN-1", to: "sales:INV-1", amount: 10_000, date: "2026-09-01" }], unsaid), null);
+});

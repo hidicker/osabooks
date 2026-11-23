@@ -15,16 +15,28 @@ import { contactKey } from "./contacts.js";
  * owing -- in whole or in part, or paid back.
  */
 
+/** A document's currency, compared: "usd" and " USD" are one, and blank is unsaid. */
+function currencyKey(currency: string | undefined): string {
+  return (currency ?? "").trim().toUpperCase();
+}
+
 export interface CreditSource {
   balance: InvoiceBalance;
   /** What is left to use, positive. */
   available: Cents;
 }
 
-/** One contact's credit, newest-held last, and the documents it could go against. */
+/**
+ * One contact's credit in one currency, newest-held last, and the documents
+ * in that currency it could go against. Credit in US dollars is not credit
+ * against an invoice in New Zealand dollars: a contact with both has one of
+ * these for each (code review of 20 November, 1.5).
+ */
 export interface CreditOnAccount {
   contact: string;
   kind: InvoiceKind;
+  /** The documents' currency, as they carry it. */
+  currency: string;
   sources: CreditSource[];
   available: Cents;
   open: InvoiceBalance[];
@@ -40,11 +52,11 @@ export function creditsOnAccount(
   linked: Readonly<Record<string, string>> = {},
 ): CreditOnAccount[] {
   const byContact = new Map<string, CreditOnAccount>();
-  const entry = (name: string): CreditOnAccount => {
-    const key = contactKey(name);
+  const entry = (name: string, currency: string): CreditOnAccount => {
+    const key = `${contactKey(name)}|${currencyKey(currency)}`;
     let one = byContact.get(key);
     if (one === undefined) {
-      one = { contact: name, kind, sources: [], available: 0, open: [] };
+      one = { contact: name, kind, currency: currencyKey(currency), sources: [], available: 0, open: [] };
       byContact.set(key, one);
     }
     return one;
@@ -54,11 +66,11 @@ export function creditsOnAccount(
     if (doc.kind !== kind || !isPosted(doc)) continue;
     if (isCreditNote(doc)) {
       if ((storedFor(linked, doc) ?? "") !== "") continue;
-      if (balance.remaining < 0) entry(doc.contact).sources.push({ balance, available: -balance.remaining });
+      if (balance.remaining < 0) entry(doc.contact, doc.currency).sources.push({ balance, available: -balance.remaining });
     } else if (balance.remaining < 0) {
-      entry(doc.contact).sources.push({ balance, available: -balance.remaining });
+      entry(doc.contact, doc.currency).sources.push({ balance, available: -balance.remaining });
     } else if (balance.remaining > 0) {
-      entry(doc.contact).open.push(balance);
+      entry(doc.contact, doc.currency).open.push(balance);
     }
   }
   const out: CreditOnAccount[] = [];
@@ -124,6 +136,13 @@ export function allocationProblem(
     if (source === undefined || target === undefined) return "A document named is not in these books.";
     if (contactKey(source.invoice.contact) !== contactKey(target.invoice.contact)) {
       return `${source.invoice.number} and ${target.invoice.number} are not the same ${source.invoice.kind === "sales" ? "customer's" : "supplier's"}.`;
+    }
+    // Credit is used only in its own currency: US$500 of credit is not NZ$500
+    // off an invoice in New Zealand dollars.
+    const fromCurrency = currencyKey(source.invoice.currency);
+    const toCurrency = currencyKey(target.invoice.currency);
+    if (fromCurrency !== "" && toCurrency !== "" && fromCurrency !== toCurrency) {
+      return `${source.invoice.number} is in ${fromCurrency} and ${target.invoice.number} in ${toCurrency}: credit is used only against documents in its own currency.`;
     }
     if (a.date < source.invoice.issued || a.date < target.invoice.issued) return "A credit is used no earlier than both documents' dates.";
     from.set(pair.from, (from.get(pair.from) ?? 0) + a.amount);

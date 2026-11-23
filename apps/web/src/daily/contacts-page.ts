@@ -25,8 +25,11 @@ import {
   WORDING_BLANKS,
   wordingFor,
   localToday,
+  owingByCurrency,
 } from "@nzosa/core";
 import type { Contact, ContactKind, Invoice, PaidTo, Wording, WordingKind } from "@nzosa/core";
+import { documentMoney, moneyByCurrency, owingInBooks } from "../fx-books.js";
+import { nzAccountDoubt } from "../nz-account.js";
 import { paidTo } from "@nzosa/core";
 import { taxYearEnd, taxYearOf, taxYearStart } from "../tax-year.js";
 import { booksCountry, booksCurrency, noSalesTax } from "../country.js";
@@ -84,15 +87,18 @@ function owing(): Map<string, Owing> {
     const key = contactKey(balance.invoice.contact);
     const one = out.get(key) ?? { owedToUs: 0, weOwe: 0, documents: 0, pastDue: 0, lateDays: 0 };
     one.documents += 1;
+    // In the books' money, each document converted at its own rate: a US$800
+    // invoice is not $800 owed (code review of 20 November, 1.5).
+    const inBooks = owingInBooks(balance.invoice, balance.remaining);
     if (balance.invoice.kind === "sales") {
-      one.owedToUs += balance.remaining;
+      one.owedToUs += inBooks;
       const due = balance.invoice.due ?? balance.invoice.issued;
       if (balance.remaining > 0 && due < now) {
-        one.pastDue += balance.remaining;
+        one.pastDue += inBooks;
         const days = Math.round((Date.parse(`${now}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86_400_000);
         one.lateDays = Math.max(one.lateDays, days);
       }
-    } else one.weOwe += balance.remaining;
+    } else one.weOwe += inBooks;
     out.set(key, one);
   }
   return out;
@@ -122,6 +128,7 @@ function statementLines(mine: readonly { invoice: Invoice; remaining: number }[]
     total: b.invoice.total,
     owing: b.remaining,
     reference: b.invoice.reference === "QuickBooks" ? "" : b.invoice.reference,
+    currency: b.invoice.currency,
   }));
 }
 
@@ -143,8 +150,8 @@ export function sendStatement(name: string, kind: "statement" | "reminder", emai
   const lines = statementLines(mine);
   const html =
     kind === "reminder"
-      ? collectionLetter(name, lines, today(), supplier, reminderStageFor(sums?.lateDays ?? 0), documentOptions())
-      : customerStatement(name, lines, today(), supplier, documentOptions());
+      ? collectionLetter(name, lines, today(), supplier, reminderStageFor(sums?.lateDays ?? 0), { ...documentOptions(), currency: booksCurrency() })
+      : customerStatement(name, lines, today(), supplier, { ...documentOptions(), currency: booksCurrency() });
   download(html, `${kind}-${name.replace(/[^A-Za-z0-9]+/g, "-")}.html`, "text/html;charset=utf-8");
   const to = (email ?? emailForContact(state.ledger.invoices ?? [], name) ?? "").trim();
   if (to === "") return false;
@@ -152,8 +159,9 @@ export function sendStatement(name: string, kind: "statement" | "reminder", emai
     customer: name,
     business: supplier.name,
     date: new Date().toLocaleDateString(booksLocale(), { day: "numeric", month: "short", year: "numeric" }),
-    owing: booksMoney(sums?.owedToUs ?? 0),
-    pastdue: booksMoney(sums?.pastDue ?? 0),
+    // Told in each invoice's own currency, never added across them.
+    owing: moneyByCurrency(owingByCurrency(lines, booksCurrency()), booksCurrency()),
+    pastdue: moneyByCurrency(owingByCurrency(lines.filter((l) => l.owing > 0 && (l.due ?? l.issued) < today()), booksCurrency()), booksCurrency()),
     payment: (supplier.payTo ?? "").trim(),
   });
   window.location.href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(words.subject)}&body=${encodeURIComponent(words.body)}`;
@@ -418,18 +426,19 @@ async function writeOffSmall(): Promise<void> {
     return;
   }
   const small = [...invoiceBalanceMap().values()].filter(
-    (b) => b.invoice.kind === "sales" && isPosted(b.invoice) && b.remaining > 0 && b.remaining <= limit,
+    // The limit is in the books' money: a foreign balance is measured converted.
+    (b) => b.invoice.kind === "sales" && isPosted(b.invoice) && b.remaining > 0 && owingInBooks(b.invoice, b.remaining) <= limit,
   );
   if (small.length === 0) {
     await tellOnPage(`No invoice has ${booksMoney(limit)} or less left to pay.`);
     return;
   }
-  const total = small.reduce((sum, b) => sum + b.remaining, 0);
+  const total = small.reduce((sum, b) => sum + owingInBooks(b.invoice, b.remaining), 0);
   if (
     !await askOnPage(
       `Write off ${small.length} balance${small.length === 1 ? "" : "s"}, ${booksMoney(total)} in all, ` +
         `to ${account.code} ${account.name}?\n\n` +
-        small.map((b) => `${b.invoice.number} ${b.invoice.contact}: ${booksMoney(b.remaining)}`).join("\n"),
+        small.map((b) => `${b.invoice.number} ${b.invoice.contact}: ${documentMoney(b.invoice, b.remaining)}`).join("\n"),
     )
   ) {
     return;
@@ -569,6 +578,9 @@ function form(existing: Contact | null): HTMLElement {
     if (alike !== undefined && !(await askOnPage(`${alike.name} is already here, and looks like the same ${alike.kind === "vendor" ? "supplier" : "customer"}. Keep ${said} as well?`, `Keep ${said}`))) {
       return;
     }
+    // A mistyped account number is paid into nobody's, or somebody else's.
+    const doubt = nzAccountDoubt(bank.value);
+    if (doubt !== null && !(await askOnPage(`${doubt}\n\nSave it as it is?`, "Save it"))) return;
     const fields = {
       name: said,
       kind: kind.value as ContactKind,

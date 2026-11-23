@@ -1,3 +1,4 @@
+import { owingInBooks } from "../fx-books.js";
 import { remindersCanSend, remindersDueCount } from "./reminders-ui.js";
 import { anyModuleOn, moduleOn, yearEndFigure } from "../modules.js";
 import { showPage } from "../app.js";
@@ -528,7 +529,7 @@ export function actionItems(): ActionItem[] {
       what: "Invoices overdue",
       count: lateSales.length,
       urgency: "amber",
-      detail: `${dollars(lateSales.reduce((s, b) => s + b.remaining, 0))} owed to you past its due date.`,
+      detail: `${dollars(lateSales.reduce((s, b) => s + owingInBooks(b.invoice, b.remaining), 0))} owed to you past its due date.`,
       go: () => showPage("invoices"),
     });
   }
@@ -539,7 +540,7 @@ export function actionItems(): ActionItem[] {
       what: "Bills overdue",
       count: lateBills.length,
       urgency: lateBills.some((b) => (b.invoice.due ?? "") < month) ? "red" : "amber",
-      detail: `${dollars(lateBills.reduce((s, b) => s + b.remaining, 0))} you owe past its due date.`,
+      detail: `${dollars(lateBills.reduce((s, b) => s + owingInBooks(b.invoice, b.remaining), 0))} you owe past its due date.`,
       go: () => showPage(document.querySelector('button[data-page="bills"]:not([hidden])') ? "bills" : "invoices"),
     });
   }

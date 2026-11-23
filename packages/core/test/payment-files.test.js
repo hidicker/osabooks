@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { abaFile, auAccountParts, bankText, nzAccountParts, nzHashTotal, nzPaymentFile } from "../dist/index.js";
+import { abaFile, auAccountParts, bankText, nzAccountCheckDigitOk, nzAccountParts, nzHashTotal, nzPaymentFile } from "../dist/index.js";
 
 const lines = (text) => {
   assert.ok(text.endsWith("\r\n"), "every record ends CR LF");
@@ -37,7 +37,7 @@ test("text a bank takes: no commas, no accents, cut to fit, no trailing space", 
 });
 
 test("BNZ: header, a transaction a payment, control with total, count and hash", () => {
-  const file = nzPaymentFile({ format: "bnz", from: "02-0100-0123456-000", payer: "Kea Coffee Limited", due: "2026-10-27", created: "2026-10-25", payments: pays, name: "bills 2026-10-27" });
+  const file = nzPaymentFile({ checkAccounts: false, format: "bnz", from: "02-0100-0123456-000", payer: "Kea Coffee Limited", due: "2026-10-27", created: "2026-10-25", payments: pays, name: "bills 2026-10-27" });
   const [header, one, two, control, ...rest] = lines(file.text);
   assert.equal(rest.length, 0);
   assert.equal(header, "1,,,,0201000123456000,7,261027,261025,I");
@@ -50,14 +50,14 @@ test("BNZ: header, a transaction a payment, control with total, count and hash",
 });
 
 test("BNZ wages: code 52 and one line on the payer's statement", () => {
-  const file = nzPaymentFile({ format: "bnz", from: "02-0100-0123456-000", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays, payroll: true });
+  const file = nzPaymentFile({ checkAccounts: false, format: "bnz", from: "02-0100-0123456-000", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays, payroll: true });
   const [header, one] = lines(file.text);
   assert.ok(header.endsWith(",261025,"), "bulk listing: indicator blank");
   assert.equal(one.split(",")[2], "52");
 });
 
 test("ANZ: eight-digit dates, otherwise the same records", () => {
-  const file = nzPaymentFile({ format: "anz", from: "01-0123-0456789-00", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays });
+  const file = nzPaymentFile({ checkAccounts: false, format: "anz", from: "01-0123-0456789-00", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays });
   const all = lines(file.text);
   assert.equal(all[0], "1,,,,,,20261027,20261025,");
   assert.equal(all[1].split(",").length, 13);
@@ -65,7 +65,7 @@ test("ANZ: eight-digit dates, otherwise the same records", () => {
 });
 
 test("Westpac: 180-character lines, a header and a detail each, nothing after", () => {
-  const file = nzPaymentFile({ format: "westpac", from: "03-0123-0456789-00", payer: "Kea Coffee", due: "2026-10-27", created: "2026-10-25", payments: pays });
+  const file = nzPaymentFile({ checkAccounts: false, format: "westpac", from: "03-0123-0456789-00", payer: "Kea Coffee", due: "2026-10-27", created: "2026-10-25", payments: pays });
   const all = lines(file.text);
   assert.equal(all.length, 3);
   for (const line of all) assert.equal(line.length, 180);
@@ -82,11 +82,11 @@ test("Westpac: 180-character lines, a header and a detail each, nothing after", 
   assert.equal(detail.slice(88, 100).trimEnd(), "2026-09-20");
   assert.equal(detail.slice(100, 118), "03" + "0123" + "00456789" + "0000");
   assert.equal(detail.slice(118, 138).trimEnd(), "Kea Coffee");
-  assert.throws(() => nzPaymentFile({ format: "westpac", from: "02-0100-0123456-000", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays }), /Westpac/);
+  assert.throws(() => nzPaymentFile({ checkAccounts: false, format: "westpac", from: "02-0100-0123456-000", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays }), /Westpac/);
 });
 
 test("payments that cannot go are left out, each with its reason, and the totals are of the rest", () => {
-  const file = nzPaymentFile({
+  const file = nzPaymentFile({ checkAccounts: false,
     format: "bnz",
     from: "02-0100-0123456-000",
     payer: "Kea",
@@ -97,7 +97,7 @@ test("payments that cannot go are left out, each with its reason, and the totals
   assert.equal(file.count, 2);
   assert.deepEqual(file.skipped.map((s) => s.name), ["No Bank", "Zero", "Odd"]);
   assert.match(file.skipped[0].why, /no NZ bank account/);
-  assert.throws(() => nzPaymentFile({ format: "bnz", from: "nope", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays }), /not a New Zealand bank account/);
+  assert.throws(() => nzPaymentFile({ checkAccounts: false, format: "bnz", from: "nope", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays }), /not a New Zealand bank account/);
 });
 
 const auPays = [
@@ -164,7 +164,7 @@ test("ABA refuses what the bank would refuse", () => {
 });
 
 test("ASB MT9: 160-character lines, header 12, a detail 13 each, trailer 13 99", () => {
-  const file = nzPaymentFile({ format: "asb", from: "12-3141-0123456-00", payer: "Kea Coffee", due: "2026-10-27", created: "2026-10-25", payments: pays });
+  const file = nzPaymentFile({ checkAccounts: false, format: "asb", from: "12-3141-0123456-00", payer: "Kea Coffee", due: "2026-10-27", created: "2026-10-25", payments: pays });
   const all = lines(file.text);
   assert.equal(all.length, 4);
   for (const line of all) assert.equal(line.length, 160);
@@ -193,13 +193,35 @@ test("ASB MT9: 160-character lines, header 12, a detail 13 each, trailer 13 99",
 
 test("ASB MT9: the check total as ASB's guide works it, wages as 052, and only from ASB", () => {
   assert.equal(nzHashTotal(["121234123456700", "124321765432100"]), "55558888888", "ASB's Appendix A example");
-  const wages = nzPaymentFile({ format: "asb", from: "12-3141-0123456-50", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays, payroll: true });
+  const wages = nzPaymentFile({ checkAccounts: false, format: "asb", from: "12-3141-0123456-50", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays, payroll: true });
   assert.equal(lines(wages.text)[1].slice(18, 21), "052");
   assert.equal(lines(wages.text)[0].slice(15, 18), "50 ");
-  assert.throws(() => nzPaymentFile({ format: "asb", from: "02-0100-0123456-000", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays }), /ASB account/);
-  const odd = nzPaymentFile({ format: "asb", from: "12-3141-0123456-00", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: [{ name: "Ref #1: test", account: "12-3456-0123456-00", amount: 100, reference: "#12:34" }] });
+  assert.throws(() => nzPaymentFile({ checkAccounts: false, format: "asb", from: "02-0100-0123456-000", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: pays }), /ASB account/);
+  const odd = nzPaymentFile({ checkAccounts: false, format: "asb", from: "12-3141-0123456-00", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: [{ name: "Ref #1: test", account: "12-3456-0123456-00", amount: 100, reference: "#12:34" }] });
   assert.equal(lines(odd.text)[1].slice(31, 51).trimEnd(), "Ref 1 test", "no # or : in ASB's fields");
-  const big = nzPaymentFile({ format: "asb", from: "12-3141-0123456-00", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: [{ name: "Too much", account: "12-3456-0123456-00", amount: 10_000_000_000 }, pays[0]] });
+  const big = nzPaymentFile({ checkAccounts: false, format: "asb", from: "12-3141-0123456-00", payer: "Kea", due: "2026-10-27", created: "2026-10-25", payments: [{ name: "Too much", account: "12-3456-0123456-00", amount: 10_000_000_000 }, pays[0]] });
   assert.equal(big.count, 1);
   assert.match(big.skipped[0].why, /more than ASB's file/);
+});
+
+test("an account paid whose check digit fails is left out, and said (code review 8.2)", () => {
+  // Payments NZ's own examples, one for each kind of weighting: as given, and
+  // with one digit changed.
+  for (const good of ["01-902-0068389-00", "08-6523-1954512-001", "26-2600-0320871-032", "31-2800-0123456-000"]) {
+    assert.equal(nzAccountCheckDigitOk(nzAccountParts(good)), true, good);
+  }
+  for (const bad of ["01-902-0068398-00", "08-6523-1954513-001", "26-2600-0320871-033"]) {
+    assert.equal(nzAccountCheckDigitOk(nzAccountParts(bad)), false, bad);
+  }
+  const file = nzPaymentFile({
+    format: "bnz", from: "02-0100-0123456-000", payer: "Kea", due: "2026-10-27", created: "2026-10-26",
+    payments: [
+      { name: "Good Supplier", account: "01-902-0068389-00", amount: 10_000 },
+      { name: "Typo Ltd", account: "01-902-0068398-00", amount: 5_000 },
+    ],
+  });
+  assert.equal(file.count, 1);
+  assert.equal(file.total, 10_000);
+  assert.deepEqual(file.skipped.map((s) => s.name), ["Typo Ltd"]);
+  assert.match(file.skipped[0].why, /check digit does not match/);
 });

@@ -112,3 +112,13 @@ test("but four digits before a separator cannot be a group", () => {
   assert.equal(parseAmount("1234.567", "NZD"), 123457);
   assert.equal(parseAmount("98765.432", "NZD"), 9876543);
 });
+
+test("a minus at the end is a debit, as SAP and card statements write one (code review 12.1)", () => {
+  assert.equal(parseAmount("12.50-"), -1250);
+  assert.equal(parseAmount("1,234.56 -"), -123456);
+  assert.equal(parseAmount("$12.50-"), -1250);
+  assert.equal(parseAmount("(12.50)-"), null, "brackets and a trailing minus: refused, not guessed");
+  assert.equal(parseAmount("-12.50-"), null, "a minus at both ends is refused, not guessed");
+  assert.equal(parseAmount("12.50"), 1250);
+  assert.equal(parseAmount("-12.50"), -1250);
+});

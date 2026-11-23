@@ -14,6 +14,7 @@ import { taxYearOf } from "../tax-year.js";
 import { $, state } from "../state.js";
 import { savePart, partChanged } from "../store.js";
 import { askOnPage, download, escapeHtml, note, tellOnPage } from "../ui.js";
+import { nzAccountDoubt } from "../nz-account.js";
 import {
   accountEntityKey,
   buildPayRun,
@@ -772,6 +773,10 @@ function renderEmployeeEditor(container: HTMLElement): void {
     const hourlyRate = payType === "hourly" ? (parseAmount(rateInput.value.trim(), booksCurrency()) ?? undefined) : undefined;
     const annualSalary = payType === "salary" ? (parseAmount(salaryInput.value.trim(), booksCurrency()) ?? undefined) : undefined;
     const standardHours = payType === "hourly" ? Number(hoursInput.value) || 40 : undefined;
+
+    // Wages paid into a mistyped account go to nobody's, or somebody else's.
+    const doubt = nzAccountDoubt(bankInput.value);
+    if (doubt !== null && !(await askOnPage(`${doubt}\n\nSave it as it is?`, "Save it"))) return;
 
     const empId = existing?.id ?? `emp-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
     const emp: Employee = {

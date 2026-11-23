@@ -1,5 +1,6 @@
 import { invoiceBalanceMap } from "./books.js";
-import { applyCountryRules, booksLocale, booksMoney, documentOptions } from "./country.js";
+import { applyCountryRules, booksCurrency, booksLocale, documentOptions } from "./country.js";
+import { moneyByCurrency, owingInBooks } from "./fx-books.js";
 import { supplierFor } from "./daily/invoices.js";
 import { state } from "./state.js";
 import { holdWrites, ledgerFromParts } from "./store.js";
@@ -11,11 +12,12 @@ import {
   findContact,
   isPosted,
   localToday,
+  owingByCurrency,
   reminderStageFor,
   remindersDue,
   wordingFor,
 } from "@nzosa/core";
-import type { ReminderDue, RemindersToday } from "@nzosa/core";
+import type { Invoice, ReminderDue, RemindersToday } from "@nzosa/core";
 
 // The reminders function sends through this, from the same bundle (run.js):
 // each email recorded as it goes (packages/core/src/reminder-sending.ts).
@@ -59,6 +61,9 @@ export function remindersToday(ledger: StoredLedger, sent: Readonly<Record<strin
     sent,
     contactOf: (name) => findContact(ledger.contacts ?? [], name),
     emailOf: (name) => emailForContact(ledger.invoices ?? [], name) ?? undefined,
+    // The minimum is in the books' money; a foreign invoice is measured against it converted.
+    inBooks: (b) => owingInBooks(b.invoice as Invoice, b.remaining),
+    books: booksCurrency(),
   });
 }
 
@@ -77,16 +82,23 @@ export function reminderEmail(one: ReminderDue, today = localToday()): ReminderE
     total: balance.invoice.total,
     owing: balance.remaining,
     reference: balance.invoice.reference === "QuickBooks" ? "" : balance.invoice.reference,
+    ...(balance.invoice.currency !== undefined ? { currency: balance.invoice.currency } : {}),
   }));
-  const owedToUs = [...invoiceBalanceMap().values()]
-    .filter((b) => b.invoice.kind === "sales" && isPosted(b.invoice) && b.invoice.contact.trim() === one.customer)
-    .reduce((sum, b) => sum + b.remaining, 0);
+  // What the customer owes and has past due, in each currency: a US$800 and
+  // an NZ$300 invoice are not "$1,100.00" (code review of 20 November, 1.5).
+  const books = booksCurrency();
+  const owedToUs = owingByCurrency(
+    [...invoiceBalanceMap().values()]
+      .filter((b) => b.invoice.kind === "sales" && isPosted(b.invoice) && b.invoice.contact.trim() === one.customer)
+      .map((b) => ({ owing: b.remaining, currency: b.invoice.currency })),
+    books,
+  );
   const words = fillWording(wordingFor("reminder", state.ledger.emailWording), {
     customer: one.customer,
     business: supplier.name,
     date: new Date(`${today}T12:00:00Z`).toLocaleDateString(booksLocale(), { day: "numeric", month: "short", year: "numeric" }),
-    owing: booksMoney(owedToUs),
-    pastdue: booksMoney(one.pastDue),
+    owing: moneyByCurrency(owedToUs, books),
+    pastdue: moneyByCurrency(one.pastDueByCurrency, books),
     payment: (supplier.payTo ?? "").trim(),
   });
   return {
@@ -96,7 +108,7 @@ export function reminderEmail(one: ReminderDue, today = localToday()): ReminderE
     fromName: supplier.name,
     subject: words.subject,
     text: words.body,
-    html: collectionLetter(one.customer, lines, today, supplier, reminderStageFor(one.lateDays), documentOptions()),
+    html: collectionLetter(one.customer, lines, today, supplier, reminderStageFor(one.lateDays), { ...documentOptions(), currency: books }),
     stages: Object.fromEntries(one.invoices.map((i) => [i.balance.invoice.number, i.stage])),
   };
 }

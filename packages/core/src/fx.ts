@@ -75,6 +75,23 @@ export function foreignInUse(
   return out;
 }
 
+/**
+ * Currencies used before their first rate held: those amounts take the first
+ * rate, from a later day, as `rateOn` does (code review of 20 November, 1.3).
+ */
+export function ratesStartLate(
+  inUse: ReadonlyMap<string, { from: IsoDate }>,
+  rates: FxRates,
+): { currency: string; from: IsoDate; firstRate: IsoDate }[] {
+  const out: { currency: string; from: IsoDate; firstRate: IsoDate }[] = [];
+  for (const [currency, use] of inUse) {
+    const held = (rates[currency] ?? []).filter((r) => r.rate > 0).map((r) => r.date).sort();
+    const first = held[0];
+    if (first !== undefined && use.from < first) out.push({ currency, from: use.from, firstRate: first });
+  }
+  return out.sort((a, b) => a.currency.localeCompare(b.currency));
+}
+
 /** The currencies that have no rate at all. */
 export function missingRates(inUse: ReadonlyMap<string, unknown>, rates: FxRates): string[] {
   return [...inUse.keys()].filter((c) => !(rates[c] ?? []).some((r) => r.rate > 0)).sort();

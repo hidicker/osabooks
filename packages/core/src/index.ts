@@ -95,7 +95,7 @@ export { isSuffix, standardAccounts, suggestSuffix, suffixedCode } from "./stand
 export { ACCOUNT_CODE, codeIn, isAccountCode } from "./account-code.js";
 export { identifyExport } from "./identify-export.js";
 export type { ExportKind, Identified } from "./identify-export.js";
-export { invoiceDocument, invoiceEmail, customerStatement, collectionLetter, reminderStageFor, lateFee, cleanLogo, LOGO_MAX_BYTES } from "./invoice-document.js";
+export { invoiceDocument, invoiceEmail, customerStatement, collectionLetter, reminderStageFor, lateFee, cleanLogo, LOGO_MAX_BYTES, owingByCurrency, owingSaid } from "./invoice-document.js";
 export type { InvoiceSupplier, InvoiceDocumentOptions, StatementLine, ReminderStage } from "./invoice-document.js";
 export { mergeAccount, renameAccount, renameProblem } from "./rename-account.js";
 export type { AccountReferences, RenameResult } from "./rename-account.js";
@@ -507,7 +507,7 @@ export * from "./product-lists.js";
 export * from "./document-dates.js";
 export * from "./xls.js";
 export * from "./simplefin.js";
-export { abaFile, auAccountParts, bankText, NZ_BANK_FORMATS, nzAccountParts, nzHashTotal, nzPaymentFile } from "./payment-files.js";
+export { abaFile, auAccountParts, bankText, NZ_BANK_FORMATS, nzAccountCheckDigitOk, nzAccountParts, nzHashTotal, nzPaymentFile } from "./payment-files.js";
 export type { AbaOptions, BankPayment, NzBankFormat, NzPaymentFileOptions, PaymentFile, SkippedPayment } from "./payment-files.js";
 export { lineKey, moveLines, moveStillHolds, restoreMove } from "./move-lines.js";
 export type { AccountLine, LineRef, MovableBooks, MoveResult, MoveSnapshot } from "./move-lines.js";
