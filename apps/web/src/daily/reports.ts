@@ -5294,6 +5294,11 @@ export function renderReportsPage(): void {
     option.selected = String(year) === chosenYear;
     yearSelect.append(option);
   }
+  // No year at all: books with nothing in them, or whose only document was
+  // voided. The reports below need a year and drew a blank page; said instead.
+  if (years.length === 0 && ["journal", "balancesheet", "cashflow"].includes(kindNow)) {
+    body.append(note("Nothing posted yet: no bank line, invoice, journal or pay run is in the books, so there is no year to report on."));
+  }
 
   // The owner list comes from the entities, so it only has people in it once
   // ownership has been set against one.
