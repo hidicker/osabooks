@@ -3,6 +3,7 @@ import {
   categorise,
   expandSplits,
   explained,
+  filedDifference,
   gstPeriods,
   gstResolver,
   gstReturn,
@@ -315,13 +316,15 @@ export function buildRows(
     // Box 8 less Box 12 on both sides. Box 15 also carries Boxes 9 and 13,
     // which hold late claims and year-end corrections that a bank-derived
     // ledger cannot contain -- comparing against it would report those as ours.
-    const core = computed ? computed.boxes.box8 - computed.boxes.box12 : null;
-    const difference = core === null ? null : core - one.core;
+    // A return filed from these books adds back the net refunds it moved into
+    // Boxes 9 and 13, which it knows (filedDifference).
+    const compared = computed ? filedDifference(one, computed) : null;
+    const difference = compared === null ? null : compared.difference;
     const accounted = explained(input.notes, one.periodEnd);
     return {
       periodEnd: one.periodEnd,
-      filed: one.core,
-      ours: core,
+      filed: compared?.filed ?? one.trading ?? one.core,
+      ours: compared === null ? null : compared.ours,
       difference,
       explained: accounted,
       left: difference === null ? null : difference - accounted,

@@ -88,7 +88,7 @@ export function filedReturnFromBoxes(options: {
 export function filedReturnFromOurs(result: GstReturnResult, status = "Filed from these books"): FiledReturn {
   const b = result.boxes;
   const basis = String(result.basis);
-  return filedReturnFromBoxes({
+  const filed = filedReturnFromBoxes({
     periodStart: result.period.from,
     periodEnd: result.period.to,
     basis: `${basis.charAt(0).toUpperCase()}${basis.slice(1)} basis`,
@@ -109,4 +109,38 @@ export function filedReturnFromOurs(result: GstReturnResult, status = "Filed fro
       box15: b.outcome === "refund" ? -b.box15 : b.box15,
     },
   });
+  return { ...filed, trading: tradingGst(result) };
+}
+
+/**
+ * A return's GST on trading before any net refunds were moved: Box 8 less
+ * Box 12, with the GST moved to Box 13 taken off and that moved to Box 9 put
+ * back. The same as Box 8 less Box 12 wherever nothing moved.
+ */
+export function tradingGst(result: Pick<GstReturnResult, "boxes" | "refundsMoved">): Cents {
+  const moved = result.refundsMoved;
+  return result.boxes.box8 - result.boxes.box12 - (moved?.toBox13 ?? 0) + (moved?.toBox9 ?? 0);
+}
+
+/**
+ * How far the books' return for a period has moved from the one filed, and
+ * the two figures compared.
+ *
+ * A return these books produced is compared on its GST on trading before
+ * refunds moved (`trading`): in a period whose refunds outweighed its sales,
+ * Box 8 is 0 whatever the refunds come to, and Box 8 less Box 12 alone would
+ * not see a refund changed afterwards. A return read from elsewhere is
+ * compared on Box 8 less Box 12, as it always has been: its Boxes 9 and 13
+ * hold corrections these books cannot know.
+ */
+export function filedDifference(
+  filed: Pick<FiledReturn, "core" | "trading">,
+  ours: Pick<GstReturnResult, "boxes" | "refundsMoved">,
+): { filed: Cents; ours: Cents; difference: Cents } {
+  if (filed.trading !== undefined) {
+    const now = tradingGst(ours);
+    return { filed: filed.trading, ours: now, difference: now - filed.trading };
+  }
+  const now = ours.boxes.box8 - ours.boxes.box12;
+  return { filed: filed.core, ours: now, difference: now - filed.core };
 }
