@@ -55,10 +55,13 @@ export function parseAmount(input: unknown, currency = "NZD"): Cents | null {
   text = text.replace(/[\u2010-\u2015\u2212]/g, "-");
 
   let negative = false;
+  // Any other way the sign was said, for the minus at the end below.
+  let signed = false;
 
   // Accounting negatives: (1,234.56)
   if (/^\(.*\)$/.test(text)) {
     negative = true;
+    signed = true;
     text = text.slice(1, -1).trim();
   }
 
@@ -68,28 +71,32 @@ export function parseAmount(input: unknown, currency = "NZD"): Cents | null {
   if (crdr) {
     const marker = (crdr[1] ?? crdr[3] ?? "").toUpperCase();
     if (marker === "DR") negative = !negative;
-    if (marker) text = (crdr[2] ?? "").trim();
+    if (marker) {
+      signed = true;
+      text = (crdr[2] ?? "").trim();
+    }
   }
 
-  let leadingMinus = false;
   if (text.startsWith("-")) {
     negative = !negative;
-    leadingMinus = true;
+    signed = true;
     text = text.slice(1).trim();
   } else if (text.startsWith("+")) {
+    signed = true;
     text = text.slice(1).trim();
   }
 
   // A minus at the end, as SAP, some MYOB exports and card statements write a
   // debit: 12.50- is -12.50. It was stripped with the other symbols below and
-  // the debit read as a credit (code review of 20 November, 12.1). A minus at
-  // both ends is not a number anybody meant.
+  // the debit read as a credit (code review of 20 November, 12.1). With any
+  // other sign as well -- -12.50-, (12.50-), (12.50)-, 12.50- DR, +12.50-,
+  // 12.50-- -- it is not a number anybody meant, and is refused rather than
+  // flipped twice (Antigravity review, 23 November).
   if (/-\s*$/.test(text)) {
-    if (leadingMinus) return null;
-    negative = !negative;
+    if (signed) return null;
+    negative = true;
     text = text.replace(/-\s*$/, "").trim();
-    // Brackets as well, (12.50)-: two ways of saying a sign, refused.
-    if (/^\(.*\)$/.test(text)) return null;
+    if (/^\(.*\)$/.test(text) || /-\s*$/.test(text)) return null;
   }
 
   // Strip currency symbols, codes and spaces, keeping digits and separators.

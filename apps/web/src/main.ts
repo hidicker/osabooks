@@ -170,7 +170,7 @@ import {
   ledgerName,
 } from "./store.js";
 import { renderEntityFilter } from "./widgets.js";
-import { MOVED_TO, moved, movedNotice } from "./moved.js";
+import { MOVED_TO, keptInBrowser, moved, movedNotice } from "./moved.js";
 import { downloadBackupNow } from "./backup.js";
 
 /**
@@ -193,6 +193,13 @@ async function init(): Promise<void> {
   // Read at once, so it is used by this start or by none: left for later, a
   // start that never got as far would carry it to some other reload.
   const onto = pageAfterReload();
+
+  // The copy left at an old address: an AI app's request to connect is
+  // answered at the new one, where signing in works.
+  if (moved() && new URLSearchParams(location.search).has("authorization_id")) {
+    location.replace(new URL(`${location.pathname.includes("/oauth/consent") ? "oauth/consent/" : ""}${location.search}`, MOVED_TO).toString());
+    return;
+  }
 
   // An outside AI app asking to connect: answered on a screen of its own.
   if (await connectInterrupts()) return;
@@ -302,6 +309,14 @@ async function init(): Promise<void> {
   try {
     const loaded = await load();
     state.ledger = loaded.ledger;
+    // The copy left at an old address (moved.ts), with nothing kept in this
+    // browser: straight on to the new one. Before anything below, which would
+    // seed the demo's books into an empty browser and then keep the visitor
+    // here to back them up.
+    if (moved() && !keptInBrowser(state.ledger)) {
+      location.replace(MOVED_TO);
+      return;
+    }
     applyCountry();
     applyReportDefaults();
     state.persistent = loaded.persistent;
@@ -362,7 +377,7 @@ async function init(): Promise<void> {
     // Not for somebody signed in to books of their own: seeding would fill this
     // browser's copy with an invented company, and send half a dozen requests
     // after seed files a hosted copy does not have.
-    if (!writesToFolder() && !signedIn()) {
+    if (!writesToFolder() && !signedIn() && !moved()) {
       // Demo books of another country -- the US set, for a first visit from
       // there -- bring its tax, reports and date order, set again once they
       // are in: they opened with New Zealand's GST at 15%.
@@ -446,7 +461,8 @@ async function init(): Promise<void> {
     // Not asked again on opening what the morning already asked. Wise after
     // the bank feed, one import at a time, and both before the suggestions,
     // so the new lines are suggested for too.
-    void autoFetchFromFeed(morning)
+    // Not at an old address: these books are only kept there to back up.
+    if (!moved()) void autoFetchFromFeed(morning)
       .then(() => autoFetchFromWise())
       .then((added) => {
         if (added > 0) {
@@ -487,12 +503,6 @@ async function init(): Promise<void> {
     // browser, straight on to the new one; books kept here, offered as a
     // backup to restore there.
     if (moved()) {
-      const kept =
-        state.ledger.transactions.length > 0 || (state.ledger.invoices ?? []).length > 0 || (state.ledger.contacts ?? []).length > 0;
-      if (!kept) {
-        location.replace(MOVED_TO);
-        return;
-      }
       document.body.prepend(movedNotice(() => downloadBackupNow(ledgerName())));
       state.page = "books";
     }

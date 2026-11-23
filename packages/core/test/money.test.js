@@ -122,3 +122,9 @@ test("a minus at the end is a debit, as SAP and card statements write one (code 
   assert.equal(parseAmount("12.50"), 1250);
   assert.equal(parseAmount("-12.50"), -1250);
 });
+
+test("a minus at the end with any other sign is refused, not flipped twice (Antigravity review)", () => {
+  for (const text of ["(12.50-)", "12.50- DR", "DR 12.50-", "12.50- CR", "+12.50-", "12.50--", "(12.50 -)"]) {
+    assert.equal(parseAmount(text), null, text);
+  }
+});

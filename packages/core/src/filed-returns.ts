@@ -340,7 +340,12 @@ export function sameRegistration(a: string | undefined, b: string | undefined): 
   if ((a ?? "") === (b ?? "")) return true;
   if (a === undefined || b === undefined || a === "" || b === "") return false;
   const account = /gst\d+$/i;
-  if (account.test(a) && account.test(b)) return a.toUpperCase() === b.toUpperCase();
+  // The same IRD number however it is written (049-091-850 or 49-091-850),
+  // and the same account under it.
+  if (account.test(a) && account.test(b)) {
+    const suffix = (s: string): string => (s.match(account)?.[0] ?? "").toUpperCase();
+    return registrationIrd(a) !== "" && registrationIrd(a) === registrationIrd(b) && suffix(a) === suffix(b);
+  }
   const ird = registrationIrd(a);
   return ird !== "" && ird === registrationIrd(b);
 }

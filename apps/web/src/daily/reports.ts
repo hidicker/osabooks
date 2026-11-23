@@ -3249,9 +3249,42 @@ function chosenGstReturn(year: number): GstReturnResult | undefined {
  * can be stored is the decision that it was filed, which keeps the return as it
  * stands that day.
  */
+/**
+ * Whose return, beside which period: the same choice as the entity picker at
+ * the top of the page, kept in step with it, where it is read with the rest.
+ * Null where the books have one entity.
+ */
+function gstEntityPicker(): HTMLSelectElement | null {
+  const top = document.getElementById("entity-filter");
+  if (!(top instanceof HTMLSelectElement) || top.options.length <= 1) return null;
+  const whose = document.createElement("select");
+  whose.setAttribute("aria-label", "Entity");
+  for (const option of top.options) {
+    const copy = document.createElement("option");
+    copy.value = option.value;
+    copy.textContent = option.textContent;
+    copy.selected = option.value === top.value;
+    whose.append(copy);
+  }
+  whose.addEventListener("change", () => {
+    top.value = whose.value;
+    top.dispatchEvent(new Event("change"));
+  });
+  return whose;
+}
+
 function renderGstReturn(body: HTMLElement, year: number): void {
   const returns = gstReturnsFor(year);
   if (returns.length === 0) {
+    // The entity picker still, so an entity with nothing this year is not
+    // the end of the way back to one that has.
+    const picker = gstEntityPicker();
+    if (picker !== null) {
+      const controls = document.createElement("div");
+      controls.className = "page-actions";
+      controls.append(picker);
+      body.append(controls);
+    }
     body.append(note("No GST periods in this year hold any transactions."));
     return;
   }
@@ -3285,25 +3318,8 @@ function renderGstReturn(body: HTMLElement, year: number): void {
   // --- period and tabs ---
   const controls = document.createElement("div");
   controls.className = "page-actions";
-  // Whose return, beside which period: the same choice as the entity picker at
-  // the top of the page, kept in step with it, where it is read with the rest.
-  const top = document.getElementById("entity-filter");
-  if (top instanceof HTMLSelectElement && top.options.length > 1) {
-    const whose = document.createElement("select");
-    whose.setAttribute("aria-label", "Entity");
-    for (const option of top.options) {
-      const copy = document.createElement("option");
-      copy.value = option.value;
-      copy.textContent = option.textContent;
-      copy.selected = option.value === top.value;
-      whose.append(copy);
-    }
-    whose.addEventListener("change", () => {
-      top.value = whose.value;
-      top.dispatchEvent(new Event("change"));
-    });
-    controls.append(whose);
-  }
+  const whose = gstEntityPicker();
+  if (whose !== null) controls.append(whose);
   const period = document.createElement("select");
   for (const one of [...returns].reverse()) {
     const option = document.createElement("option");

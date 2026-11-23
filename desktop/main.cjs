@@ -84,9 +84,9 @@ function openWindow() {
   window.webContents.setWindowOpenHandler(({ url }) => {
     if (isSignInStart(url, edition.connect ?? [])) {
       openSignInWindow(window, url, (fragment) => {
-        if (window === null) return;
+        if (window === null || window.isDestroyed()) return;
         // The app finishes on hashchange, as it does in a browser tab.
-        void window.webContents.executeJavaScript(`location.hash = ${JSON.stringify(fragment)}`);
+        window.webContents.executeJavaScript(`location.hash = ${JSON.stringify(fragment)}`).catch(() => {});
         window.focus();
       });
       return { action: "deny" };
