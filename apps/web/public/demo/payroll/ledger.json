@@ -9971,7 +9971,7 @@
     "kiwiSaverRate": 0.03,
     "kiwiSaverEmployerRate": 0.03,
     "esctRate": 0.3,
-    "bankAccount": "03-1354-0456123-000",
+    "bankAccount": "03-1354-0456122-000",
     "startDate": "2023-06-01"
    },
    {
@@ -9985,7 +9985,7 @@
     "kiwiSaverRate": 0.04,
     "kiwiSaverEmployerRate": 0.03,
     "esctRate": 0.175,
-    "bankAccount": "12-3192-0012345-001",
+    "bankAccount": "12-3192-0012340-001",
     "startDate": "2024-01-15"
    },
    {
@@ -9999,7 +9999,7 @@
     "kiwiSaverRate": 0.03,
     "kiwiSaverEmployerRate": 0.03,
     "esctRate": 0.175,
-    "bankAccount": "06-0501-0234567-000",
+    "bankAccount": "06-0501-0234569-000",
     "startDate": "2024-11-04"
    }
   ],

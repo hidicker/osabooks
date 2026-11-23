@@ -29,6 +29,7 @@ import {
 } from "@nzosa/core";
 import type { Contact, ContactKind, Invoice, PaidTo, Wording, WordingKind } from "@nzosa/core";
 import { documentMoney, moneyByCurrency, owingInBooks } from "../fx-books.js";
+import { nzAccountDoubt } from "../nz-account.js";
 import { paidTo } from "@nzosa/core";
 import { taxYearEnd, taxYearOf, taxYearStart } from "../tax-year.js";
 import { booksCountry, booksCurrency, noSalesTax } from "../country.js";
@@ -577,6 +578,9 @@ function form(existing: Contact | null): HTMLElement {
     if (alike !== undefined && !(await askOnPage(`${alike.name} is already here, and looks like the same ${alike.kind === "vendor" ? "supplier" : "customer"}. Keep ${said} as well?`, `Keep ${said}`))) {
       return;
     }
+    // A mistyped account number is paid into nobody's, or somebody else's.
+    const doubt = nzAccountDoubt(bank.value);
+    if (doubt !== null && !(await askOnPage(`${doubt}\n\nSave it as it is?`, "Save it"))) return;
     const fields = {
       name: said,
       kind: kind.value as ContactKind,

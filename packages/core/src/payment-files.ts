@@ -95,6 +95,52 @@ export function nzAccountParts(account: string): { bank: string; branch: string;
   return null;
 }
 
+/**
+ * The check digit of an NZ account number, by Payments NZ's bank account
+ * number validation standard: the weighted digits of the branch, base and
+ * suffix must divide by 11 (or 10). Which weights depends on the bank, and for
+ * most banks on whether the base is below 00990000. A single mistyped digit,
+ * or two swapped, almost always fails it (code review of 20 November, 8.2).
+ *
+ * Only the check digit is checked, not the bank's branch ranges, which change
+ * over time: refusing a real account would be worse than missing a typo.
+ * Bank 31 has no check digit, and passes.
+ */
+export function nzAccountCheckDigitOk(parts: { bank: string; branch: string; base: string; suffix: string }): boolean {
+  const bank = Number(parts.bank);
+  const base8 = parts.base.padStart(8, "0");
+  const digits = `${parts.bank.padStart(2, "0")}${parts.branch.padStart(4, "0")}${base8}${parts.suffix.padStart(4, "0")}`
+    .split("")
+    .map(Number);
+  //          bk    branch      base                        suffix
+  const W = {
+    A: [0, 0, 6, 3, 7, 9, 0, 0, 10, 5, 8, 4, 2, 1, 0, 0, 0, 0],
+    B: [0, 0, 0, 0, 0, 0, 0, 0, 10, 5, 8, 4, 2, 1, 0, 0, 0, 0],
+    D: [0, 0, 0, 0, 0, 0, 0, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0],
+    E: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5, 4, 3, 2, 0, 0, 0, 1],
+    F: [0, 0, 0, 0, 0, 0, 0, 1, 7, 3, 1, 7, 3, 1, 0, 0, 0, 0],
+    G: [0, 0, 0, 0, 0, 0, 0, 1, 3, 7, 1, 3, 7, 1, 0, 3, 7, 1],
+  } as const;
+  let rule: keyof typeof W;
+  if (bank === 31) return true;
+  else if (bank === 8) rule = "D";
+  else if (bank === 9) rule = "E";
+  else if (bank === 25 || bank === 33) rule = "F";
+  else if (bank === 26 || bank === 28 || bank === 29) rule = "G";
+  else rule = Number(base8) < 990_000 ? "A" : "B";
+  // E and G add each product's digits, and again, to one digit.
+  const oneDigit = (n: number): number => {
+    let v = n;
+    while (v >= 10) v = String(v).split("").reduce((s, d) => s + Number(d), 0);
+    return v;
+  };
+  const sum = digits.reduce((s, d, i) => {
+    const product = d * W[rule][i]!;
+    return s + (rule === "E" || rule === "G" ? oneDigit(product) : product);
+  }, 0);
+  return sum % (rule === "F" || rule === "G" ? 10 : 11) === 0;
+}
+
 /** As the CSV formats take it: 16 digits, the suffix as three. */
 function nzSixteen(parts: { bank: string; branch: string; base: string; suffix: string }): string {
   return `${parts.bank}${parts.branch}${parts.base}${parts.suffix}`;
@@ -191,6 +237,11 @@ export interface NzPaymentFileOptions {
   payroll?: boolean;
   /** Start of the file name, without extension. */
   name?: string;
+  /**
+   * Whether each account paid is checked for its check digit (on unless
+   * false). Off only for working out a file's layout with made-up numbers.
+   */
+  checkAccounts?: boolean;
 }
 
 /**
@@ -209,12 +260,19 @@ export function nzPaymentFile(options: NzPaymentFileOptions): PaymentFile {
   }
   const sorted = sortOut(options.payments, nzAccountParts, "NZ bank account", "NZD");
   const skipped = sorted.skipped;
+  // A mistyped account number would be paid into nobody's, or somebody
+  // else's: one whose check digit fails is left out, and said.
+  const checked = sorted.kept.filter((k) => {
+    if (options.checkAccounts === false || nzAccountCheckDigitOk(k.account)) return true;
+    skipped.push({ name: k.payment.name.trim(), why: `${k.payment.account.trim()}: the check digit does not match, so the number has a mistake in it. Check it with them` });
+    return false;
+  });
   // MT9 holds an amount in ten digits: up to $99,999,999.99 a payment.
-  const kept = options.format === "asb" ? sorted.kept.filter((k) => {
+  const kept = options.format === "asb" ? checked.filter((k) => {
     if (k.payment.amount <= MT9_MOST) return true;
     skipped.push({ name: k.payment.name.trim(), why: "more than ASB's file can hold in one payment" });
     return false;
-  }) : sorted.kept;
+  }) : checked;
   const total = kept.reduce((sum, k) => sum + k.payment.amount, 0);
   const payer = bankText(options.payer, 20);
   const code = options.payroll === true ? "52" : "50";

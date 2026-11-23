@@ -98,7 +98,7 @@ test("a domestic payment file leaves out a bill in another currency, and says wh
     { name: "US Supplier", account: "02-0100-0123457-000", amount: 100_000, currency: "USD" },
     { name: "Said NZD", account: "02-0100-0123458-000", amount: 20_000, currency: "nzd" },
   ];
-  const nz = nzPaymentFile({ format: "bnz", from: "02-0100-0999999-000", payer: "Us", due: "2026-05-01", created: "2026-05-01", payments });
+  const nz = nzPaymentFile({ checkAccounts: false, format: "bnz", from: "02-0100-0999999-000", payer: "Us", due: "2026-05-01", created: "2026-05-01", payments });
   assert.equal(nz.count, 2);
   assert.equal(nz.total, 70_000);
   assert.deepEqual(nz.skipped.map((s) => s.name), ["US Supplier"]);
