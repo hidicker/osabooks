@@ -13,7 +13,8 @@ on:
       target:
         description: What to put online
         type: choice
-        options: [both, app, demo]
+        # old: the old nbparagliding.nz addresses only, once, at the move.
+        options: [both, app, demo, old]
         default: both
 
 # One deploy at a time: two uploading at once could leave the site half of each.
@@ -67,7 +68,19 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node tools/cloudflare-deploy.mjs online-demo osabooks-demo demo.osabooks.app
 
+      # The old addresses: the moved copy of the app, and the demo forwarding.
+      - name: The old addresses
+        if: inputs.target == 'old'
+        env:
+          WEBDISK_PASSWORD: ${{ secrets.NZOSA_WEBDISK_PASSWORD }}
+          WEBDISK_APP_USER: ${{ secrets.NZOSA_WEBDISK_APP_USER }}
+          WEBDISK_DEMO_USER: ${{ secrets.NZOSA_WEBDISK_DEMO_USER }}
+        run: |
+          OSABOOKS_MOVED_TO=https://osabooks.app/ OSABOOKS_DIST=apps/web/dist-moved node apps/web/build.js
+          bash tools/forward-old.sh
+
       - name: Check the live site
+        if: inputs.target != 'old'
         # Pages, demo books, the old addresses, the extension, and the AI
         # connector refusing a request with no sign-in. Reads only.
         run: node tools/after-deploy.mjs ${{ inputs.target }}
