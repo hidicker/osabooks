@@ -6,7 +6,9 @@ import type { RuleFileShape } from "../rules-ui.js";
 import { $, state } from "../state.js";
 import { save, saveEvents } from "../store.js";
 import { note, tellOnPage } from "../ui.js";
-import type { Account, Attachment, RuleSet } from "@nzosa/core";
+import type { Account, Attachment, Invoice, RuleSet } from "@nzosa/core";
+import { isPosted } from "@nzosa/core";
+import { voidDocument } from "./invoices.js";
 import { deleteFile } from "../files.js";
 import { renameAccountBack } from "./entities.js";
 import { postedJournals } from "../books.js";
@@ -61,6 +63,22 @@ export async function undo(event: LedgerEvent): Promise<void> {
     return;
   }
 
+  // An invoice or bill put into the books -- made approved, or approved from a
+  // draft -- is not taken back out of existence by undoing that: it is voided,
+  // as the Void button does, so it stays listed and the numbers keep no gap.
+  if (event.kind === "invoice" && postedBy(event)) {
+    const made = event.after as Invoice;
+    const now = (state.ledger.invoices ?? []).find((i) => i.kind === made.kind && i.number === made.number);
+    if (now !== undefined && isPosted(now)) {
+      if (!(await voidDocument(now, { ask: true, why: "undone from History" }))) return;
+    }
+    state.events = state.events.map((e) => (e.id === event.id ? { ...e, reverted: true } : e));
+    await saveEvents(state.events);
+    reclassify();
+    redraw("history");
+    return;
+  }
+
   // A rename is undone by renaming back, which carries its codings, rules,
   // journals and documents with it; the chart row alone would orphan them.
   if (event.kind === "chart" && / renamed to /.test(event.summary) && event.before !== null && event.after !== null && event.after !== undefined) {
@@ -102,6 +120,15 @@ export async function undo(event: LedgerEvent): Promise<void> {
   // An undone module choice, or an entity, can change what the menu offers.
   applyModules();
   redraw("history");
+}
+
+/** Whether an invoice event is the one that put a document into the books. */
+function postedBy(event: LedgerEvent): boolean {
+  const after = event.after as Invoice | null | undefined;
+  const before = event.before as Invoice | null | undefined;
+  if (after === null || after === undefined || typeof after !== "object" || !("number" in after) || !("status" in after)) return false;
+  if (!isPosted(after)) return false;
+  return before === null || before === undefined || (typeof before === "object" && "status" in before && !isPosted(before));
 }
 
 export function renderHistory(): void {

@@ -1267,15 +1267,32 @@ export function renderInvoiceEditor(): void {
       redraw("invoiceEditor");
     });
     actions.append(duplicate);
-    const remove = document.createElement("button");
-    remove.type = "button";
-    remove.className = "danger";
-    remove.textContent = "Delete";
-    remove.addEventListener("click", async () => {
-      if (!await askOnPage(`Delete ${existing.number}? The change log can undo it.`)) return;
-      void deleteInvoice(existing);
-    });
-    actions.append(remove);
+    // A draft, an estimate or an order was never in the books, and can go. One
+    // that was is voided instead, as Xero does: it stays listed, marked
+    // Voided, so the numbers run without a gap and what happened is still
+    // there to see. A voided one stays as it is.
+    const said = existing.status.trim().toLowerCase();
+    if (!isPosted(existing) && said !== "voided" && said !== "deleted") {
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.className = "danger";
+      remove.textContent = "Delete";
+      remove.addEventListener("click", async () => {
+        if (!await askOnPage(`Delete ${existing.number}? The change log can undo it.`)) return;
+        void deleteInvoice(existing);
+      });
+      actions.append(remove);
+    } else if (isPosted(existing)) {
+      const voiding = document.createElement("button");
+      voiding.type = "button";
+      voiding.className = "danger";
+      voiding.textContent = "Void";
+      voiding.title = "Take it back out of the books. It stays listed, marked Voided.";
+      voiding.addEventListener("click", () => {
+        void voidDocument(existing, { ask: true });
+      });
+      actions.append(voiding);
+    }
   }
 
   box.append(actions);
@@ -1445,6 +1462,69 @@ async function billReady(bill: Invoice): Promise<boolean> {
       warnings.map((w) => `- ${w.message}`).join("\n") +
       "\n\nSave it as it is?",
   );
+}
+
+/**
+ * What is applied to a document that voiding it would leave dangling, in
+ * words, or an empty list when nothing is.
+ *
+ * Bank lines matched to it, payments recorded outside a bank line, credit
+ * notes against it, and -- for a credit note -- the invoice it was put
+ * against. As Xero asks, those come off first: a bank line left settling an
+ * invoice that is no longer in the books is money that went nowhere.
+ * A sales receipt's own payment is part of the receipt, and goes with it.
+ */
+export function appliedTo(doc: Invoice): string[] {
+  const out: string[] = [];
+  const key = documentKey(doc);
+  const balance = invoiceBalanceMap().get(key);
+  const money = (cents: number): string => documentMoney(doc, Math.abs(cents));
+  if ((balance?.assigned ?? 0) !== 0) out.push(`${money(balance!.assigned)} of bank lines matched to it, on Reconcile`);
+  if (doc.receipt !== true && (balance?.paidOutside ?? 0) !== 0) out.push(`${money(balance!.paidOutside)} recorded as paid`);
+  if ((balance?.credited ?? 0) !== 0) out.push(`${money(balance!.credited)} of credit notes against it`);
+  if (isCreditNote(doc)) {
+    if ((storedFor(state.ledger.creditNotes ?? {}, doc) ?? "") !== "") out.push("it is put against an invoice");
+    const used = (state.ledger.creditAllocations ?? []).filter((a) => a.from === key || a.from === doc.number);
+    if (used.length > 0) out.push("it is used as credit on account");
+  }
+  return out;
+}
+
+/**
+ * Void a document that is in the books: it stays listed, marked Voided, and
+ * comes out of every balance and report. Refused while anything is applied
+ * to it, saying what. True when it was voided.
+ */
+export async function voidDocument(doc: Invoice, options: { ask: boolean; why?: string }): Promise<boolean> {
+  const what = doc.kind === "purchase" ? "bill" : doc.receipt === true ? "sales receipt" : isCreditNote(doc) ? "credit note" : "invoice";
+  const applied = appliedTo(doc);
+  if (applied.length > 0) {
+    await tellOnPage(
+      `${doc.number} cannot be voided while ${applied.length === 1 ? "this is" : "these are"} applied to it:\n\n` +
+        applied.map((a) => `- ${a}`).join("\n") +
+        `\n\nTake ${applied.length === 1 ? "it" : "them"} off first, then void the ${what}.`,
+    );
+    return false;
+  }
+  if (options.ask && !(await askOnPage(`Void ${doc.number}? It comes out of the books and stays listed, marked Voided. The change log can undo it.`))) {
+    return false;
+  }
+  const after: Invoice = { ...doc, status: "Voided" };
+  const before = state.ledger.invoices ?? [];
+  state.ledger = { ...state.ledger, invoices: before.map((i) => (documentKey(i) === documentKey(doc) ? after : i)) };
+  state.persistent = await savePart(state.ledger, "invoices");
+  await record(
+    "invoice",
+    `Voided ${doc.number} — ${doc.contact} ${formatAmount(doc.total)}${options.why ? ` (${options.why})` : ""}`,
+    doc,
+    after,
+    doc.number,
+  );
+  editingInvoice = null;
+  redraw("invoiceEditor");
+  redraw("invoices");
+  redraw("bills");
+  return true;
 }
 
 async function deleteInvoice(invoice: Invoice): Promise<void> {
