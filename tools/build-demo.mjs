@@ -99,10 +99,10 @@ writeFileSync(join(demoDir, ".htaccess"), htaccessContent, "utf-8");
 const readmeContent = `# OsaBooks Online Demo Build
 
 This directory contains the production build for the online demo hosted at:
-https://nbparagliding.nz/osabooks_demo/
+https://demo.osabooks.app/
 
 That is **not** the same place as the app itself, which lives at
-https://nbparagliding.nz/osabooks/ and is deployed separately. Unpacking this
+https://osabooks.app/ and is deployed separately. Unpacking this
 over \`osabooks/\` would replace the app with the demo, banner and seed data and
 all.
 

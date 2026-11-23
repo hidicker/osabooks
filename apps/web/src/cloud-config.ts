@@ -10,6 +10,8 @@
  * A build with no project named here has no cloud option at all: the app is
  * then exactly what it was, a folder or a browser.
  */
+import { moved } from "./moved.js";
+
 interface CloudProject {
   url: string;
   publishableKey: string;
@@ -32,7 +34,7 @@ export const CLOUD: CloudProject = {
   url: "https://ronancqtbbqmsiatxmfn.supabase.co",
   publishableKey: "sb_publishable_IS6I8qzIGjmWzWUSXW5IhA_TFLO1A5M",
   googleClientId: "542220598161-qcg2d23ci9hpj3vr2nm3lnl2tji43qj1.apps.googleusercontent.com",
-  googleReturn: "https://nbparagliding.nz/osabooks/",
+  googleReturn: "https://osabooks.app/",
 };
 
 /**
@@ -94,5 +96,7 @@ export function usingOwnProject(): boolean {
  */
 export function cloudConfigured(): boolean {
   if (typeof document !== "undefined" && document.documentElement.dataset["demo"] === "yes") return false;
+  // Not at an address OsaBooks has moved away from: its storage is shared (moved.ts).
+  if (moved()) return false;
   return CLOUD.url !== "" && CLOUD.publishableKey !== "";
 }

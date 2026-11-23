@@ -197,7 +197,7 @@ function haveALook(): HTMLElement {
 
   const online = document.createElement("a");
   online.className = "migration-look-link";
-  online.href = "https://nbparagliding.nz/osabooks_demo/";
+  online.href = "https://demo.osabooks.app/";
   online.target = "_blank";
   online.rel = "noopener noreferrer";
   online.textContent = "or try the demo online";

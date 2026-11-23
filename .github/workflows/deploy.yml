@@ -1,4 +1,6 @@
-# Put the web app and the online demo on the website.
+# Put the web app and the online demo on the website: osabooks.app and
+# demo.osabooks.app, on Cloudflare. nbparagliding.nz/osabooks and
+# /osabooks_demo forward there (tools/redirects).
 #
 # Started by hand only (Actions tab, "Deploy website", "Run workflow"): the
 # site changes when somebody decides it should, never as a side effect of a
@@ -48,13 +50,22 @@ jobs:
           npm run build -w @nzosa/mcp
           node tools/build-mcpb.mjs
 
-      - name: Upload and check
+      # Each app at an address of its own on Cloudflare (osabooks.app,
+      # demo.osabooks.app), off nbparagliding.nz, whose other sites shared its
+      # browser storage (code review of 20 November, section 5).
+      - name: Publish the app
+        if: inputs.target == 'app' || inputs.target == 'both'
         env:
-          WEBDISK_PASSWORD: ${{ secrets.NZOSA_WEBDISK_PASSWORD }}
-          WEBDISK_APP_USER: ${{ secrets.NZOSA_WEBDISK_APP_USER }}
-          WEBDISK_DEMO_USER: ${{ secrets.NZOSA_WEBDISK_DEMO_USER }}
-          TARGET: ${{ inputs.target }}
-        run: bash tools/deploy-webdisk.sh
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node tools/cloudflare-deploy.mjs apps/web/dist osabooks osabooks.app
+
+      - name: Publish the demo
+        if: inputs.target == 'demo' || inputs.target == 'both'
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node tools/cloudflare-deploy.mjs online-demo osabooks-demo demo.osabooks.app
 
       - name: Check the live site
         # Pages, demo books, the old addresses, the extension, and the AI

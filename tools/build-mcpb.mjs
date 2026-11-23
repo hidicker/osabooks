@@ -66,8 +66,8 @@ const manifest = {
     "It cannot change the books. With suggestions turned on it can also suggest codes, a split or a journal, and bring up a page in OsaBooks: " +
     "each waits in OsaBooks, beside the books, until you use or decline it there. " +
     "What Claude asks for is sent to Anthropic as part of your chat, including payee names, so choose the folder with that in mind.",
-  author: { name: "hidicker", url: "https://nbparagliding.nz/osabooks/home/" },
-  homepage: "https://nbparagliding.nz/osabooks/home/",
+  author: { name: "hidicker", url: "https://osabooks.app/home/" },
+  homepage: "https://osabooks.app/home/",
   license: "AGPL-3.0-or-later",
   icon: "icon.png",
   server: {

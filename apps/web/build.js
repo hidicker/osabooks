@@ -103,6 +103,8 @@ const options = {
   entryPoints: [join(root, "src/main.ts")],
   define: {
     __NZOSA_EDITION__: JSON.stringify(edition),
+    // The copy left at an old address, pointing to the new one (moved.ts).
+    __MOVED_TO__: JSON.stringify(process.env.OSABOOKS_MOVED_TO ?? ""),
     // The seed files this build ships (shipped.ts): the demo's, and no data/,
     // which is never copied. Not listed for a development server, whose
     // folder can change while it runs.
