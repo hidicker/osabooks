@@ -139,7 +139,7 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
     allow.disabled = true;
     deny.disabled = true;
     said.textContent = action === "approve" ? "Connecting…" : "Refusing…";
-    const back = await answerConnectRequest(id, action);
+    const back = await answerConnectRequest(id, action, asked.client?.id);
     if (back === null) {
       said.textContent = "That did not go through. Go back to your AI app and connect again.";
       return;

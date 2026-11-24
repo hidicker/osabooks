@@ -148,6 +148,22 @@ async function twoFactorNeeded(book: string, person: string): Promise<boolean> {
   return (await response.json().catch(() => true)) !== false;
 }
 
+/**
+ * Whether this person approved this app while signed in with their
+ * authenticator code. Supabase issues an app's token at aal1 whatever the
+ * approving sign-in gave, so the consent screen records it
+ * (note_connector_consent, which only an aal2 sign-in can write).
+ */
+async function approvedWithCode(person: string, clientId: unknown): Promise<boolean> {
+  if (typeof clientId !== "string" || !/^[0-9a-f-]{36}$/i.test(clientId)) return false;
+  const response = await service(
+    `/rest/v1/connector_consents?select=client_id&user_id=eq.${person}&client_id=eq.${clientId}`,
+  );
+  if (!response.ok) return false;
+  const rows = (await response.json().catch(() => [])) as unknown[];
+  return rows.length > 0;
+}
+
 async function booksNamed(book: string): Promise<string | null> {
   const response = await service(`/rest/v1/books?select=name&id=eq.${book}&deleted_at=is.null`);
   if (!response.ok) return null;
@@ -229,7 +245,14 @@ Deno.serve(async (request) => {
   // or books whose owner requires it, need a sign-in that gave the code. Said
   // rather than sent back to sign in, which would only go round again if the
   // app's sign-in cannot carry the code.
-  if ((await twoFactorNeeded(book, person)) && claimsOf(token)["aal"] !== "aal2") {
+  // An app's own token never carries aal2 (Supabase's way), so the approval
+  // made with the code is what counts for it.
+  const claims0 = claimsOf(token);
+  if (
+    (await twoFactorNeeded(book, person)) &&
+    claims0["aal"] !== "aal2" &&
+    !(await approvedWithCode(person, claims0["client_id"]))
+  ) {
     return json(
       rpcError(firstId, -32001, "These books need two-factor sign-in, and this connection was not made with the code from your authenticator app."),
       403,
