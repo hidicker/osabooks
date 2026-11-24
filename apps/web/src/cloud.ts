@@ -304,8 +304,13 @@ export async function signInWithGoogle(): Promise<void> {
   // anybody else is refused.
   const nonce = randomToken();
   const state = randomToken();
+  // Google comes back to the site's bare address, so anything this page was
+  // asked for in its own is lost on the way -- an AI app's request to connect
+  // (`authorization_id`) above all, which left the request unanswered and the
+  // app saying it could not finish connecting. Kept here, put back on return.
+  const connecting = new URLSearchParams(location.search).get("authorization_id");
   try {
-    sessionStorage.setItem(GOOGLE_PENDING, JSON.stringify({ nonce, state }));
+    sessionStorage.setItem(GOOGLE_PENDING, JSON.stringify({ nonce, state, ...(connecting ? { connecting } : {}) }));
   } catch {
     authError = "this browser would not keep the sign-in while it went to Google.";
     return;
@@ -324,7 +329,7 @@ export async function signInWithGoogle(): Promise<void> {
 
 /** Google's token, back in the address, for a session. */
 async function googleSession(idToken: string, state: string | null): Promise<boolean> {
-  let pending: { nonce?: string; state?: string } = {};
+  let pending: { nonce?: string; state?: string; connecting?: string } = {};
   try {
     pending = JSON.parse(sessionStorage.getItem(GOOGLE_PENDING) ?? "{}") as typeof pending;
     sessionStorage.removeItem(GOOGLE_PENDING);
@@ -334,6 +339,13 @@ async function googleSession(idToken: string, state: string | null): Promise<boo
   if (pending.nonce === undefined || state === null || state !== pending.state) {
     authError = "the reply from Google did not match a sign-in started in this browser. Try again.";
     return false;
+  }
+  // Back on the AI app's request to connect, where the sign-in started: the
+  // connect screen reads it from the address, so it is answered, not lost.
+  // Put back whether or not Google's sign-in is accepted, so a refusal is said
+  // on that screen and the request can still be answered.
+  if (pending.connecting !== undefined && /^[A-Za-z0-9_-]{8,128}$/.test(pending.connecting)) {
+    history.replaceState(null, "", `${location.pathname}?authorization_id=${encodeURIComponent(pending.connecting)}`);
   }
   const reply = await auth("token?grant_type=id_token", { provider: "google", id_token: idToken, nonce: pending.nonce });
   const next = sessionFrom(reply);
