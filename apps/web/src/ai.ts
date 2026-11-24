@@ -63,6 +63,18 @@ export function aiSuggestionFor(id: string): AiSuggestion | undefined {
   return found.get(id);
 }
 
+/**
+ * What a model said about a line it would not code: "Possibly DeepSeek, an
+ * AI service; the name is garbled". Kept apart from the suggestions, so
+ * nothing is ever coded from it -- it is for the person reading the line.
+ * Emptied by a reload; asking again brings it back.
+ */
+const hunches = new Map<string, { because: string; via?: string }>();
+
+export function aiHunchFor(id: string): { because: string; via?: string } | undefined {
+  return found.has(id) ? undefined : hunches.get(id);
+}
+
 export function aiSuggestionCount(): number {
   return found.size;
 }
@@ -108,6 +120,7 @@ export function keepAiSuggestionsWith(keep: (all: AiSuggestion[]) => void): void
 
 export function forgetAiSuggestions(): void {
   found.clear();
+  hunches.clear();
   directoryFor = null;
 }
 
@@ -600,6 +613,12 @@ export function keepWhatIsUsable(
     // a queue of things to decide, and is not an invented account either.
     if (one.code === "") {
       blank += 1;
+      // Its hunch about who the line is, where it gave one, is still worth
+      // reading -- but only a reason it wrote, never the note this app puts
+      // on a code the chart does not have.
+      if (one.because !== "" && !/^Suggested .*, which is not in this chart/.test(one.because)) {
+        hunches.set(one.id, { because: one.because, ...(via !== undefined ? { via } : {}) });
+      }
       continue;
     }
     const label = labelForCode(one.code, labels);
@@ -628,7 +647,8 @@ export function keepWhatIsUsable(
     blank === 0
       ? ""
       : `${blank} of ${back.length} came back without an account: the model was not sure ` +
-        "enough to name one. Those lines are still waiting, for you or for a later ask.";
+        "enough to name one. Those lines are still waiting, for you or for a later ask; " +
+        "where it had a hunch who the payee is, the line says so.";
   return {
     got,
     said:

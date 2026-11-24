@@ -99,6 +99,9 @@ test("the briefing carries what changes the right answer, not only the names", (
   assert.equal(said.includes("Trading account"), false);
   // And it is told to refuse rather than guess.
   assert.match(said, /return an\n {2}empty code rather than a guess/);
+  // But a hunch about who it is still comes back, for the person to read.
+  assert.match(said, /An empty code still gets a because/);
+  assert.match(said, /still leave the code empty/);
 });
 
 test("worked examples are one per payee, and the newest win", () => {

@@ -46,7 +46,7 @@ import type { RuleFileShape } from "../rules-ui.js";
 import { splitEditor } from "../split-ui.js";
 import { $, state } from "../state.js";
 import { startNewAccount } from "./entities.js";
-import { DIRECTORY_VIA, aiSuggestionFor, rateForSuggestion, suggestFromDirectory } from "../ai.js";
+import { DIRECTORY_VIA, aiHunchFor, aiSuggestionFor, rateForSuggestion, suggestFromDirectory } from "../ai.js";
 import { save, savePart } from "../store.js";
 import { askOnPage, dollars, note, tellOnPage } from "../ui.js";
 import { fillAccounts, unresolvedNote } from "../widgets.js";
@@ -473,6 +473,8 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
   // thing -- something to agree with or change -- and refusing to put it there
   // would mean retyping an answer that is already on screen.
   const fromModel = one.code === null ? aiSuggestionFor(one.transaction.id) : undefined;
+  // What a model thought the line might be, where it would not code it.
+  const hunch = one.code === null && fromModel === undefined ? aiHunchFor(one.transaction.id) : undefined;
   // What was typed on this line and not yet confirmed, so confirming another
   // line -- which redraws the list -- does not throw it away.
   const draft = drafts.get(one.transaction.id) ?? {};
@@ -657,10 +659,13 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
               ` · ${fromModel.because}`) +
           (fromModel.caution === undefined ? "" : ` · ${fromModel.caution}`) +
           (fromHistory === null || noSalesTax() ? "" : ` · GST ${fromHistory.why}`)
+        : hunch !== undefined
+          ? // Said as not a suggestion: nothing is in the picker from it.
+            `AI left this uncoded${hunch.via === undefined ? "" : ` (${hunch.via})`} · ${hunch.because}`
         : noSalesTax()
           ? one.reason
           : `${taxTypeLabel(rateLabel(one.classification))} · ${one.reason}`;
-  if (fromModel !== undefined) reason.classList.add("code-reason-ai");
+  if (fromModel !== undefined || hunch !== undefined) reason.classList.add("code-reason-ai");
 
   /**
    * What the row now says, once something on it has been changed by hand.
