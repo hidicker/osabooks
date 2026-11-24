@@ -109,6 +109,9 @@ export function nzAccountParts(account: string): { bank: string; branch: string;
 export function nzAccountCheckDigitOk(parts: { bank: string; branch: string; base: string; suffix: string }): boolean {
   const bank = Number(parts.bank);
   const base8 = parts.base.padStart(8, "0");
+  // No account has a base of all zeros, yet zeros pass every weighting: a
+  // blank typed as 00-0000-0000000-000 is not an account (Antigravity L5).
+  if (Number(base8) === 0) return false;
   const digits = `${parts.bank.padStart(2, "0")}${parts.branch.padStart(4, "0")}${base8}${parts.suffix.padStart(4, "0")}`
     .split("")
     .map(Number);
@@ -257,6 +260,11 @@ export function nzPaymentFile(options: NzPaymentFileOptions): PaymentFile {
   }
   if (options.format === "asb" && (from.bank !== "12" || Number(from.suffix) > 99)) {
     throw new Error("ASB's file pays from an ASB account, one starting 12 with a two-digit suffix.");
+  }
+  // The paying account is checked as the accounts paid are: a mistyped one
+  // has the whole file refused by the bank (Antigravity L5).
+  if (options.checkAccounts !== false && !nzAccountCheckDigitOk(from)) {
+    throw new Error(`${options.from.trim()}: the check digit does not match, so the paying account number has a mistake in it.`);
   }
   const sorted = sortOut(options.payments, nzAccountParts, "NZ bank account", "NZD");
   const skipped = sorted.skipped;

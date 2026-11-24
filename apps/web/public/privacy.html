@@ -61,6 +61,9 @@
     <li><strong>OpenAccountants.</strong> If you connect it on the AI check page, the AI provider you use
     looks up New Zealand tax guides from openaccountants.com while it answers. The lookups can include the
     topic being checked.</li>
+    <li><strong>Exchange rates.</strong> If you press the button to fetch exchange rates, the app asks
+    frankfurter.dev for the European Central Bank's published rates. Only the currencies and the dates are
+    sent, nothing from your books.</li>
   </ul>
 
   <h2>Books kept online (signed in)</h2>
@@ -76,6 +79,9 @@
     (the page is only ever shown their first and last few characters) and used only to fetch your transactions or ask the AI for you.</li>
     <li><strong>AI use:</strong> a count of AI requests per person per day, to keep the shared AI within its
     limits. Not what was asked.</li>
+    <li><strong>Emails we send for you:</strong> invitations to share a set of books, and payment reminders
+    if you turn them on. Each goes from our mailbox through our email provider, carrying the address it is
+    sent to and its wording (for a reminder, the business's name and the invoices it is about).</li>
   </ul>
   <p>Only you and the people you invite can open your books: the database enforces this on every request.
   We do not look at your books.</p>
@@ -117,6 +123,8 @@
     <li><strong>Supabase</strong>: database, sign-in and server functions for books kept online.</li>
     <li><strong>Google</strong>: Google sign-in, and Gemini for the shared AI and the demo's AI suggestions.</li>
     <li><strong>Stripe</strong>: donations.</li>
+    <li><strong>Resend, or our mail host</strong>: sending invitations and payment reminders.</li>
+    <li><strong>Frankfurter (frankfurter.dev)</strong>: exchange rates, when you fetch them. Only currencies and dates.</li>
     <li><strong>Cloudflare</strong>: serving the website and app at osabooks.app. It serves the app's files and sees the addresses that ask for them, as any web host does; your books never pass through it.</li>
     <li><strong>Akahu, Wise and AI providers you choose</strong>: only when you connect them, as above.</li>
   </ul>

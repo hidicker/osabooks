@@ -139,5 +139,7 @@ export function moneyByCurrency(sums: readonly { currency: string; owing: number
 
 export function documentMoney(invoice: Pick<Invoice, "currency">, cents: number): string {
   const books = booksCurrency();
-  return isForeign(invoice.currency, books) ? `${invoice.currency.toUpperCase()} ${formatAmount(cents)}` : booksMoney(cents);
+  // In the document's own currency's places: yen and won have none, so not "JPY 12,340.00" (Antigravity L2).
+  const code = invoice.currency.toUpperCase();
+  return isForeign(invoice.currency, books) ? `${code} ${formatAmount(cents, code)}` : booksMoney(cents);
 }
