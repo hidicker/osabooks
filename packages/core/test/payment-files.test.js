@@ -214,7 +214,7 @@ test("an account paid whose check digit fails is left out, and said (code review
     assert.equal(nzAccountCheckDigitOk(nzAccountParts(bad)), false, bad);
   }
   const file = nzPaymentFile({
-    format: "bnz", from: "02-0100-0123456-000", payer: "Kea", due: "2026-10-27", created: "2026-10-26",
+    format: "bnz", from: "08-6523-1954512-001", payer: "Kea", due: "2026-10-27", created: "2026-10-26",
     payments: [
       { name: "Good Supplier", account: "01-902-0068389-00", amount: 10_000 },
       { name: "Typo Ltd", account: "01-902-0068398-00", amount: 5_000 },
@@ -224,4 +224,14 @@ test("an account paid whose check digit fails is left out, and said (code review
   assert.equal(file.total, 10_000);
   assert.deepEqual(file.skipped.map((s) => s.name), ["Typo Ltd"]);
   assert.match(file.skipped[0].why, /check digit does not match/);
+});
+
+test("the paying account is checked too, and an all-zero number is no account (Antigravity L5)", () => {
+  const pay = [{ name: "Good Supplier", account: "01-902-0068389-00", amount: 10_000 }];
+  const base = { format: "bnz", payer: "Kea", due: "2026-10-27", created: "2026-10-26", payments: pay };
+  assert.throws(() => nzPaymentFile({ ...base, from: "08-6523-1954513-001" }), /paying account number has a mistake/);
+  assert.throws(() => nzPaymentFile({ ...base, from: "00-0000-0000000-000" }), /paying account number has a mistake/);
+  assert.equal(nzAccountCheckDigitOk(nzAccountParts("31-2800-0000000-000")), false, "zeros pass every weighting, so are refused first");
+  const zero = nzPaymentFile({ ...base, from: "08-6523-1954512-001", payments: [...pay, { name: "Blank", account: "00-0000-0000000-00", amount: 500 }] });
+  assert.deepEqual(zero.skipped.map((s) => s.name), ["Blank"]);
 });
