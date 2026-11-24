@@ -789,6 +789,8 @@ export function connectorUrl(bookId: string): string {
 export interface ConnectRequest {
   authorization_id?: string;
   client?: { name?: string; client_name?: string; uri?: string };
+  /** Where the browser goes back to once this is answered: the app's own address. */
+  redirect_uri?: string;
   scope?: string;
   /** Set alone when this person already allowed this app. */
   redirect_url?: string;
