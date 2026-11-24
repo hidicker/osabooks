@@ -1,5 +1,6 @@
 import { answerConnectRequest, connectRequest, currentSession, signIn, signInWithGoogle, signedIn } from "./cloud.js";
 import { codeAskedFor } from "./daily/two-factor-ui.js";
+import { knownApp, returnHost } from "@nzosa/core";
 
 /**
  * An outside AI app asking to connect: the screen Supabase's OAuth server
@@ -85,11 +86,35 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
     return;
   }
 
-  const name = asked.client?.client_name ?? asked.client?.name ?? "An AI app";
-  card.append(
-    el("p", `${name} is asking to connect to OsaBooks as ${currentSession()?.email ?? "you"}.`, "connect-who"),
-    el("p", "Allowed, it can, for any set of books you give it the connector address of:"),
-  );
+  // The name is whatever the app registered with, so it proves nothing: any
+  // app can call itself Claude. Where it sends the browser back to is what
+  // tells them apart, so that is said, and an app OsaBooks does not know by
+  // it is marked as such (code review of 20 November, 4.1).
+  const selfName = (asked.client?.client_name ?? asked.client?.name ?? "").trim().slice(0, 60);
+  const known = knownApp(asked.redirect_uri);
+  const host = returnHost(asked.redirect_uri);
+  const who = currentSession()?.email ?? "you";
+  if (known !== null) {
+    card.append(
+      el("p", `${known} is asking to connect to OsaBooks as ${who}.`, "connect-who"),
+      el("p", `Once you answer, you go back to ${host}.`, "connect-where"),
+    );
+  } else {
+    card.append(
+      el(
+        "p",
+        `An app ${selfName === "" ? "with no name" : `calling itself “${selfName}”`} is asking to connect to OsaBooks as ${who}.`,
+        "connect-who",
+      ),
+      el(
+        "p",
+        `OsaBooks does not know this app: once you answer, it sends you to ${host ?? "an address it cannot show"}. ` +
+          "Allow it only if you set it up yourself. Claude and ChatGPT send you back to their own sites.",
+        "connect-unverified",
+      ),
+    );
+  }
+  card.append(el("p", "Allowed, it can, for any set of books you give it the connector address of:"));
   const can = el("ul");
   for (const line of [
     "read the books: transactions, accounts, coding and entities;",

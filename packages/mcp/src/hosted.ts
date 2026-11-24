@@ -3,6 +3,10 @@ import { handle } from "./protocol.js";
 import type { Message } from "./protocol.js";
 import { PartsSource } from "./source.js";
 
+// For the connector function, which has only this bundle: an app named by
+// where it returns to, not by what it calls itself (code review 4.1).
+export { connectedAppLabel } from "@nzosa/core";
+
 /**
  * The same tools, for books kept online: what the connector edge function
  * (supabase/functions/mcp) runs for each request. The function checks who is

@@ -19,7 +19,7 @@
  */
 
 // @ts-ignore: built output, see tools/build-mcp-function.mjs
-import { answerHosted } from "./tools.js";
+import { answerHosted, connectedAppLabel } from "./tools.js";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL") ?? "";
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -99,7 +99,11 @@ function claimsOf(token: string): Record<string, unknown> {
 
 const clientNames = new Map<string, string>();
 
-/** The app's name as it registered itself ("Claude"), for saying who suggested what. */
+/**
+ * Who suggested what: the app it really is, by where it returns to ("Claude"
+ * for claude.ai), or the name it registered with marked "(unverified)" -- an
+ * app calling itself Claude is not shown as Claude (code review 4.1).
+ */
 async function clientName(clientId: string): Promise<string> {
   if (clientId === "") return "";
   const known = clientNames.get(clientId);
@@ -108,8 +112,8 @@ async function clientName(clientId: string): Promise<string> {
   try {
     const response = await service(`/auth/v1/admin/oauth/clients/${encodeURIComponent(clientId)}`);
     if (response.ok) {
-      const client = (await response.json()) as { client_name?: string; name?: string };
-      name = (client.client_name ?? client.name ?? "").slice(0, 60);
+      const client = (await response.json()) as { client_name?: string; name?: string; redirect_uris?: string[] };
+      name = connectedAppLabel(client.client_name ?? client.name ?? "", client.redirect_uris ?? []);
     }
   } catch {
     name = "";

@@ -2,7 +2,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   addSuggestedSet,
+  connectedAppLabel,
+  knownApp,
   readSuggestedFile,
+  returnHost,
   suggestedSetId,
   suggesterName,
   suggestionKey,
@@ -50,4 +53,23 @@ test("the app is named as a person would name it", () => {
   assert.equal(suggesterName("Claude Desktop"), "Claude");
   assert.equal(suggesterName("cursor-vscode"), "Cursor");
   assert.equal(suggesterName(""), "your AI app");
+});
+
+test("an online app is known by where it returns to, not by its name (code review 4.1)", () => {
+  // Claude's own connector, as seen on the live project.
+  assert.equal(knownApp("https://claude.ai/api/mcp/auth_callback"), "Claude");
+  assert.equal(knownApp("https://chatgpt.com/connector_platform_oauth_redirect"), "ChatGPT");
+  // A look-alike host, plain http, or no address is not known.
+  for (const other of ["https://claude.ai.evil.example/cb", "https://evilclaude.ai/cb", "http://claude.ai/cb", "not a url", undefined]) {
+    assert.equal(knownApp(other), null, String(other));
+  }
+  assert.equal(returnHost("https://evilclaude.ai/cb?x=1"), "evilclaude.ai");
+  assert.equal(returnHost("javascript:alert(1)"), null);
+
+  assert.equal(connectedAppLabel("Claude", ["https://claude.ai/api/mcp/auth_callback"]), "Claude");
+  // Calling itself Claude, returning elsewhere: its own name, marked, and never shown as Claude.
+  const fake = connectedAppLabel("claude-helper", ["https://evil.example/cb"]);
+  assert.equal(fake, "claude-helper (unverified)");
+  assert.equal(suggesterName(fake), "claude-helper (unverified)");
+  assert.equal(connectedAppLabel("", ["http://localhost:9/cb"]), "An AI app (unverified)");
 });

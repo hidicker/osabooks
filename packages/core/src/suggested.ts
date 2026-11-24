@@ -145,8 +145,64 @@ export function suggestionsWaiting(
   return out;
 }
 
+/**
+ * Apps known by where they send the browser back to, not by the name they
+ * give themselves: any app can register as "Claude", but only Claude's own
+ * connector returns to claude.ai (code review of 20 November, 4.1). Seen on
+ * the live project: Claude returns to https://claude.ai/api/mcp/auth_callback.
+ */
+const KNOWN_APP_HOSTS: Readonly<Record<string, string>> = {
+  "claude.ai": "Claude",
+  "claude.com": "Claude",
+  "chatgpt.com": "ChatGPT",
+  "chat.openai.com": "ChatGPT",
+};
+
+/** Where an app sends the browser back to, as a host ("claude.ai"), or null when it is no web address. */
+export function returnHost(redirect: string | undefined): string | null {
+  if (redirect === undefined) return null;
+  try {
+    const url = new URL(redirect);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.hostname.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The app an outside connection really is, by where it returns to: "Claude",
+ * "ChatGPT", or null for any other -- whatever it calls itself. Only https
+ * counts: a known host over plain http is no proof.
+ */
+export function knownApp(redirect: string | undefined): string | null {
+  if (redirect === undefined) return null;
+  try {
+    const url = new URL(redirect);
+    return url.protocol === "https:" ? (KNOWN_APP_HOSTS[url.hostname.toLowerCase()] ?? null) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * How an online connection's suggestions are labelled: the known app's own
+ * name, or the name it gave itself marked as not checked. Kept as the set's
+ * `from`, so suggesterName shows it as it is.
+ */
+export function connectedAppLabel(selfName: string, redirects: readonly string[]): string {
+  const known = redirects.map((r) => knownApp(r)).find((app) => app !== null);
+  if (known !== undefined && known !== null) return known;
+  const name = selfName.trim().slice(0, 60) || "An AI app";
+  return `${name} ${UNVERIFIED}`;
+}
+
+const UNVERIFIED = "(unverified)";
+
 /** The app's name as a person reads it. */
 export function suggesterName(from: string): string {
+  // Marked as not checked by the connector: shown as it is, never as Claude
+  // because "claude" is somewhere in the name it chose.
+  if (from.trim().endsWith(UNVERIFIED)) return from.trim();
   if (/claude/i.test(from)) return "Claude";
   if (/chatgpt|openai/i.test(from)) return "ChatGPT";
   if (/cursor/i.test(from)) return "Cursor";
