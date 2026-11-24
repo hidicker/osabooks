@@ -2832,7 +2832,12 @@ export function bookYears(): number[] {
     ...(state.ledger.prepayments ?? []).map((p) => p.from),
     // Invoices and bills are in the books too: books with only those, and no
     // bank file yet, had no year to report on.
-    ...(state.ledger.invoices ?? []).filter((i) => isPosted(i)).map((i) => i.issued),
+    // One dated before the start posts nothing in its own year -- what it
+    // still owed opens the books on the start day -- so it is the start's year.
+    ...(state.ledger.invoices ?? []).filter((i) => isPosted(i)).map((i) => {
+      const start = booksStartKnown();
+      return start !== undefined && i.issued < start ? start : i.issued;
+    }),
   ];
   const years = new Set(dates.filter((d) => d !== "").map((d) => taxYearOf(d)));
   for (const use of state.ledger.vehicleUse ?? []) years.add(use.year);
