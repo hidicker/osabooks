@@ -800,7 +800,8 @@ export function connectorUrl(bookId: string): string {
 /** An outside app asking to connect, as Supabase's OAuth server describes it. */
 export interface ConnectRequest {
   authorization_id?: string;
-  client?: { name?: string; client_name?: string; uri?: string };
+  /** The app asking: its id (client_id), and the name it registered with. */
+  client?: { id?: string; name?: string; client_name?: string; uri?: string };
   /** Where the browser goes back to once this is answered: the app's own address. */
   redirect_uri?: string;
   scope?: string;
@@ -824,9 +825,17 @@ export async function connectRequest(id: string): Promise<ConnectRequest | null>
 }
 
 /** Allow or refuse it. Returns where to send the browser back to the app, or null. */
-export async function answerConnectRequest(id: string, action: "approve" | "deny"): Promise<string | null> {
+export async function answerConnectRequest(id: string, action: "approve" | "deny", clientId?: string): Promise<string | null> {
   const token = await freshToken();
   if (token === null) return null;
+  // Allowed by a sign-in that gave the authenticator code: said to the
+  // database first, because Supabase issues the app's own token without that
+  // mark, and books that need the code accept the app only with this record.
+  // The database refuses it unless this sign-in really has the code; a refusal
+  // here still lets the connection go ahead, for books that do not need it.
+  if (action === "approve" && clientId !== undefined && clientId !== "") {
+    await rpc<boolean>("note_connector_consent", { p_client_id: clientId });
+  }
   try {
     const response = await fetch(`${CLOUD.url}/auth/v1/oauth/authorizations/${encodeURIComponent(id)}/consent`, {
       method: "POST",
