@@ -2832,11 +2832,12 @@ export function bookYears(): number[] {
     ...(state.ledger.prepayments ?? []).map((p) => p.from),
     // Invoices and bills are in the books too: books with only those, and no
     // bank file yet, had no year to report on.
-    // One dated before the start posts nothing in its own year -- what it
-    // still owed opens the books on the start day -- so it is the start's year.
-    ...(state.ledger.invoices ?? []).filter((i) => isPosted(i)).map((i) => {
+    // One dated before the start also makes the start's year: what it still
+    // owed opens the books on the start day. Its own year stays too -- books
+    // taken over from Xero are reported on for the year before they began.
+    ...(state.ledger.invoices ?? []).filter((i) => isPosted(i)).flatMap((i) => {
       const start = booksStartKnown();
-      return start !== undefined && i.issued < start ? start : i.issued;
+      return start !== undefined && i.issued < start ? [i.issued, start] : [i.issued];
     }),
   ];
   const years = new Set(dates.filter((d) => d !== "").map((d) => taxYearOf(d)));
