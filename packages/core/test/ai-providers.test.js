@@ -115,6 +115,13 @@ test("a refusal says what the provider said", async () => {
   await assert.rejects(() => listModels("anthropic", "sk-ant-bad", fetcher), /invalid x-api-key/);
 });
 
+test("Google 400 invalid API key also says to change the key", async () => {
+  const { fetcher } = fake([
+    { status: 400, body: { error: { status: "INVALID_ARGUMENT", message: "API key not valid. Please pass a valid API key." } } },
+  ]);
+  await assert.rejects(() => listModels("gemini", "AIzaBad", fetcher), /make a new key with the provider/);
+});
+
 test("a key refused outright says to change the key, keeping the provider's words", async () => {
   const { fetcher } = fake([{ status: 401, body: { type: "error", error: { type: "authentication_error", message: "invalid x-api-key" } } }]);
   await assert.rejects(

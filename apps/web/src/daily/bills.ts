@@ -13,7 +13,7 @@ import {
 import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { amountCell, askOnPage, invoiceCell, nameCell, note, noteBriefly, tellOnPage } from "../ui.js";
-import { approveBill, creditNoteSection, editBill, startNewBill } from "./invoices.js";
+import { approveBill, creditNoteSection, editBill, startNewBill, voidDocument } from "./invoices.js";
 import { addPayableFor } from "./standard-accounts-panel.js";
 import {
   accountEntityKey,
@@ -279,8 +279,8 @@ function actionsCell(bill: Invoice, balance: InvoiceBalance, status: DocumentSta
       }, "Record a payment that no bank line in these books shows"),
     );
   }
-  if (status !== "Voided") {
-    td.append(button("void", () => void voidBill(bill, balance), "Take it back out of the books"));
+  if (isPosted(bill)) {
+    td.append(button("void", () => void voidDocument(bill, { ask: true }), "Take it back out of the books"));
   }
   return td;
 }
@@ -517,24 +517,6 @@ async function removeOutside(bill: Invoice, index: number): Promise<void> {
     rest.length === 0 ? without : { ...without, paidOutside: rest },
     `${bill.number}: removed the ${formatAmount(payment.amount)} payment of ${payment.date}`,
   );
-}
-
-/**
- * Take a bill back out of the books.
- *
- * Not while anything has paid it: the payment would be left settling a bill
- * that is not there, and the money with nowhere to go.
- */
-async function voidBill(bill: Invoice, balance: InvoiceBalance): Promise<void> {
-  if (balance.assigned > 0 || balance.paidOutside > 0) {
-    await tellOnPage(
-      `${bill.number} has payments against it. Unmatch the bank lines on Reconcile, and remove any ` +
-        "payment recorded here, before voiding it.",
-    );
-    return;
-  }
-  if (!await askOnPage(`Void ${bill.number} from ${bill.contact}? It leaves the books; History can undo it.`)) return;
-  await replaceBill(bill, { ...bill, status: "Voided" }, `Voided ${bill.number} — ${bill.contact} ${formatAmount(bill.total)}`);
 }
 
 /**

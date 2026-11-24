@@ -56,7 +56,11 @@ export function twoFactorOffered(): boolean {
  * sign-in has not given its code. Null when nothing is asked. On a right code
  * the page reloads, as signing in does, with everything now open.
  */
-export async function codeAskedFor(): Promise<HTMLElement | null> {
+export async function codeAskedFor(options?: {
+  onVerified?: () => void;
+  buttonLabel?: string;
+  intro?: string;
+}): Promise<HTMLElement | null> {
   if (!twoFactorOffered() || signedInWithCode()) return null;
   const mine = (await authenticators())?.filter((a) => a.verified) ?? [];
   if (mine.length === 0) return null;
@@ -67,7 +71,10 @@ export async function codeAskedFor(): Promise<HTMLElement | null> {
   heading.textContent = "The code from your authenticator app";
   form.append(
     heading,
-    note("Your books open once you give it. This browser then stays signed in, so you are asked again only on a new computer or browser, or after signing out."),
+    note(
+      options?.intro ??
+        "Your books open once you give it. This browser then stays signed in, so you are asked again only on a new computer or browser, or after signing out.",
+    ),
   );
 
   let which: Authenticator = mine[0] as Authenticator;
@@ -93,7 +100,7 @@ export async function codeAskedFor(): Promise<HTMLElement | null> {
   const go = document.createElement("button");
   go.type = "submit";
   go.className = "primary";
-  go.textContent = "Open my books";
+  go.textContent = options?.buttonLabel ?? "Open my books";
   const answer = document.createElement("p");
   answer.className = "cloud-said";
   form.append(label, go, answer);
@@ -104,6 +111,10 @@ export async function codeAskedFor(): Promise<HTMLElement | null> {
     said(answer, "Checking…");
     void giveCode(which.id, code.value).then((result) => {
       if (result.ok) {
+        if (options?.onVerified !== undefined) {
+          options.onVerified();
+          return;
+        }
         // Back to the Books page, where the code was asked for, rather than
         // the first page a reload opens on.
         reloadOnto("books", "Code accepted. Your books are open.");

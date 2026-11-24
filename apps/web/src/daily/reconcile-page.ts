@@ -681,7 +681,7 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
    * own earlier coding of this payee set the rate -- that is the answer.
    */
   function aiGstView(view: "charges" | "none" | undefined, rate: { why: string } | null): string {
-    if (view === undefined || noSalesTax() || rate?.why.startsWith("as ") === true) return "";
+    if (view === undefined || booksCountry().id !== "nz" || noSalesTax() || rate?.why.startsWith("as ") === true) return "";
     return view === "charges" ? " · The AI thinks it charges NZ GST" : " · The AI thinks it charges no NZ GST";
   }
 

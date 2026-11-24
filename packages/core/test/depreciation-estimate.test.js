@@ -61,3 +61,14 @@ test("a year ending in December, as a United States book's does", () => {
   assert.equal(estimate.to, "2026-12-31");
   assert.ok(estimate.amount > 0 && estimate.amount < 1_200_000 * 0.2, "about a month and a half of the year");
 });
+
+test("partial-year and future-year P&L periods estimate only months inside [from, to] (Antigravity review H7)", () => {
+  const today = "2026-11-24";
+  // Future financial year (FY2028): zero estimate for FY2028 P&L.
+  assert.equal(depreciationStillToPost([van], { today, from: "2027-04-01", to: "2028-03-31" }).amount, 0);
+  // Single future month (December 2026): 1 month (20,000 cents), not Nov + Dec (40,000 cents).
+  const decOnly = depreciationStillToPost([van], { today, from: "2026-12-01", to: "2026-12-31" });
+  const novAndDec = depreciationStillToPost([van], { today, from: "2026-11-01", to: "2026-12-31" });
+  assert.equal(decOnly.amount, 20_000);
+  assert.equal(novAndDec.amount, 40_000);
+});

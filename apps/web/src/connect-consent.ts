@@ -1,4 +1,14 @@
-import { answerConnectRequest, connectRequest, currentSession, signIn, signInWithGoogle, signedIn } from "./cloud.js";
+import {
+  answerConnectRequest,
+  connectRequest,
+  currentSession,
+  noteConnectorConsent,
+  signIn,
+  signInWithGoogle,
+  signedIn,
+  signedInWithCode,
+  takeAuthError,
+} from "./cloud.js";
 import { codeAskedFor } from "./daily/two-factor-ui.js";
 import { knownApp, returnHost } from "@nzosa/core";
 
@@ -66,8 +76,12 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
   }
   // Somebody with an authenticator gives its code before connecting: the
   // connection carries the sign-in it was made with, and books that need the
-  // code refuse a connection made without it. A right code reloads this page.
-  const askCode = await codeAskedFor();
+  // code refuse a connection made without it.
+  const askCode = await codeAskedFor({
+    onVerified: () => void draw(screen, id),
+    buttonLabel: "Continue",
+    intro: "Give the code from your authenticator app before connecting this app.",
+  });
   if (askCode !== null) {
     card.append(askCode);
     return;
@@ -80,8 +94,12 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
     );
     return;
   }
-  // Allowed before: straight back.
+  // Allowed before: straight back (recording this aal2 sign-in so an app
+  // approved before 2FA was turned on is not deadlocked in the connector).
   if (asked.authorization_id === undefined && asked.redirect_url !== undefined) {
+    if (asked.client?.id !== undefined && asked.client.id !== "" && signedInWithCode()) {
+      await noteConnectorConsent(asked.client.id);
+    }
     goBack(card, asked.redirect_url);
     return;
   }
@@ -169,6 +187,8 @@ function signInHere(card: HTMLElement, then: () => void): void {
   const go = el("button", "Sign in", "primary");
   go.type = "submit";
   const said = el("p", "", "connect-said");
+  const priorError = takeAuthError();
+  if (priorError !== null) said.textContent = priorError;
   form.append(email, password, go, said);
   form.addEventListener("submit", (event) => {
     event.preventDefault();

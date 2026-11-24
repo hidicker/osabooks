@@ -96,9 +96,10 @@ export function renderOpeningBalances(): void {
   // the account as well, the two are compared: what they differ by is left in
   // the historical account until the rest are entered or the figure changed.
   for (const account of openingFromDocuments()) {
-    const flip = account.documents < 0 || account.opening < 0 ? -1 : 1;
+    const controlType = state.chart.find((a) => a.code === account.control.code)?.type ?? "";
+    const flip = /liability/i.test(controlType) ? -1 : 1;
     const said = document.createElement("p");
-    said.className = account.difference === 0 ? "journal-balanced" : "journal-out";
+    said.className = account.opening === 0 || account.difference === 0 ? "journal-balanced" : "journal-out";
     const docs = booksMoney(flip * account.documents);
     said.textContent =
       account.opening === 0

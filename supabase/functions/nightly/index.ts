@@ -184,6 +184,15 @@ function isNightlyKey(given: string | null): boolean {
   return differ === 0;
 }
 
+// morningRun writes to module-level ledger/suggestion state, so serialize
+// requests that land on the same warm Deno isolate.
+let runQueue: Promise<unknown> = Promise.resolve();
+function runBookSerialized(book: string): Promise<string> {
+  const next = runQueue.then(() => runBook(book));
+  runQueue = next.catch(() => {});
+  return next;
+}
+
 Deno.serve(async (request: Request) => {
   if (request.method !== "POST") return reply({ error: "POST only" }, 405);
   if (!isNightlyKey(request.headers.get("x-nightly-key"))) {
@@ -194,7 +203,7 @@ Deno.serve(async (request: Request) => {
   // One set of books: do it, and say what happened.
   if (typeof body.book === "string" && body.book !== "") {
     try {
-      return reply({ book: body.book, said: await runBook(body.book) });
+      return reply({ book: body.book, said: await runBookSerialized(body.book) });
     } catch (error) {
       console.error(`morning run for ${body.book}:`, (error as Error).message);
       await logFailure(body.book, (error as Error).message);

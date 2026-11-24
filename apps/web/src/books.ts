@@ -1573,7 +1573,7 @@ function exchangeJournals(): PostedJournal[] {
   const accounts = exchangeAccounts();
   if (accounts === null) return [];
   const rates = fxRates();
-  const foreignDocs = new Map(invoicesInPlay().filter((i) => isForeign(i.currency, books)).map((i) => [documentKey(i), i]));
+  const foreignDocs = new Map(invoicesInPlay().filter((i) => isPosted(i) && isForeign(i.currency, books)).map((i) => [documentKey(i), i]));
   const payments: DocumentPayment[] = [];
   if (foreignDocs.size > 0) {
     const byId = new Map(state.ledger.transactions.map((t) => [t.id, t]));
@@ -2632,7 +2632,7 @@ export function openingFromDocuments(): OpeningFromDocuments[] {
     documentControl(invoice) ??
     (invoice.kind === "sales" ? { code: "610", name: "Accounts Receivable" } : { code: "800", name: "Accounts Payable" });
   return openingDocumentJournals(
-    owingAtStart(invoicesInPlay(), start as IsoDate, { controlOf, agedKinds: options.agedKinds }),
+    owingAtStart(invoicesInPlay().map(accountingDocument), start as IsoDate, { controlOf, agedKinds: options.agedKinds }),
     { start: start as IsoDate, historical: options.historical, openingFigures: options.openingFigures },
   ).accounts;
 }

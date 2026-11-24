@@ -152,6 +152,8 @@ export function depreciationStillToPost(
   options: {
     today: string;
     to: string;
+    /** Optional period start (for Profit & Loss); restricts the estimate to `[from, to]`. */
+    from?: string;
     yearEnd?: FinancialYearOptions;
     byDays?: boolean;
     /**
@@ -169,6 +171,7 @@ export function depreciationStillToPost(
   const to = options.to < span.to ? options.to : span.to;
   const none = { amount: 0, to, byType: [] };
   if (assets.length === 0 || to < options.today) return none;
+  if (options.from !== undefined && options.from > span.to) return none;
   const posting =
     options.transactions === undefined || options.transactions.some((t) => financialYearOf(t.date, yearEnd) === year);
   // Where the posting stops: the last month end before today, as above.
@@ -177,16 +180,31 @@ export function depreciationStillToPost(
     if (!posting || end >= options.today) break;
     postedTo = end;
   }
+  // For a partial-year P&L starting after what was already posted, subtract
+  // depreciation up to the day before `from` so only months inside [from, to]
+  // are estimated.
+  let baseline = postedTo;
+  if (options.from !== undefined && options.from > span.from) {
+    const beforeFrom = dayBefore(options.from);
+    if (baseline === null || beforeFrom > baseline) baseline = beforeFrom;
+  }
   const schedule = (end: string): Map<string, number> =>
     new Map(depreciationSchedule(assets, { from: span.from, to: end } as never, { byDays: options.byDays === true }).byType.map((g) => [g.type, g.depreciation]));
   const whole = schedule(to);
-  const posted = postedTo === null ? new Map<string, number>() : schedule(postedTo);
-  const byType = [...new Set([...whole.keys(), ...posted.keys()])]
-    .map((type) => ({ type, amount: (whole.get(type) ?? 0) - (posted.get(type) ?? 0) }))
+  const prior = baseline === null ? new Map<string, number>() : schedule(baseline);
+  const byType = [...new Set([...whole.keys(), ...prior.keys()])]
+    .map((type) => ({ type, amount: (whole.get(type) ?? 0) - (prior.get(type) ?? 0) }))
     .filter((t) => t.amount !== 0);
   return { amount: byType.reduce((s, t) => s + t.amount, 0), to, byType };
 }
 
+function dayBefore(iso: string): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
+/** The last day of each of the twelve months from a year's first day. */
 function monthEndsOfYear(start: string): string[] {
   const out: string[] = [];
   const y0 = Number(start.slice(0, 4));

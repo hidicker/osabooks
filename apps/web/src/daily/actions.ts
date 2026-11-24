@@ -453,7 +453,7 @@ export function actionItems(): ActionItem[] {
   const balances = invoiceBalanceMap();
   const credits = state.ledger.creditNotes ?? {};
   const unassigned = [...balances.values()].filter(
-    (b) => isCreditNote(b.invoice) && (storedFor(credits, b.invoice) ?? "") === "",
+    (b) => isPosted(b.invoice) && isCreditNote(b.invoice) && (storedFor(credits, b.invoice) ?? "") === "",
   ).length;
   // Rental properties' jobs and issues past their due date.
   const model = state.ledger.entities ?? emptyEntityModel();

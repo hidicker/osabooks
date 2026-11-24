@@ -163,7 +163,9 @@ export function returnHost(redirect: string | undefined): string | null {
   if (redirect === undefined) return null;
   try {
     const url = new URL(redirect);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.hostname.toLowerCase() : null;
+    if (url.protocol === "https:") return url.hostname.toLowerCase();
+    if (url.protocol === "http:") return `http://${url.hostname.toLowerCase()}`;
+    return null;
   } catch {
     return null;
   }
@@ -190,8 +192,9 @@ export function knownApp(redirect: string | undefined): string | null {
  * `from`, so suggesterName shows it as it is.
  */
 export function connectedAppLabel(selfName: string, redirects: readonly string[]): string {
-  const known = redirects.map((r) => knownApp(r)).find((app) => app !== null);
-  if (known !== undefined && known !== null) return known;
+  const apps = redirects.map((r) => knownApp(r));
+  const first = apps[0];
+  if (first !== undefined && first !== null && apps.every((app) => app === first)) return first;
   const name = selfName.trim().slice(0, 60) || "An AI app";
   return `${name} ${UNVERIFIED}`;
 }

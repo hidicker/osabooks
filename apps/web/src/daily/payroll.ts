@@ -1687,7 +1687,7 @@ function renderEmployerDeductions(container: HTMLElement): void {
     table,
     note(
       "By the month of each payday, as Inland Revenue takes them: due on the 20th of the next " +
-        "month for an employer deducting less than $500,000 a year, and December's on 15 January; " +
+        "month for an employer deducting less than $500,000 a year; " +
         "a due date on a weekend or public holiday moves to the next working day. A larger employer " +
         "pays twice a month, on the 20th and on the 5th of the month after (15 January for 16 to 31 December).",
     ),
