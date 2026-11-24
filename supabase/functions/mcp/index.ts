@@ -108,18 +108,16 @@ async function clientName(clientId: string): Promise<string> {
   if (clientId === "") return "";
   const known = clientNames.get(clientId);
   if (known !== undefined) return known;
-  let name = "";
   try {
     const response = await service(`/auth/v1/admin/oauth/clients/${encodeURIComponent(clientId)}`);
-    if (response.ok) {
-      const client = (await response.json()) as { client_name?: string; name?: string; redirect_uris?: string[] };
-      name = connectedAppLabel(client.client_name ?? client.name ?? "", client.redirect_uris ?? []);
-    }
+    if (!response.ok) return "";
+    const client = (await response.json()) as { client_name?: string; name?: string; redirect_uris?: string[] };
+    const name = connectedAppLabel(client.client_name ?? client.name ?? "", client.redirect_uris ?? []);
+    clientNames.set(clientId, name);
+    return name;
   } catch {
-    name = "";
+    return "";
   }
-  clientNames.set(clientId, name);
-  return name;
 }
 
 /** The person's role in these books, or null when they are not a member (or no longer). */
@@ -154,14 +152,20 @@ async function twoFactorNeeded(book: string, person: string): Promise<boolean> {
  * approving sign-in gave, so the consent screen records it
  * (note_connector_consent, which only an aal2 sign-in can write).
  */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CONSENT_MAX_AGE_MS = 90 * 86_400_000;
+
 async function approvedWithCode(person: string, clientId: unknown): Promise<boolean> {
-  if (typeof clientId !== "string" || !/^[0-9a-f-]{36}$/i.test(clientId)) return false;
+  if (typeof clientId !== "string" || !UUID_RE.test(clientId)) return false;
   const response = await service(
-    `/rest/v1/connector_consents?select=client_id&user_id=eq.${person}&client_id=eq.${clientId}`,
+    `/rest/v1/connector_consents?select=client_id,made_at&user_id=eq.${person}&client_id=eq.${clientId}`,
   );
   if (!response.ok) return false;
-  const rows = (await response.json().catch(() => [])) as unknown[];
-  return rows.length > 0;
+  const rows = (await response.json().catch(() => [])) as { made_at?: string }[];
+  const madeAt = rows[0]?.made_at;
+  if (typeof madeAt !== "string") return false;
+  const when = Date.parse(madeAt);
+  return Number.isFinite(when) && Date.now() - when <= CONSENT_MAX_AGE_MS;
 }
 
 async function booksNamed(book: string): Promise<string | null> {
@@ -261,8 +265,7 @@ Deno.serve(async (request) => {
 
   try {
     const parts = await partsOf(book);
-    const claims = claimsOf(token);
-    const client = await clientName(typeof claims["client_id"] === "string" ? (claims["client_id"] as string) : "");
+    const client = await clientName(typeof claims0["client_id"] === "string" ? (claims0["client_id"] as string) : "");
     const answer = answerHosted({ body, parts, name, suggest: SUGGESTERS.has(role), client });
     if (answer.suggested !== undefined) await keepSuggested(book, person, parts["suggested"], answer.suggested);
     if (answer.reply === undefined) return new Response(null, { status: 202, headers: CORS });

@@ -2053,13 +2053,14 @@ let withDepreciationEstimate = false;
  * depreciation -- and for all entities or books of one, since the register
  * does not say whose each asset is.
  */
-function depreciationEstimateFor(to: string): { amount: number; to: string } | null {
+function depreciationEstimateFor(to: string, from?: string): { amount: number; to: string } | null {
   if ($<HTMLSelectElement>("report-basis").value !== "posted") return null;
   const entities = state.ledger.entities?.entities ?? [];
   if (state.entityFilter !== "" && entities.length > 1) return null;
   const estimate = depreciationStillToPost(state.ledger.assets ?? [], {
     today: localToday(),
     to,
+    ...(from !== undefined ? { from } : {}),
     // The lines the depreciation is posted from, so what counts as already
     // posted is what was.
     transactions: accountingLines(),
@@ -5295,8 +5296,8 @@ export function renderReportsPage(): void {
     yearSelect.append(option);
   }
   // No year at all: books with nothing in them, or whose only document was
-  // voided. The reports below need a year and drew a blank page; said instead.
-  if (years.length === 0 && ["journal", "balancesheet", "cashflow"].includes(kindNow)) {
+  // voided. Year-dependent reports would otherwise draw a blank page.
+  if (years.length === 0 && !["agedpayables", "agedreceivables", "bankreconcile", "pl"].includes(kindNow)) {
     body.append(note("Nothing posted yet: no bank line, invoice, journal or pay run is in the books, so there is no year to report on."));
   }
 
@@ -5673,7 +5674,8 @@ export function renderReportsPage(): void {
 
   // A period running past today carries depreciation only for the months
   // already ended. The rest of the year's, estimated, where asked for.
-  const estimate = depreciationEstimateFor(reportRange(year).to);
+  const plRange = reportRange(year);
+  const estimate = depreciationEstimateFor(plRange.to, plRange.from);
   if (estimate !== null) {
     depreciationEstimateRows(body, estimate, money, {
       estimateLabel: "Depreciation still to post, estimated",

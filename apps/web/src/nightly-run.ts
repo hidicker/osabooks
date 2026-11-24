@@ -1,4 +1,4 @@
-import { AI_OWN_BATCH, allAiSuggestions, askAboutLines, keptAiAnswers, restoreAiSuggestions, suggestFromDirectory, waitingForAnswers } from "./ai.js";
+import { AI_OWN_BATCH, allAiSuggestions, askAboutLines, forgetAiSuggestions, keptAiAnswers, restoreAiSuggestions, suggestFromDirectory, waitingForAnswers } from "./ai.js";
 import type { AiAnswer, AskedLines } from "./ai-backend.js";
 import { applyCountryRules } from "./country.js";
 import { feedLinesForBooks, mergeIncoming } from "./daily/bank-import.js";
@@ -84,6 +84,7 @@ function rulesFrom(held: unknown): RuleSet | undefined {
 
 export async function morningRun(input: MorningInput): Promise<MorningResult> {
   holdWrites();
+  forgetAiSuggestions();
   state.ledger = ledgerFromParts(input.parts);
   applyCountryRules();
   state.chart = state.ledger.chart ?? [];

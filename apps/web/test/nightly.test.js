@@ -202,3 +202,29 @@ test("the inbox keeps only what the books do not already hold, and a refused ask
   assert.match(result.said, /0 lines asked of the AI|0 line asked of the AI|no allowance left today/);
   assert.ok(!/100 lines asked/.test(result.said));
 });
+
+test("sequential morning runs in the same isolate never leak suggestions or hunches across books (Antigravity review C1)", async () => {
+  const { morningRun } = await import(`${pathToFileURL(bundle).href}?shared=1`);
+  const bookA = await morningRun({
+    parts: parts([
+      line("a-coded", "2026-06-01", -2500, "SECRET SUPPLIER A"),
+      line("a-hunch", "2026-06-02", -1500, "GARBLED A"),
+    ]),
+    ask: async () => ({
+      text: JSON.stringify([
+        { id: "a-coded", code: "429", confidence: 0.8, because: "Book A supplies", payee: "Secret A" },
+        { id: "a-hunch", code: "", confidence: 0.1, because: "Book A hunch", payee: "Garbled A" },
+      ]),
+    }),
+    maxLines: 100,
+  });
+  assert.equal(bookA.suggestions.length, 2);
+
+  const bookB = await morningRun({
+    parts: parts([line("b-only", "2026-06-03", -3000, "SUPPLIER B")]),
+    ask: async () => ({ text: "[]" }),
+    maxLines: 100,
+  });
+  assert.deepEqual(bookB.suggestions, [], "Book A's suggestions and hunches must not appear in Book B");
+  assert.equal(bookB.suggested, 0);
+});

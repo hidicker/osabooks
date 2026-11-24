@@ -1269,13 +1269,12 @@ export interface EmployerDeductionsMonth {
 }
 
 /**
- * When a month's employer deductions are due: the 20th of the next month,
- * except December's, due 15 January -- Inland Revenue's holiday exception,
- * as for a GST period ending 30 November.
+ * When a month's employer deductions are due: the 20th of the next month
+ * (including December, due 20 January) for small/monthly employers. A due date
+ * on a weekend or national public holiday moves to the next working day.
  */
 export function employerDeductionsDue(month: string): IsoDate {
   const [y, m] = month.split("-").map(Number) as [number, number];
-  if (m === 12) return `${String(y + 1).padStart(4, "0")}-01-15` as IsoDate;
   return new Date(Date.UTC(y, m, 20)).toISOString().slice(0, 10) as IsoDate;
 }
 

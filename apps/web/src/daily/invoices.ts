@@ -68,6 +68,7 @@ import {
   parseAmount,
   documentKey,
   documentNumberOf,
+  resolveAllocation,
   DocumentIndex,
   isCreditNote,
   storedFor,
@@ -1265,7 +1266,12 @@ export function renderInvoiceEditor(): void {
     void saveInvoice({ ...built, number: stem === built.number && existing === undefined ? `${prefix}-${built.number}` : stem }, existing);
   });
 
-  actions.append(...(asBill ? [approve] : []), save, ...(asBill ? [] : [estimate]), cancel);
+  const voidedExisting = existing !== undefined && ["voided", "deleted"].includes(existing.status.trim().toLowerCase());
+  if (voidedExisting) {
+    actions.append(cancel);
+  } else {
+    actions.append(...(asBill ? [approve] : []), save, ...(asBill ? [] : [estimate]), cancel);
+  }
 
   if (existing) {
     // The same again: a monthly invoice, a supplier's regular bill.
@@ -1416,6 +1422,23 @@ async function saveInvoice(built: Invoice, existing: Invoice | undefined): Promi
     }
   }
 
+  if (existing !== undefined && isPosted(existing) && !isPosted(built)) {
+    const nextStatus = built.status.trim().toLowerCase();
+    if (nextStatus !== "voided") {
+      await tellOnPage(`${existing.number} is already in the books. Use Void to take it out rather than changing it back to ${built.status}.`);
+      return;
+    }
+    const applied = appliedTo(existing);
+    if (applied.length > 0) {
+      await tellOnPage(
+        `${existing.number} cannot be voided while ${applied.length === 1 ? "this is" : "these are"} applied to it:\n\n` +
+          applied.map((line) => `• ${line}`).join("\n") +
+          "\n\nTake those off first, then void it.",
+      );
+      return;
+    }
+  }
+
   const at = existing ? invoices.indexOf(existing) : -1;
   if (at >= 0) invoices[at] = built;
   else invoices.push(built);
@@ -1496,7 +1519,8 @@ export function appliedTo(doc: Invoice): string[] {
   if ((balance?.credited ?? 0) !== 0) out.push(`${money(balance!.credited)} of credit notes against it`);
   if (isCreditNote(doc)) {
     if ((storedFor(state.ledger.creditNotes ?? {}, doc) ?? "") !== "") out.push("it is put against an invoice");
-    const used = (state.ledger.creditAllocations ?? []).filter((a) => a.from === key || a.from === doc.number);
+    const index = new DocumentIndex(state.ledger.invoices ?? []);
+    const used = (state.ledger.creditAllocations ?? []).filter((a) => resolveAllocation(index, a)?.from === key);
     if (used.length > 0) out.push("it is used as credit on account");
   }
   return out;
@@ -1861,7 +1885,7 @@ export function renderInvoices(): void {
   // receipt was found is interesting once; what is still owed is the question
   // the page exists to answer.
   const owed = invoiceBalanceMap();
-  const summaryBalances = [...owed.values()].filter((b) => shows(b.invoice));
+  const summaryBalances = [...owed.values()].filter((b) => isPosted(b.invoice) && shows(b.invoice));
   const count = (status: string) => summaryBalances.filter((b) => b.status === status).length;
   // In the books' currency, as the aged report and the balance sheet hold it:
   // a US dollar invoice's 1,000.00 is not 1,000.00 of these books' money.
@@ -2367,7 +2391,7 @@ export function creditNoteSection(
   balances: Map<DocumentKey, InvoiceBalance>,
   money: (cents: number) => string,
 ): void {
-  const notes = [...balances.values()].filter((b) => b.status === "credit note");
+  const notes = [...balances.values()].filter((b) => isPosted(b.invoice) && b.status === "credit note");
   if (notes.length === 0) return;
   const bills = notes.every((b) => b.invoice.kind === "purchase");
 

@@ -749,7 +749,7 @@ export function invoiceBalances(
   const credited = new Map<DocumentKey, Cents>();
   for (const [noteRef, targetRef] of Object.entries(credits)) {
     const note = index.resolve(noteRef, isCreditNote);
-    if (note === undefined || targetRef === "") continue;
+    if (note === undefined || !isPosted(note) || targetRef === "") continue;
     const target = index.resolveKey(targetRef, (d) => d.kind === note.kind);
     if (target === undefined) continue;
     credited.set(target, (credited.get(target) ?? 0) + Math.abs(note.total));

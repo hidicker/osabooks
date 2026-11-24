@@ -547,21 +547,23 @@ test("employer deductions by month: what the month's pay runs owe Inland Revenue
   );
 });
 
-test("employer deductions: December's are due 15 January, and a due date on a weekend or holiday moves on", async () => {
+test("employer deductions: monthly payers are due on the 20th (including December -> 20 January), and weekends/holidays move on", async () => {
   const { employerDeductionsByMonth, employerDeductionsDue } = await import("../dist/index.js");
-  assert.equal(employerDeductionsDue("2026-12"), "2027-01-15", "December: 15 January, not 20 January");
+  assert.equal(employerDeductionsDue("2026-12"), "2027-01-20", "December monthly PAYE: 20 January");
   assert.equal(employerDeductionsDue("2026-11"), "2026-12-20");
   const r = run();
-  const [dec2026, jan2027, dec2027] = employerDeductionsByMonth([
+  const [may2025, dec2026, jan2027, dec2027] = employerDeductionsByMonth([
+    { ...r, id: "m25", payDate: "2025-05-15" },
     { ...r, id: "d", payDate: "2026-12-18" },
     { ...r, id: "j", payDate: "2027-01-29" },
     { ...r, id: "d2", payDate: "2027-12-17" },
   ]);
-  assert.deepEqual([dec2026.due, dec2026.payBy], ["2027-01-15", "2027-01-15"], "a Friday");
-  // 20 February 2027 is a Saturday.
+  // 20 June 2025 is Matariki (Friday) -> moves to Monday 23 June 2025.
+  assert.deepEqual([may2025.due, may2025.payBy], ["2025-06-20", "2025-06-23"], "Matariki Friday shifts to Monday");
+  assert.deepEqual([dec2026.due, dec2026.payBy], ["2027-01-20", "2027-01-20"], "a Wednesday");
+  // 20 February 2027 is a Saturday -> Monday 22 Feb.
   assert.deepEqual([jan2027.due, jan2027.payBy], ["2027-02-20", "2027-02-22"]);
-  // 15 January 2028 is a Saturday.
-  assert.deepEqual([dec2027.due, dec2027.payBy], ["2028-01-15", "2028-01-17"]);
+  assert.deepEqual([dec2027.due, dec2027.payBy], ["2028-01-20", "2028-01-20"], "a Thursday");
 });
 
 test("the next pay period follows the last, paid the same days after it ends", async () => {

@@ -79,6 +79,21 @@ export async function undo(event: LedgerEvent): Promise<void> {
     return;
   }
 
+  if (event.kind === "invoiceBatch" && Array.isArray(event.after)) {
+    const made = event.after as Invoice[];
+    const posted = made
+      .map((m) => (state.ledger.invoices ?? []).find((i) => i.kind === m.kind && i.number === m.number))
+      .filter((i): i is Invoice => i !== undefined && isPosted(i));
+    for (const one of posted) {
+      if (!(await voidDocument(one, { ask: true, why: "undone from History" }))) return;
+    }
+    state.events = state.events.map((e) => (e.id === event.id ? { ...e, reverted: true } : e));
+    await saveEvents(state.events);
+    reclassify();
+    redraw("history");
+    return;
+  }
+
   // A rename is undone by renaming back, which carries its codings, rules,
   // journals and documents with it; the chart row alone would orphan them.
   if (event.kind === "chart" && / renamed to /.test(event.summary) && event.before !== null && event.after !== null && event.after !== undefined) {

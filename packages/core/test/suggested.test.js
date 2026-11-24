@@ -64,12 +64,20 @@ test("an online app is known by where it returns to, not by its name (code revie
     assert.equal(knownApp(other), null, String(other));
   }
   assert.equal(returnHost("https://evilclaude.ai/cb?x=1"), "evilclaude.ai");
+  assert.equal(returnHost("http://claude.ai/cb"), "http://claude.ai");
   assert.equal(returnHost("javascript:alert(1)"), null);
 
   assert.equal(connectedAppLabel("Claude", ["https://claude.ai/api/mcp/auth_callback"]), "Claude");
+  assert.equal(connectedAppLabel("Claude", ["https://claude.ai/cb", "https://claude.com/cb"]), "Claude");
+  // Mixed redirect URIs (one Claude, one attacker): never labelled Claude (Antigravity review H1).
+  assert.equal(
+    connectedAppLabel("Claude", ["https://claude.ai/api/mcp/auth_callback", "https://evil.example/cb"]),
+    "Claude (unverified)",
+  );
   // Calling itself Claude, returning elsewhere: its own name, marked, and never shown as Claude.
   const fake = connectedAppLabel("claude-helper", ["https://evil.example/cb"]);
   assert.equal(fake, "claude-helper (unverified)");
   assert.equal(suggesterName(fake), "claude-helper (unverified)");
   assert.equal(connectedAppLabel("", ["http://localhost:9/cb"]), "An AI app (unverified)");
+  assert.equal(connectedAppLabel("Claude", []), "Claude (unverified)");
 });

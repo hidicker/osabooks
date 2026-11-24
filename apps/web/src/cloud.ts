@@ -230,7 +230,17 @@ export async function sessionFromUrl(): Promise<boolean> {
   const refused = params.get("error_description") ?? params.get("error");
   if (refused !== null && params.get("access_token") === null) {
     authError = refused;
-    history.replaceState(null, "", location.pathname + location.search);
+    let search = location.search;
+    try {
+      const pending = JSON.parse(sessionStorage.getItem(GOOGLE_PENDING) ?? "{}") as { connecting?: string };
+      sessionStorage.removeItem(GOOGLE_PENDING);
+      if (pending.connecting !== undefined && /^[A-Za-z0-9_-]{8,128}$/.test(pending.connecting)) {
+        search = `?authorization_id=${encodeURIComponent(pending.connecting)}`;
+      }
+    } catch {
+      // sessionStorage unavailable
+    }
+    history.replaceState(null, "", location.pathname + search);
     return false;
   }
   const accessToken = params.get("access_token");
@@ -824,18 +834,16 @@ export async function connectRequest(id: string): Promise<ConnectRequest | null>
   }
 }
 
+/** Record that this aal2 sign-in approved an OAuth client. Returns true when recorded. */
+export async function noteConnectorConsent(clientId: string): Promise<boolean> {
+  if (clientId === "") return false;
+  return (await rpc<boolean>("note_connector_consent", { p_client_id: clientId })) === true;
+}
+
 /** Allow or refuse it. Returns where to send the browser back to the app, or null. */
 export async function answerConnectRequest(id: string, action: "approve" | "deny", clientId?: string): Promise<string | null> {
   const token = await freshToken();
   if (token === null) return null;
-  // Allowed by a sign-in that gave the authenticator code: said to the
-  // database first, because Supabase issues the app's own token without that
-  // mark, and books that need the code accept the app only with this record.
-  // The database refuses it unless this sign-in really has the code; a refusal
-  // here still lets the connection go ahead, for books that do not need it.
-  if (action === "approve" && clientId !== undefined && clientId !== "") {
-    await rpc<boolean>("note_connector_consent", { p_client_id: clientId });
-  }
   try {
     const response = await fetch(`${CLOUD.url}/auth/v1/oauth/authorizations/${encodeURIComponent(id)}/consent`, {
       method: "POST",
@@ -844,6 +852,16 @@ export async function answerConnectRequest(id: string, action: "approve" | "deny
     });
     if (!response.ok) return null;
     const answer = (await response.json()) as { redirect_url?: string };
+    // Allowed by a sign-in that gave the authenticator code: record it once
+    // consent succeeds, because Supabase issues the app's own token at aal1.
+    if (clientId !== undefined && clientId !== "") {
+      if (action === "approve" && signedInWithCode()) {
+        const noted = await noteConnectorConsent(clientId);
+        if (!noted) return null;
+      } else if (action === "deny") {
+        await rpc<void>("revoke_connector_consent", { p_client_id: clientId });
+      }
+    }
     return answer.redirect_url ?? null;
   } catch {
     return null;

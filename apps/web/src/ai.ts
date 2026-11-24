@@ -114,10 +114,11 @@ export function allAiSuggestions(): AiSuggestion[] {
  * `restoreAiSuggestions` puts back as a hunch, never as a suggestion.
  */
 export function keptAiAnswers(): AiSuggestion[] {
+  const inBooks = new Set(state.ledger.transactions.map((t) => t.id));
   const uncoded: AiSuggestion[] = [...hunches]
-    .filter(([id]) => !found.has(id))
+    .filter(([id]) => inBooks.has(id) && !found.has(id))
     .map(([id, hunch]) => ({ id, code: "", confidence: 0, because: hunch.because, ...hunchExtras(hunch) }));
-  return [...found.values(), ...uncoded];
+  return [[...found.values()].filter((one) => inBooks.has(one.id)), uncoded].flat();
 }
 
 /**
@@ -142,12 +143,13 @@ export function restoreAiSuggestions(kept: readonly AiSuggestion[], replace = fa
     // An uncoded answer comes back as the hunch it was, never as a suggestion.
     if (one.code.trim() === "") {
       const hunch = hunchOf(one);
-      if (hunch !== null && !hunches.has(one.id)) hunches.set(one.id, { because: hunch, ...hunchExtras(one) });
+      if (hunch !== null && (!hunches.has(one.id) || replace)) hunches.set(one.id, { because: hunch, ...hunchExtras(one) });
       continue;
     }
     const label = labelForCode(splitAccountLabel(one.code).code || one.code, labels);
     if (label === null) continue;
     found.set(one.id, { ...one, code: label });
+    hunches.delete(one.id);
     back += 1;
   }
   return back;
@@ -468,14 +470,14 @@ export function rateForSuggestion(
       return { rate: classificationToRate(before.classification), why: `as ${before.transaction.date}'s was` };
     }
   }
-  if (booksCountry().id === "nz") {
+  if (transaction.amount < 0 && booksCountry().id === "nz") {
     const business = businessOf(transaction, "nz");
     if (business !== null && chargesNzGst(business.name)) {
       return { rate: "15", why: `15%: ${business.name} charges NZ GST unless given a GST number. Check the receipt` };
     }
-  }
-  if (paidInForeignCurrency(transaction)) {
-    return { rate: "0", why: "0%: an overseas supplier not known to charge NZ GST. Check the receipt" };
+    if (paidInForeignCurrency(transaction)) {
+      return { rate: "0", why: "0%: an overseas supplier not known to charge NZ GST. Check the receipt" };
+    }
   }
   return null;
 }
