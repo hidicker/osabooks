@@ -148,6 +148,36 @@ test("a change to the chart lets the unanswered lines be asked again", async () 
   assert.equal(count, 1, "the chart is different, so the line is worth asking again");
 });
 
+test("a hunch on a line left uncoded is kept for the morning, with its payee, and not counted as a suggestion", async () => {
+  const result = await run({
+    parts: parts([line("h1", "2026-06-01", -1957, "DEEPSEERWEA 18658850911 USD1060"), line("h2", "2026-06-02", -2000, "KOWHAI SUPPLIER")]),
+    ask: async () => ({
+      text: JSON.stringify([
+        { id: "h1", code: "", confidence: 0.1, because: "Possibly DeepSeek, an AI service; the name is garbled", payee: "DeepSeek" },
+        { id: "h2", code: "429", confidence: 0.7, because: "supplies", payee: "Kowhai Supplier" },
+      ]),
+    }),
+    maxLines: 100,
+  });
+  const kept = result.suggestions.find((s) => s.id === "h1");
+  assert.deepEqual(
+    { code: kept?.code, because: kept?.because, payee: kept?.payee },
+    { code: "", because: "Possibly DeepSeek, an AI service; the name is garbled", payee: "DeepSeek" },
+  );
+  assert.equal(result.suggested, 1, "only the line given an account is a suggestion");
+  assert.match(result.said, /1 suggestion waiting in all/);
+
+  // The next morning, put back as the hunch it was: still kept, still not a suggestion.
+  const next = await run({
+    parts: parts([line("h1", "2026-06-01", -1957, "DEEPSEERWEA 18658850911 USD1060")]),
+    kept: result.suggestions,
+    unsure: result.unsure,
+    maxLines: 100,
+  });
+  assert.ok(next.suggestions.some((s) => s.id === "h1" && s.code === "" && s.payee === "DeepSeek"));
+  assert.equal(next.suggested, 0);
+});
+
 test("an error is not remembered as a line the model could not answer", async () => {
   const many = [line("e1", "2026-06-01", -2000, "KOWHAI SUPPLIER ONE")];
   const r = await run({ parts: parts(many), ask: async () => ({ error: "no allowance left today" }), maxLines: 100, now: new Date("2026-10-01T00:00:00Z") });

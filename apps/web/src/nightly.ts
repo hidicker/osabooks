@@ -1,4 +1,4 @@
-import { allAiSuggestions, keepAiSuggestionsWith, restoreAiSuggestions } from "./ai.js";
+import { keepAiSuggestionsWith, keptAiAnswers, restoreAiSuggestions } from "./ai.js";
 import { readNightlyPart, writeNightlyPart } from "./store.js";
 import type { AiSuggestion } from "@nzosa/core";
 import type { UnsureLines } from "./nightly-run.js";
@@ -77,7 +77,7 @@ export async function restoreMorning(morning: Morning): Promise<number> {
 
 /** Keep what is on the lines now, e.g. after accepting some of them. */
 export async function keepSuggestionsNow(): Promise<void> {
-  await change((now) => ({ ...now, suggestions: { at: new Date().toISOString(), list: allAiSuggestions() } }));
+  await change((now) => ({ ...now, suggestions: { at: new Date().toISOString(), list: keptAiAnswers() } }));
 }
 
 /** The inbox has come in: empty it, so the same lines are not offered twice. */
