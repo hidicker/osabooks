@@ -98,6 +98,14 @@ export interface Invoice {
    */
   broughtForward?: Cents;
   /**
+   * Made in these books, not imported. Its payments are all here, so what it
+   * owed on the day the books start is known -- which an imported one's paid
+   * and outstanding figures, as of the export, do not say. Only one of these
+   * dated before the start is brought into the opening receivables or payables
+   * (see `owingAtStart`).
+   */
+  enteredHere?: boolean;
+  /**
    * An expense claim: owed to a person who paid it themselves, held in
    * Unpaid Expense Claims rather than Accounts Payable.
    */

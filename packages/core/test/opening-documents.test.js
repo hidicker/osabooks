@@ -2,10 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import {
   documentsInPlay,
+  historicalAccountIn,
   identifyExport,
   invoiceBalances,
   isAgedDetail,
+  openingDocumentJournals,
   openingDocumentsTotal,
+  owingAtStart,
   postLedger,
   readAgedDetail,
 } from "../dist/index.js";
@@ -152,6 +155,108 @@ test("an invoice dated before the start is not posted, one from the start is", (
   const text = JSON.stringify(journals);
   assert.match(text, /INV-0020/);
   assert.doesNotMatch(text, /INV-0010/);
+});
+
+// Made in these books: what it owed on the start day is known here.
+const keyed = (number, issued, total, kind = "sales", extra = {}) => ({
+  ...invoice(number, issued, total, kind), paid: 0, outstanding: total, enteredHere: true, ...extra,
+});
+const CHART = [
+  { code: "090", name: "BNZ 01", type: "Bank", taxCode: "No GST", description: "" },
+  { code: "200", name: "Sales", type: "Revenue", taxCode: "15% GST on Income", description: "" },
+  { code: "610", name: "Accounts Receivable", type: "Current Asset", taxCode: "No GST", description: "" },
+  { code: "800", name: "Accounts Payable", type: "Current Liability", taxCode: "No GST", description: "" },
+  { code: "840", name: "Historical Adjustment", type: "Historical", taxCode: "No GST", description: "" },
+  { code: "960", name: "Retained Earnings", type: "Retained Earnings", taxCode: "No GST", description: "" },
+];
+const postWith = (invoices, { transactions = [], settled = new Map(), openingFigures = {}, agedKinds = [] } = {}) =>
+  postLedger({
+    transactions, codeOf: () => "200 Sales", classify: () => ({ treatment: "exempt", side: "sales" }),
+    chart: CHART, bankLabels: new Map(), byId: new Map(transactions.map((t) => [t.id, t])),
+    invoices, settled, transfers: {}, manualJournals: [], startDate: "2025-04-01",
+    owingAtStart: { historical: historicalAccountIn(CHART), openingFigures, agedKinds },
+  });
+const sumOf = (journals, code) => journals.flatMap((j) => j.lines).filter((l) => l.accountCode === code).reduce((s, l) => s + l.amount, 0);
+
+test("Xero's way: an invoice made here before the start opens the receivable, against Historical Adjustment", () => {
+  const journals = postWith([keyed("INV-0005", "2025-03-10", 11500)]);
+  assert.equal(sumOf(journals, "610"), 11500, "owing on the start day");
+  assert.equal(sumOf(journals, "840"), -11500);
+  assert.equal(sumOf(journals, "200"), 0, "the sale was last year's: not posted again");
+  assert.equal(journals.find((j) => j.lines.some((l) => l.accountCode === "610")).date, "2025-04-01");
+  // And its receipt after the start clears it.
+  const receipt = {
+    id: "r1", date: "2025-04-20", account: "BNZ 01", amount: 11500, otherParty: "Rimu Cafe",
+    particulars: "", code: "", reference: "INV-0005", description: "", currency: "NZD", source: "bank",
+  };
+  const paid = postWith([keyed("INV-0005", "2025-03-10", 11500)], { transactions: [receipt], settled: new Map([["r1", "INV-0005"]]) });
+  assert.equal(sumOf(paid, "610"), 0, "raised on the start day, cleared by the receipt");
+});
+
+test("what was paid before the start is not owing; a bill opens the payable; a credit note turns round", () => {
+  const journals = postWith([
+    keyed("INV-0006", "2025-03-01", 20000, "sales", { paidOutside: [{ date: "2025-03-15", amount: 5000, accountCode: "090" }] }),
+    keyed("INV-0007", "2025-03-02", 8000, "sales", { paidOutside: [{ date: "2025-03-20", amount: 8000, accountCode: "090" }] }),
+    keyed("BILL-9", "2025-03-05", 3000, "purchase"),
+    keyed("CN-1", "2025-03-06", -1000),
+  ]);
+  assert.equal(sumOf(journals, "610"), 15000 - 1000, "150 still owing on INV-0006, nothing on INV-0007, less the credit");
+  assert.equal(sumOf(journals, "800"), -3000, "a bill is a credit to payables");
+  assert.equal(sumOf(journals, "840"), -(15000 - 1000) + 3000);
+});
+
+test("an opening figure as well is replaced by the documents, and the difference is said", () => {
+  const journals = postWith([keyed("INV-0005", "2025-03-10", 11500)], { openingFigures: { "610": 500000 } });
+  // Not 5,000 + 115: the documents are the opening receivable.
+  assert.equal(500000 + sumOf(journals, "610"), 11500);
+  assert.equal(sumOf(journals, "840"), 500000 - 11500, "what the figure and the documents differ by");
+  const { accounts } = openingDocumentJournals(
+    owingAtStart([keyed("INV-0005", "2025-03-10", 11500)], "2025-04-01", {
+      controlOf: () => ({ code: "610", name: "Accounts Receivable" }), agedKinds: [],
+    }),
+    { start: "2025-04-01", historical: historicalAccountIn(CHART), openingFigures: { "610": 500000 } },
+  );
+  assert.deepEqual(accounts.map((a) => [a.control.code, a.documents, a.opening, a.difference]), [["610", 11500, 500000, 488500]]);
+  // Where they agree, nothing is left over.
+  const same = postWith([keyed("INV-0005", "2025-03-10", 11500)], { openingFigures: { "610": 11500 } });
+  assert.equal(sumOf(same, "840"), 0);
+  assert.equal(11500 + sumOf(same, "610"), 11500);
+});
+
+test("left as they were: imported documents, drafts, kinds with an aged list, and books without the option", () => {
+  const imported = invoice("INV-0001", "2025-03-10", 11500); // no enteredHere: what it owed then is not known
+  const draft = keyed("INV-0002", "2025-03-10", 2000, "sales", { status: "Draft" });
+  const listed = keyed("BILL-2", "2025-03-10", 4000, "purchase");
+  const journals = postWith([imported, draft, listed], { agedKinds: ["purchase"], openingFigures: { "610": 500000 } });
+  assert.equal(sumOf(journals, "610"), 0, "and the opening figure is not touched when no document replaces it");
+  assert.equal(sumOf(journals, "800"), 0);
+  assert.equal(sumOf(journals, "840"), 0);
+  const without = postLedger({
+    transactions: [], codeOf: () => null, classify: () => ({ treatment: "exempt", side: "sales" }), chart: CHART,
+    bankLabels: new Map(), byId: new Map(), invoices: [keyed("INV-0005", "2025-03-10", 11500)],
+    settled: new Map(), transfers: {}, manualJournals: [], startDate: "2025-04-01",
+  });
+  assert.equal(sumOf(without, "610"), 0, "no owingAtStart option: as before");
+});
+
+test("the historical account: Historical Adjustment, else retained earnings, else none", () => {
+  assert.equal(historicalAccountIn(CHART).code, "840");
+  assert.equal(historicalAccountIn(CHART.filter((a) => a.code !== "840")).code, "960");
+  assert.equal(
+    historicalAccountIn([{ code: "3900", name: "Retained Earnings", type: "Equity", taxCode: "", description: "" }]).code,
+    "3900",
+    "QuickBooks' and SlowBooks' charts type it Equity",
+  );
+  assert.equal(historicalAccountIn(CHART.filter((a) => !["840", "960"].includes(a.code))), null);
+  // Several entities: each receivable balanced in its own entity's account.
+  const two = [
+    { code: "840KC", name: "Historical Adjustment", type: "Historical", taxCode: "", description: "" },
+    { code: "840MS", name: "Historical Adjustment", type: "Historical", taxCode: "", description: "" },
+    { code: "960RL", name: "Retained Earnings", type: "Retained Earnings", taxCode: "", description: "" },
+  ];
+  assert.equal(historicalAccountIn(two, "610MS").code, "840MS");
+  assert.equal(historicalAccountIn(two, "610RL").code, "960RL", "its own retained earnings before another's adjustment");
+  assert.equal(historicalAccountIn(two, "610XX").code, "840KC", "none of its own: the first there is");
 });
 
 test("a numbered bill on the same day as an open numberless one is not taken for it", async () => {

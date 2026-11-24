@@ -3,13 +3,13 @@ import { bankIdThenName, bankWithId } from "./balance-sheet-label.js";
 import { redraw, showPage } from "../app.js";
 import { XERO_TRIAL_BALANCE } from "../migrate/setup-wizard.js";
 import { feedStatus } from "../feed-route.js";
-import { accountsForEditing, bankLabel, ledgerAccountFor, ledgerFromStart, postedJournals, record } from "../books.js";
+import { accountsForEditing, bankLabel, ledgerAccountFor, ledgerFromStart, openingFromDocuments, postedJournals, record } from "../books.js";
 import { combobox } from "../combobox.js";
 import { $, state } from "../state.js";
 import { savePart } from "../store.js";
 import { chosenStartDate, sourceForTheseBooks, startOfFinancialYear } from "../migrate/onboarding-state.js";
 import { amountCell, nameCell, note } from "../ui.js";
-import { accountEntityKey, emptyEntityModel, financialYearBalances, localToday, parseAmount } from "@nzosa/core";
+import { accountEntityKey, emptyEntityModel, financialYearBalances, historicalAccountIn, localToday, parseAmount } from "@nzosa/core";
 import type { Account, Cents, FinancialYearBalances, IsoDate, OpeningBalances } from "@nzosa/core";
 import { asCsvText } from "../books.js";
 import { checkDailyBalances, dayAfter, daysBetween, formatAmount, openingBalancesFrom, parseTrialBalance, isQuickBooksTrialBalance, parseQuickBooksTrialBalance } from "@nzosa/core";
@@ -90,6 +90,28 @@ export function renderOpeningBalances(): void {
       ". The figures below start from these.";
   }
   body.append(status);
+
+  // Invoices and bills dated before the start, still owing then, make the
+  // opening receivables and payables, as in Xero. Where a figure was given for
+  // the account as well, the two are compared: what they differ by is left in
+  // the historical account until the rest are entered or the figure changed.
+  for (const account of openingFromDocuments()) {
+    const flip = account.documents < 0 || account.opening < 0 ? -1 : 1;
+    const said = document.createElement("p");
+    said.className = account.difference === 0 ? "journal-balanced" : "journal-out";
+    const docs = booksMoney(flip * account.documents);
+    said.textContent =
+      account.opening === 0
+        ? `${account.control.name} opens at ${docs}, made of the documents dated before the start that were still owing then.`
+        : account.difference === 0
+          ? `${account.control.name}: the documents dated before the start come to ${docs}, the same as its opening balance.`
+          : `${account.control.name}: the opening balance is ${booksMoney(flip * account.opening)}, but the documents dated ` +
+            `before the start that were still owing then come to ${docs}. The books use the documents, as Xero does, ` +
+            `and the ${booksMoney(Math.abs(account.difference))} between them is in ` +
+            `${historicalAccountIn(state.chart, account.control.code)?.name ?? "Historical Adjustment"} until the rest ` +
+            "are entered, or the opening balance is corrected.";
+    body.append(said);
+  }
 
   // Checking the bank's balance at other dates is a different job, on another
   // page; said here because this is where somebody looks for it first.
