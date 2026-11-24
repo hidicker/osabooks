@@ -5,6 +5,7 @@ import {
   AI_BATCH,
   AI_OWN_BATCH,
   DIRECTORY_VIA,
+  aiPayeeFor,
   aiSuggestionFor,
   askAboutLines,
   rateForSuggestion,
@@ -456,8 +457,12 @@ export async function acceptAllShown(): Promise<void> {
             ? rateToClassification(history.rate, one.transaction.amount)
             : accountDefault(code, one.transaction.amount)
           : null;
+      // The payee the model named, where only the bank's garbled text had: as
+      // the row showed it in "To", and as ticking the row would have saved it.
+      const payee = said !== undefined ? aiPayeeFor(one) : undefined;
       overrides[one.transaction.id] = {
         ...(code !== null ? { code } : {}),
+        ...(payee !== undefined ? { contact: payee } : {}),
         confirmed: true,
         treatment: own?.treatment ?? one.classification.treatment,
         side: own?.side ?? one.classification.side,

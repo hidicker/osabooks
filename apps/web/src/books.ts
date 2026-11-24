@@ -13,8 +13,11 @@ import { filedByPeriod, filedKey, sameRegistration,
   localToday,
   localStamp,
   documentKey,
+  historicalAccountIn,
+  owingAtStart,
+  openingDocumentJournals,
 } from "@nzosa/core";
-import type { CarriesGst } from "@nzosa/core";
+import type { CarriesGst, OpeningFromDocuments, PostLedgerOptions } from "@nzosa/core";
 import type { DocumentKey } from "@nzosa/core";
 import { appendEvent, makeEvent } from "./events.js";
 import type { EventKind } from "./events.js";
@@ -2599,6 +2602,41 @@ export function yearsSaid(years: readonly number[]): string {
   return named.length <= 1 ? (named[0] ?? "") : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
 }
 
+/**
+ * How documents dated before the start are brought in, Xero's way: their
+ * owing on the start day, against Historical Adjustment (or retained
+ * earnings). Null where the start is not known or the chart has neither.
+ */
+function owingAtStartOptions(): NonNullable<PostLedgerOptions["owingAtStart"]> | null {
+  if (booksStartKnown() === undefined) return null;
+  const any = historicalAccountIn(state.chart);
+  if (any === null) return null;
+  return {
+    // Each entity's receivable balanced in its own: 610KC in 840KC.
+    historical: (control) => historicalAccountIn(state.chart, control.code) ?? any,
+    openingFigures: state.ledger.openingBalances?.accounts ?? {},
+    agedKinds: (state.ledger.openingDocuments ?? []).map((list) => list.kind),
+  };
+}
+
+/**
+ * Per receivable or payable account, what the documents owing at the start
+ * make it, against the opening figure given for it. Empty when nothing dated
+ * before the start is brought in.
+ */
+export function openingFromDocuments(): OpeningFromDocuments[] {
+  const start = booksStartKnown();
+  const options = owingAtStartOptions();
+  if (start === undefined || options === null) return [];
+  const controlOf = (invoice: Invoice): { code: string; name: string } =>
+    documentControl(invoice) ??
+    (invoice.kind === "sales" ? { code: "610", name: "Accounts Receivable" } : { code: "800", name: "Accounts Payable" });
+  return openingDocumentJournals(
+    owingAtStart(invoicesInPlay(), start as IsoDate, { controlOf, agedKinds: options.agedKinds }),
+    { start: start as IsoDate, historical: options.historical, openingFigures: options.openingFigures },
+  ).accounts;
+}
+
 /** The coding of books with no bank lines: nothing to code. */
 const NO_BANK_LINES: CodingEngine = {
   transactions: [],
@@ -2647,6 +2685,7 @@ export function postedJournals(): PostedJournal[] {
     gstAccount: gstAccount(),
     gstAccountFor: gstAccountForEntities(),
     ...(booksStartKnown() !== undefined ? { startDate: booksStartKnown()! } : {}),
+    ...(owingAtStartOptions() !== null ? { owingAtStart: owingAtStartOptions()! } : {}),
     transfers: state.ledger.transfers ?? {},
     // A property manager's statement posts as a journal of its own, derived
     // each time so an edited statement cannot leave its old journal behind.
@@ -2793,7 +2832,13 @@ export function bookYears(): number[] {
     ...(state.ledger.prepayments ?? []).map((p) => p.from),
     // Invoices and bills are in the books too: books with only those, and no
     // bank file yet, had no year to report on.
-    ...(state.ledger.invoices ?? []).filter((i) => isPosted(i)).map((i) => i.issued),
+    // One dated before the start also makes the start's year: what it still
+    // owed opens the books on the start day. Its own year stays too -- books
+    // taken over from Xero are reported on for the year before they began.
+    ...(state.ledger.invoices ?? []).filter((i) => isPosted(i)).flatMap((i) => {
+      const start = booksStartKnown();
+      return start !== undefined && i.issued < start ? [i.issued, start] : [i.issued];
+    }),
   ];
   const years = new Set(dates.filter((d) => d !== "").map((d) => taxYearOf(d)));
   for (const use of state.ledger.vehicleUse ?? []) years.add(use.year);

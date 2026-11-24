@@ -73,6 +73,7 @@ import {
   storedFor,
   assignedFor,
   documentSource,
+  historicalAccountIn,
 } from "@nzosa/core";
 import type {
   DocumentKey,
@@ -563,12 +564,20 @@ export function renderInvoiceEditor(): void {
     // that list has it as owing: one entered since is kept in the file, not shown.
     const agedList = (state.ledger.openingDocuments ?? []).some((list) => list.kind === (asBill ? "purchase" : "sales"));
     const aged = asBill ? "aged payables" : "aged receivables";
-    beforeStart.textContent =
-      `Before these books start, on ${day}. It is not posted: what was ${asBill ? "owed to suppliers" : "owed to you"} on that day ` +
-      `goes in the opening balances, under ${asBill ? "accounts payable" : "accounts receivable"}. ` +
-      (agedList
-        ? `These books have the opening ${aged}, so it is kept but not shown here unless that list has it as still owing.`
-        : "Until it is there, it shows as owing here but is in no report.");
+    const control = asBill ? "accounts payable" : "accounts receivable";
+    // Without an aged list, one entered here is brought in as Xero does: what
+    // was still owing on it opens in the receivable or payable on the start day.
+    const broughtIn =
+      !agedList && historicalAccountIn(state.chart) !== null && (existing === undefined || existing.enteredHere === true);
+    beforeStart.textContent = broughtIn
+      ? `Before these books start, on ${day}. Its ${asBill ? "cost" : "sale"} was last year's and is not posted again; ` +
+        `what was still owing on it on that day opens in ${control}, as in Xero. Opening balances compares the ` +
+        `documents with any opening figure for ${control}.`
+      : `Before these books start, on ${day}. It is not posted: what was ${asBill ? "owed to suppliers" : "owed to you"} on that day ` +
+        `goes in the opening balances, under ${control}. ` +
+        (agedList
+          ? `These books have the opening ${aged}, so it is kept but not shown here unless that list has it as still owing.`
+          : "Until it is there, it shows as owing here but is in no report.");
   };
   issued.addEventListener("input", sayBeforeStart);
   issued.addEventListener("change", sayBeforeStart);
@@ -1138,6 +1147,9 @@ export function renderInvoiceEditor(): void {
       ...(emailValue !== "" ? { email: emailValue } : {}),
       ...(linkValue !== null ? { documentLink: linkValue } : {}),
       ...(messageValue !== "" ? { message: messageValue } : {}),
+      // Made here, so what it owed is known from these books: one dated before
+      // the start is brought into the opening receivables or payables.
+      ...(existing === undefined || existing.enteredHere === true ? { enteredHere: true } : {}),
       ...(asBill && entity.value !== ""
         ? { entityId: entity.value }
         : draft.entityId !== undefined

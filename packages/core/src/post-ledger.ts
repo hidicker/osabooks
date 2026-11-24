@@ -15,6 +15,8 @@ import {
 } from "./posting.js";
 import type { PostedJournal, PostingOptions } from "./posting.js";
 import { splitAccountLabel } from "./chart-codes.js";
+import { openingDocumentJournals, owingAtStart } from "./opening-documents.js";
+import type { IsoDate } from "./dates.js";
 import type { Transaction } from "./types.js";
 
 /**
@@ -80,11 +82,27 @@ export interface PostLedgerOptions {
   gstAccountFor?: (accountCode: string) => { code: string; name: string } | undefined;
   /**
    * The day the books start. An invoice or bill dated before it is not
-   * posted: its sale or cost is in a year the other system kept, and in the
-   * opening retained earnings, and what was still owing on it is in the
-   * opening receivables or payables. Posted again here, it counted twice.
+   * posted as a sale or cost: that is in a year the other system kept, and in
+   * the opening retained earnings. Posted again here, it counted twice.
    */
   startDate?: string;
+  /**
+   * What was still owing on documents dated before the start, brought in as
+   * Xero does: each one's owing to its receivable or payable on the start day,
+   * against the historical account, and the opening figure for that account
+   * moved out so it is not counted twice. See `owingAtStart`. Without this,
+   * nothing dated before the start is posted at all.
+   */
+  owingAtStart?: {
+    /** The account balancing them, or one for each receivable or payable. */
+    historical:
+      | { code: string; name: string }
+      | ((control: { code: string; name: string }) => { code: string; name: string });
+    /** Opening balances by account code, debit positive. */
+    openingFigures: Readonly<Record<string, number>>;
+    /** Kinds whose opening aged list is loaded: those are left as they are. */
+    agedKinds: readonly ("sales" | "purchase")[];
+  };
   /** Where an exchange difference on a conversion between two currencies goes. */
   exchangeAccount?: { code: string; name: string };
 }
@@ -245,6 +263,16 @@ export function postLedger(options: PostLedgerOptions): PostedJournal[] {
         },
       ),
     ),
+    ...(options.startDate !== undefined && options.owingAtStart !== undefined
+      ? openingDocumentJournals(
+          owingAtStart(invoices, options.startDate as IsoDate, { controlOf, agedKinds: options.owingAtStart.agedKinds }),
+          {
+            start: options.startDate as IsoDate,
+            historical: options.owingAtStart.historical,
+            openingFigures: options.owingAtStart.openingFigures,
+          },
+        ).journals
+      : []),
     ...(options.assetJournals ?? []),
     ...manualJournals
       .map((journal) => postManualJournal(journal, journalPosting))

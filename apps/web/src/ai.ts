@@ -19,6 +19,7 @@ import {
   splitAccountLabel,
   labelForCode,
   parseSuggestions,
+  hunchOf,
   wholePrompt,
 } from "@nzosa/core";
 import type { AiSuggestion, AskedAbout, EntityKind, JevOption } from "@nzosa/core";
@@ -61,6 +62,31 @@ const found = new Map<string, AiSuggestion>();
 
 export function aiSuggestionFor(id: string): AiSuggestion | undefined {
   return found.get(id);
+}
+
+/**
+ * What a model said about a line it would not code: "Possibly DeepSeek, an
+ * AI service; the name is garbled". Kept apart from the suggestions, so
+ * nothing is ever coded from it -- it is for the person reading the line.
+ * Emptied by a reload; asking again brings it back.
+ */
+const hunches = new Map<string, { because: string; via?: string; payee?: string }>();
+
+export function aiHunchFor(id: string): { because: string; via?: string; payee?: string } | undefined {
+  return found.has(id) ? undefined : hunches.get(id);
+}
+
+/**
+ * The payee name a model offered for a line, where nothing else has named
+ * the payee: no name typed on the line, and no rule's. Undefined otherwise --
+ * a person's or a rule's choice is never replaced by a model's.
+ */
+export function aiPayeeFor(line: { transaction: { id: string; otherParty?: string }; contact: string }): string | undefined {
+  const id = line.transaction.id;
+  if (state.ledger.overrides?.[id]?.contact !== undefined) return undefined;
+  if (line.contact !== (line.transaction.otherParty ?? "")) return undefined;
+  const offered = found.get(id)?.payee ?? hunches.get(id)?.payee;
+  return offered === undefined || offered === line.contact ? undefined : offered;
 }
 
 export function aiSuggestionCount(): number {
@@ -108,6 +134,7 @@ export function keepAiSuggestionsWith(keep: (all: AiSuggestion[]) => void): void
 
 export function forgetAiSuggestions(): void {
   found.clear();
+  hunches.clear();
   directoryFor = null;
 }
 
@@ -600,6 +627,17 @@ export function keepWhatIsUsable(
     // a queue of things to decide, and is not an invented account either.
     if (one.code === "") {
       blank += 1;
+      // Its hunch about who the line is, where it gave one, is still worth
+      // reading -- but only a reason it wrote, never the note this app puts
+      // on a code the chart does not have.
+      const hunch = hunchOf(one);
+      if (hunch !== null) {
+        hunches.set(one.id, {
+          because: hunch,
+          ...(via !== undefined ? { via } : {}),
+          ...(one.payee !== undefined ? { payee: one.payee } : {}),
+        });
+      }
       continue;
     }
     const label = labelForCode(one.code, labels);
@@ -628,7 +666,8 @@ export function keepWhatIsUsable(
     blank === 0
       ? ""
       : `${blank} of ${back.length} came back without an account: the model was not sure ` +
-        "enough to name one. Those lines are still waiting, for you or for a later ask.";
+        "enough to name one. Those lines are still waiting, for you or for a later ask; " +
+        "where it had a hunch who the payee is, the line says so.";
   return {
     got,
     said:

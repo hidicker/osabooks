@@ -87,6 +87,12 @@ export interface AiSuggestion {
   caution?: string;
   /** Where it came from, when that is not the configured model. */
   via?: string;
+  /**
+   * The counterparty's plain name, where the bank's text garbles it:
+   * "DeepSeek" for "DEEPSEERWEA 18658850911 USD1060". Offered as the line's
+   * "To" where nothing else named the payee; never coded from.
+   */
+  payee?: string;
 }
 
 /**
@@ -251,7 +257,15 @@ export function instructions(books: BooksBriefing): string {
     "  coded confidently is found at year end, if at all. A payment from a person could be",
     "  a customer, a loan, or an owner putting money in: if the books do not say which,",
     "  neither should you.",
-    "- Reply with JSON only: an array of {id, code, confidence, because}.",
+    "- An empty code still gets a because. If you have a hunch who the counterparty is --",
+    "  a bank feed often cuts or garbles a name, so \"KEACOFEERO\" may be Kea Coffee Roasters --",
+    "  say it there, as a hunch (\"Possibly Kea Coffee Roasters; the name is cut short\"), and",
+    "  still leave the code empty. A person reads it; nothing is coded from it.",
+    "- payee is the counterparty's everyday name, where the bank's text garbles or",
+    "  buries it: \"Kea Coffee Roasters\" for \"KEACOFEERO 0800123456 NZD42\". Leave it",
+    "  empty when the bank's text already says it plainly, or when you are not sure who",
+    "  it is. Never invent one.",
+    "- Reply with JSON only: an array of {id, code, confidence, because, payee}.",
     "  confidence is 0 to 1. because is one short sentence naming what in the",
     "  transaction led you there.",
     "",
@@ -427,6 +441,7 @@ export function parseSuggestions(
       typeof raw === "number" ? raw : typeof raw === "string" && raw.trim() !== "" ? Number(raw) : NaN;
     const confidence = Number.isFinite(asNumber) && asNumber >= 0 && asNumber <= 1 ? asNumber : 0;
     const because = typeof one["because"] === "string" ? one["because"].trim() : "";
+    const payee = plainPayee(one["payee"]);
 
     answered.add(id);
     found.push({
@@ -437,7 +452,37 @@ export function parseSuggestions(
         real === "" && code !== ""
           ? `Suggested ${code}, which is not in this chart of accounts.`
           : because,
+      ...(payee !== null ? { payee } : {}),
     });
   }
   return found;
+}
+
+/**
+ * A payee name as a model wrote it, made safe to put in a box: one line, no
+ * more than a name's length, or null for nothing usable. A sentence -- "the
+ * name is unclear" -- is not a name, and is dropped rather than filed as a
+ * contact.
+ */
+function plainPayee(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const name = raw.replace(/\s+/g, " ").trim();
+  if (name === "" || name.length > 60) return null;
+  // "Kea Coffee Ltd." is a name; "It is not clear who this is." is not.
+  if (/^(unknown|unclear|n\/?a|none|null|not sure)$/i.test(name) || /[!?]$/.test(name) || name.split(" ").length > 6) return null;
+  return name;
+}
+
+/**
+ * What a model thought a line it would not code might be -- "Possibly
+ * DeepSeek, an AI service; the name is garbled" -- or null. Only a reason it
+ * wrote for an empty code: a coded answer is a suggestion, not a hunch, and
+ * the note this module writes for a code the chart does not have is not the
+ * model's opinion of the payee.
+ */
+export function hunchOf(one: AiSuggestion): string | null {
+  if (one.code !== "") return null;
+  const said = one.because.trim();
+  if (said === "" || /^Suggested .*, which is not in this chart of accounts\.$/.test(said)) return null;
+  return said;
 }

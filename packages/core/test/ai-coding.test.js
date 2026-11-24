@@ -8,6 +8,7 @@ import {
   instructions,
   labelForCode,
   parseSuggestions,
+  hunchOf,
   unmatched,
   wholePrompt,
 } from "../dist/index.js";
@@ -99,6 +100,9 @@ test("the briefing carries what changes the right answer, not only the names", (
   assert.equal(said.includes("Trading account"), false);
   // And it is told to refuse rather than guess.
   assert.match(said, /return an\n {2}empty code rather than a guess/);
+  // But a hunch about who it is still comes back, for the person to read.
+  assert.match(said, /An empty code still gets a because/);
+  assert.match(said, /still leave the code empty/);
 });
 
 test("worked examples are one per payee, and the newest win", () => {
@@ -141,6 +145,57 @@ test("an answer is believed only where it names a code this chart has", () => {
   assert.equal(out[1].code, "");
   assert.equal(out[1].confidence, 0);
   assert.match(out[1].because, /9999, which is not in this chart/);
+});
+
+test("an uncoded line keeps the model's hunch about who it is, and nothing else does", () => {
+  const out = parseSuggestions(
+    JSON.stringify([
+      // Left uncoded, with a hunch: kept, for the person to read.
+      { id: "t1", code: "", confidence: 0.1, because: "Possibly DeepSeek, an AI service; the name is garbled" },
+      // Coded: a suggestion, not a hunch.
+      { id: "t2", code: "485", confidence: 0.9, because: "Anthropic is a subscription" },
+      // An invented code: the app's own note is not the model's view of the payee.
+      { id: "t3", code: "9999", confidence: 0.9, because: "Made this up" },
+      // Uncoded with nothing said, or only spaces.
+      { id: "t4", code: "", confidence: 0 },
+      { id: "t5", code: "", confidence: 0, because: "   " },
+    ]),
+    { asked: ["t1", "t2", "t3", "t4", "t5"], codes: ["485"] },
+  );
+  const hunches = Object.fromEntries(out.map((one) => [one.id, hunchOf(one)]));
+  assert.deepEqual(hunches, {
+    t1: "Possibly DeepSeek, an AI service; the name is garbled",
+    t2: null,
+    t3: null,
+    t4: null,
+    t5: null,
+  });
+  // And the hunch never becomes a code.
+  assert.equal(out[0].code, "");
+  assert.equal(out[0].confidence, 0);
+});
+
+test("a payee name comes back where the model gives a usable one, and only then", () => {
+  const out = parseSuggestions(
+    JSON.stringify([
+      { id: "t1", code: "485", confidence: 0.5, because: "AI service", payee: "  DeepSeek " },
+      { id: "t2", code: "485", confidence: 0.5, because: "x", payee: "" },
+      { id: "t3", code: "485", confidence: 0.5, because: "x", payee: "Unknown" },
+      { id: "t4", code: "485", confidence: 0.5, because: "x", payee: "It is not at all clear who this one could be?" },
+      { id: "t5", code: "485", confidence: 0.5, because: "x", payee: 42 },
+      { id: "t6", code: "", confidence: 0, because: "Possibly Kea Coffee Ltd.", payee: "Kea Coffee Ltd." },
+      { id: "t7", code: "485", confidence: 0.5, because: "x" },
+    ]),
+    { asked: ["t1", "t2", "t3", "t4", "t5", "t6", "t7"], codes: ["485"] },
+  );
+  assert.deepEqual(
+    out.map((one) => [one.id, one.payee]),
+    [["t1", "DeepSeek"], ["t2", undefined], ["t3", undefined], ["t4", undefined], ["t5", undefined], ["t6", "Kea Coffee Ltd."], ["t7", undefined]],
+  );
+  // The prompt asks for it, and says when to leave it empty.
+  const said = instructions({ ...briefing(model, chart, about), about: "" });
+  assert.match(said, /\{id, code, confidence, because, payee\}/);
+  assert.match(said, /Never invent one/);
 });
 
 test("nothing about a transaction nobody asked about gets through", () => {

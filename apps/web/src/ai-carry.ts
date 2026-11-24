@@ -1,4 +1,5 @@
 import { keepWhatIsUsable, promptToCarry, waitingForAnswers } from "./ai.js";
+import { redraw } from "./app.js";
 import { note } from "./ui.js";
 
 /**
@@ -146,6 +147,9 @@ export function carrySection(options: {
     // Trouble stays on screen: it is the one case where closing would throw
     // away the only account of what went wrong.
     if (done.said !== "") {
+      // The lines are drawn again all the same: one left uncoded may now
+      // carry what the model thought it was.
+      redraw("reconcile");
       said.textContent = done.said;
       return;
     }

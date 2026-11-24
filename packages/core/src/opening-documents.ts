@@ -4,6 +4,10 @@ import type { IsoDate } from "./dates.js";
 import { parseDate } from "./dates.js";
 import { parseCsvRecords } from "./csv.js";
 import type { Invoice, InvoiceKind } from "./invoices.js";
+import { invoiceBalances, isPosted } from "./invoices.js";
+import type { Account } from "./chart.js";
+import { documentKey } from "./document-key.js";
+import type { PostedJournal } from "./posting.js";
 
 /**
  * The invoices and bills still open on the day before the books start.
@@ -15,11 +19,15 @@ import type { Invoice, InvoiceKind } from "./invoices.js";
  * invoice or bill open on the day, and how much of it was still owing.
  *
  * That settles what happens to every document dated before the books start.
- * None is posted -- its sale or cost belongs to a year the other system kept,
- * and is already in the opening retained earnings. One that was open stays in
- * play, owing what the report says, so the payment that arrives later clears
- * the receivable it is part of. Every other one was paid before the books
- * began: it is history, offered for matching to nothing.
+ * None is posted as a sale or cost -- that belongs to a year the other system
+ * kept, and is already in the opening retained earnings. One that was open
+ * stays in play, owing what the report says, so the payment that arrives later
+ * clears the receivable it is part of. Every other one was paid before the
+ * books began: it is history, offered for matching to nothing.
+ *
+ * Without the report, a document made in these books is brought in as Xero
+ * does: what it still owed opens the receivable or payable on the start day,
+ * against Historical Adjustment (`owingAtStart`, `openingDocumentJournals`).
  */
 
 export interface OpeningDocument {
@@ -172,4 +180,174 @@ export function documentsInPlay(
 /** What the opening documents come to, against the opening balance for their control account. */
 export function openingDocumentsTotal(list: OpeningDocuments): Cents {
   return list.items.reduce((sum, item) => sum + item.owing, 0);
+}
+
+/**
+ * Where a document owed before the books start is balanced: Xero's Historical
+ * Adjustment, or -- in a chart without one, such as QuickBooks' -- retained
+ * earnings, where last year's sale or cost belongs. Null when the chart has
+ * neither, and then nothing is posted from before the start.
+ */
+export function historicalAccountIn(
+  chart: readonly Account[],
+  /**
+   * The receivable or payable it balances, where the books keep several
+   * entities: 610KC is balanced in 840KC, so each entity's own balance sheet
+   * still balances.
+   */
+  forCode?: string,
+): { code: string; name: string } | null {
+  const ending = (code: string): string => /^\d+([A-Za-z]{1,3})$/.exec(code.trim())?.[1] ?? "";
+  const wanted = forCode === undefined ? undefined : ending(forCode);
+  const kinds: ((a: Account) => boolean)[] = [
+    (a) => a.type.trim().toLowerCase() === "historical",
+    (a) => /historical adjustment/i.test(a.name),
+    (a) => /retained earnings/i.test(a.type),
+    (a) => /equity/i.test(a.type) && /retained/i.test(a.name),
+  ];
+  // The entity's own first, of any of the kinds; then any at all.
+  const passes: ((a: Account) => boolean)[] =
+    wanted === undefined ? [() => true] : [(a) => ending(a.code) === wanted, () => true];
+  for (const pass of passes) {
+    for (const kind of kinds) {
+      const found = chart.find((a) => kind(a) && pass(a));
+      if (found !== undefined) return { code: found.code, name: found.name };
+    }
+  }
+  return null;
+}
+
+export type HistoricalAccount = { code: string; name: string };
+
+/** A document dated before the start that was still owing on it. */
+export interface OwingAtStart {
+  invoice: Invoice;
+  control: { code: string; name: string };
+  /** Owing on the start day: positive for an invoice or bill, negative for a credit note. */
+  owing: Cents;
+}
+
+/**
+ * The documents dated before the books start that were still owing then, as
+ * far as these books can tell.
+ *
+ * Xero's way: the opening receivables and payables are made of the documents
+ * open on the day, not typed in as one figure. Only where the amount owing on
+ * the start day is known here, though:
+ *
+ * - a document made in these books (`enteredHere`): its total, less what it
+ *   says was paid outside the bank before the start -- as the Invoices page
+ *   counts it;
+ * - not one of a kind whose opening aged list is loaded -- that list already
+ *   says what was owing, and the documents on it are carried forward as they
+ *   always were;
+ * - not one imported from another system without that list: its paid and
+ *   outstanding figures are as of the export, not the start, so what it owed
+ *   then is not known.
+ */
+export function owingAtStart(
+  invoices: readonly Invoice[],
+  start: IsoDate,
+  options: {
+    controlOf: (invoice: Invoice) => { code: string; name: string };
+    /** Kinds whose opening aged list is loaded. */
+    agedKinds: readonly InvoiceKind[];
+  },
+): OwingAtStart[] {
+  const out: OwingAtStart[] = [];
+  for (const invoice of invoices) {
+    if (invoice.issued >= start || !isPosted(invoice) || invoice.receipt === true) continue;
+    if (options.agedKinds.includes(invoice.kind) || invoice.broughtForward !== undefined) continue;
+    if (invoice.enteredHere !== true) continue;
+    const before = { ...invoice, paidOutside: (invoice.paidOutside ?? []).filter((p) => p.date < start) };
+    const balance = invoiceBalances([before], []).get(documentKey(invoice));
+    const owing = balance?.remaining ?? 0;
+    if (owing === 0) continue;
+    out.push({ invoice, control: options.controlOf(invoice), owing });
+  }
+  return out;
+}
+
+/** Per control account: what the documents make it, against the opening figure. */
+export interface OpeningFromDocuments {
+  control: { code: string; name: string };
+  /** What the documents come to, debit positive. */
+  documents: Cents;
+  /** The opening balance typed or imported for the account, debit positive. */
+  opening: Cents;
+  /** `opening` less `documents`: left in the historical account until it is explained. */
+  difference: Cents;
+}
+
+/**
+ * The journals that bring documents owing at the start into the books, on the
+ * start day, and what each control account then holds.
+ *
+ * Each document posts its owing to its receivable or payable against the
+ * historical account -- not to sales or costs, which were last year's. Where an
+ * opening figure was also given for that account it is moved out to the
+ * historical account, so the documents are the opening figure, as in Xero, and
+ * nothing is counted twice. A difference between the two is then what is left
+ * in the historical account, and is said.
+ */
+export function openingDocumentJournals(
+  owing: readonly OwingAtStart[],
+  options: {
+    start: IsoDate;
+    /** The account balancing them, or one for each receivable or payable (see `historicalAccountIn`). */
+    historical: HistoricalAccount | ((control: { code: string; name: string }) => HistoricalAccount);
+    /** Opening balances by account code, debit positive. */
+    openingFigures: Readonly<Record<string, Cents>>;
+  },
+): { journals: PostedJournal[]; accounts: OpeningFromDocuments[] } {
+  const journals: PostedJournal[] = [];
+  const byControl = new Map<string, OpeningFromDocuments>();
+  const { start } = options;
+  const historicalFor = (control: { code: string; name: string }): HistoricalAccount =>
+    typeof options.historical === "function" ? options.historical(control) : options.historical;
+  for (const one of owing) {
+    const historical = historicalFor(one.control);
+    const sale = one.invoice.kind === "sales";
+    // Debit positive: an invoice owed to us is a debit to receivables, a bill
+    // owed by us a credit to payables; a credit note turns either round.
+    const toControl = sale ? one.owing : -one.owing;
+    const who = [one.invoice.number, one.invoice.contact].filter((s) => s.trim() !== "").join(" ");
+    journals.push({
+      transactionId: `start:${documentKey(one.invoice)}`,
+      date: start,
+      narration: `Owing at the start: ${who}, dated ${one.invoice.issued}`,
+      lines: [
+        { accountCode: one.control.code, accountName: one.control.name, amount: toControl, taxType: "NONE", description: who },
+        { accountCode: historical.code, accountName: historical.name, amount: -toControl, taxType: "NONE", description: who },
+      ],
+      source: "manual",
+      taxBasis: "both",
+      document: documentKey(one.invoice),
+    });
+    const held = byControl.get(one.control.code) ?? {
+      control: one.control,
+      documents: 0,
+      opening: options.openingFigures[one.control.code] ?? 0,
+      difference: 0,
+    };
+    held.documents += toControl;
+    byControl.set(one.control.code, held);
+  }
+  const accounts = [...byControl.values()].map((a) => ({ ...a, difference: a.opening - a.documents }));
+  for (const account of accounts) {
+    if (account.opening === 0) continue;
+    const historical = historicalFor(account.control);
+    journals.push({
+      transactionId: `start:opening:${account.control.code}`,
+      date: start,
+      narration: `Opening ${account.control.name} taken from the documents open at the start`,
+      lines: [
+        { accountCode: account.control.code, accountName: account.control.name, amount: -account.opening, taxType: "NONE", description: "Opening balance, now made of documents" },
+        { accountCode: historical.code, accountName: historical.name, amount: account.opening, taxType: "NONE", description: "Opening balance, now made of documents" },
+      ],
+      source: "manual",
+      taxBasis: "both",
+    });
+  }
+  return { journals, accounts };
 }

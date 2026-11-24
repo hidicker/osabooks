@@ -46,7 +46,7 @@ import type { RuleFileShape } from "../rules-ui.js";
 import { splitEditor } from "../split-ui.js";
 import { $, state } from "../state.js";
 import { startNewAccount } from "./entities.js";
-import { DIRECTORY_VIA, aiSuggestionFor, rateForSuggestion, suggestFromDirectory } from "../ai.js";
+import { DIRECTORY_VIA, aiHunchFor, aiPayeeFor, aiSuggestionFor, rateForSuggestion, suggestFromDirectory } from "../ai.js";
 import { save, savePart } from "../store.js";
 import { askOnPage, dollars, note, tellOnPage } from "../ui.js";
 import { fillAccounts, unresolvedNote } from "../widgets.js";
@@ -473,6 +473,8 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
   // thing -- something to agree with or change -- and refusing to put it there
   // would mean retyping an answer that is already on screen.
   const fromModel = one.code === null ? aiSuggestionFor(one.transaction.id) : undefined;
+  // What a model thought the line might be, where it would not code it.
+  const hunch = one.code === null && fromModel === undefined ? aiHunchFor(one.transaction.id) : undefined;
   // What was typed on this line and not yet confirmed, so confirming another
   // line -- which redraws the list -- does not throw it away.
   const draft = drafts.get(one.transaction.id) ?? {};
@@ -548,10 +550,16 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
   to.type = "text";
   to.className = "code-contact";
   to.placeholder = "To";
-  to.value = draft.contact ?? one.contact;
+  // Where only the bank named the payee, and garbled it, the name a model
+  // offered: "DeepSeek" for "DEEPSEERWEA 18658850911 USD1060". Only offered --
+  // ticking the line is what saves it.
+  const offeredPayee = one.confirmed ? undefined : aiPayeeFor(one);
+  to.value = draft.contact ?? offeredPayee ?? one.contact;
   to.addEventListener("input", () => keep({ contact: to.value }));
   to.title =
-    "Who the money went to or came from. Set it for all matching lines on the Rules page.";
+    (offeredPayee !== undefined && draft.contact === undefined
+      ? `Named by the AI; the bank said "${one.contact}". `
+      : "") + "Who the money went to or came from. Set it for all matching lines on the Rules page.";
 
   const description = document.createElement("input");
   description.type = "text";
@@ -657,10 +665,13 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
               ` · ${fromModel.because}`) +
           (fromModel.caution === undefined ? "" : ` · ${fromModel.caution}`) +
           (fromHistory === null || noSalesTax() ? "" : ` · GST ${fromHistory.why}`)
+        : hunch !== undefined
+          ? // Said as not a suggestion: nothing is in the picker from it.
+            `AI left this uncoded${hunch.via === undefined ? "" : ` (${hunch.via})`} · ${hunch.because}`
         : noSalesTax()
           ? one.reason
           : `${taxTypeLabel(rateLabel(one.classification))} · ${one.reason}`;
-  if (fromModel !== undefined) reason.classList.add("code-reason-ai");
+  if (fromModel !== undefined || hunch !== undefined) reason.classList.add("code-reason-ai");
 
   /**
    * What the row now says, once something on it has been changed by hand.
