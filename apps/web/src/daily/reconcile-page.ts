@@ -46,7 +46,7 @@ import type { RuleFileShape } from "../rules-ui.js";
 import { splitEditor } from "../split-ui.js";
 import { $, state } from "../state.js";
 import { startNewAccount } from "./entities.js";
-import { DIRECTORY_VIA, aiHunchFor, aiSuggestionFor, rateForSuggestion, suggestFromDirectory } from "../ai.js";
+import { DIRECTORY_VIA, aiHunchFor, aiPayeeFor, aiSuggestionFor, rateForSuggestion, suggestFromDirectory } from "../ai.js";
 import { save, savePart } from "../store.js";
 import { askOnPage, dollars, note, tellOnPage } from "../ui.js";
 import { fillAccounts, unresolvedNote } from "../widgets.js";
@@ -550,10 +550,16 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
   to.type = "text";
   to.className = "code-contact";
   to.placeholder = "To";
-  to.value = draft.contact ?? one.contact;
+  // Where only the bank named the payee, and garbled it, the name a model
+  // offered: "DeepSeek" for "DEEPSEERWEA 18658850911 USD1060". Only offered --
+  // ticking the line is what saves it.
+  const offeredPayee = one.confirmed ? undefined : aiPayeeFor(one);
+  to.value = draft.contact ?? offeredPayee ?? one.contact;
   to.addEventListener("input", () => keep({ contact: to.value }));
   to.title =
-    "Who the money went to or came from. Set it for all matching lines on the Rules page.";
+    (offeredPayee !== undefined && draft.contact === undefined
+      ? `Named by the AI; the bank said "${one.contact}". `
+      : "") + "Who the money went to or came from. Set it for all matching lines on the Rules page.";
 
   const description = document.createElement("input");
   description.type = "text";

@@ -70,10 +70,23 @@ export function aiSuggestionFor(id: string): AiSuggestion | undefined {
  * nothing is ever coded from it -- it is for the person reading the line.
  * Emptied by a reload; asking again brings it back.
  */
-const hunches = new Map<string, { because: string; via?: string }>();
+const hunches = new Map<string, { because: string; via?: string; payee?: string }>();
 
-export function aiHunchFor(id: string): { because: string; via?: string } | undefined {
+export function aiHunchFor(id: string): { because: string; via?: string; payee?: string } | undefined {
   return found.has(id) ? undefined : hunches.get(id);
+}
+
+/**
+ * The payee name a model offered for a line, where nothing else has named
+ * the payee: no name typed on the line, and no rule's. Undefined otherwise --
+ * a person's or a rule's choice is never replaced by a model's.
+ */
+export function aiPayeeFor(line: { transaction: { id: string; otherParty?: string }; contact: string }): string | undefined {
+  const id = line.transaction.id;
+  if (state.ledger.overrides?.[id]?.contact !== undefined) return undefined;
+  if (line.contact !== (line.transaction.otherParty ?? "")) return undefined;
+  const offered = found.get(id)?.payee ?? hunches.get(id)?.payee;
+  return offered === undefined || offered === line.contact ? undefined : offered;
 }
 
 export function aiSuggestionCount(): number {
@@ -618,7 +631,13 @@ export function keepWhatIsUsable(
       // reading -- but only a reason it wrote, never the note this app puts
       // on a code the chart does not have.
       const hunch = hunchOf(one);
-      if (hunch !== null) hunches.set(one.id, { because: hunch, ...(via !== undefined ? { via } : {}) });
+      if (hunch !== null) {
+        hunches.set(one.id, {
+          because: hunch,
+          ...(via !== undefined ? { via } : {}),
+          ...(one.payee !== undefined ? { payee: one.payee } : {}),
+        });
+      }
       continue;
     }
     const label = labelForCode(one.code, labels);

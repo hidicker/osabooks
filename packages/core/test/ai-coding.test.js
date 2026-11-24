@@ -175,6 +175,29 @@ test("an uncoded line keeps the model's hunch about who it is, and nothing else 
   assert.equal(out[0].confidence, 0);
 });
 
+test("a payee name comes back where the model gives a usable one, and only then", () => {
+  const out = parseSuggestions(
+    JSON.stringify([
+      { id: "t1", code: "485", confidence: 0.5, because: "AI service", payee: "  DeepSeek " },
+      { id: "t2", code: "485", confidence: 0.5, because: "x", payee: "" },
+      { id: "t3", code: "485", confidence: 0.5, because: "x", payee: "Unknown" },
+      { id: "t4", code: "485", confidence: 0.5, because: "x", payee: "It is not at all clear who this one could be?" },
+      { id: "t5", code: "485", confidence: 0.5, because: "x", payee: 42 },
+      { id: "t6", code: "", confidence: 0, because: "Possibly Kea Coffee Ltd.", payee: "Kea Coffee Ltd." },
+      { id: "t7", code: "485", confidence: 0.5, because: "x" },
+    ]),
+    { asked: ["t1", "t2", "t3", "t4", "t5", "t6", "t7"], codes: ["485"] },
+  );
+  assert.deepEqual(
+    out.map((one) => [one.id, one.payee]),
+    [["t1", "DeepSeek"], ["t2", undefined], ["t3", undefined], ["t4", undefined], ["t5", undefined], ["t6", "Kea Coffee Ltd."], ["t7", undefined]],
+  );
+  // The prompt asks for it, and says when to leave it empty.
+  const said = instructions({ ...briefing(model, chart, about), about: "" });
+  assert.match(said, /\{id, code, confidence, because, payee\}/);
+  assert.match(said, /Never invent one/);
+});
+
 test("nothing about a transaction nobody asked about gets through", () => {
   const out = parseSuggestions('[{"id":"someone-elses","code":"200","confidence":1}]', {
     asked: ["t1"],
