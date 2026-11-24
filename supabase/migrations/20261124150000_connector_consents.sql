@@ -49,5 +49,5 @@ begin
 end;
 $$;
 
-revoke all on function public.note_connector_consent(uuid) from public;
+revoke all on function public.note_connector_consent(uuid) from public, anon;
 grant execute on function public.note_connector_consent(uuid) to authenticated;
