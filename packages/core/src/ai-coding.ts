@@ -445,3 +445,17 @@ export function parseSuggestions(
   }
   return found;
 }
+
+/**
+ * What a model thought a line it would not code might be -- "Possibly
+ * DeepSeek, an AI service; the name is garbled" -- or null. Only a reason it
+ * wrote for an empty code: a coded answer is a suggestion, not a hunch, and
+ * the note this module writes for a code the chart does not have is not the
+ * model's opinion of the payee.
+ */
+export function hunchOf(one: AiSuggestion): string | null {
+  if (one.code !== "") return null;
+  const said = one.because.trim();
+  if (said === "" || /^Suggested .*, which is not in this chart of accounts\.$/.test(said)) return null;
+  return said;
+}

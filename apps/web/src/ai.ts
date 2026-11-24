@@ -19,6 +19,7 @@ import {
   splitAccountLabel,
   labelForCode,
   parseSuggestions,
+  hunchOf,
   wholePrompt,
 } from "@nzosa/core";
 import type { AiSuggestion, AskedAbout, EntityKind, JevOption } from "@nzosa/core";
@@ -616,9 +617,8 @@ export function keepWhatIsUsable(
       // Its hunch about who the line is, where it gave one, is still worth
       // reading -- but only a reason it wrote, never the note this app puts
       // on a code the chart does not have.
-      if (one.because !== "" && !/^Suggested .*, which is not in this chart/.test(one.because)) {
-        hunches.set(one.id, { because: one.because, ...(via !== undefined ? { via } : {}) });
-      }
+      const hunch = hunchOf(one);
+      if (hunch !== null) hunches.set(one.id, { because: hunch, ...(via !== undefined ? { via } : {}) });
       continue;
     }
     const label = labelForCode(one.code, labels);
