@@ -1,4 +1,4 @@
-import { AI_OWN_BATCH, allAiSuggestions, askAboutLines, restoreAiSuggestions, suggestFromDirectory, waitingForAnswers } from "./ai.js";
+import { AI_OWN_BATCH, allAiSuggestions, askAboutLines, keptAiAnswers, restoreAiSuggestions, suggestFromDirectory, waitingForAnswers } from "./ai.js";
 import type { AiAnswer, AskedLines } from "./ai-backend.js";
 import { applyCountryRules } from "./country.js";
 import { feedLinesForBooks, mergeIncoming } from "./daily/bank-import.js";
@@ -66,7 +66,10 @@ export interface MorningResult {
   added: number;
   /** What the feed gave, as it gave it, for the inbox. */
   items: unknown[];
+  /** Kept beside the books: suggestions, and hunches on lines left uncoded (an empty code). */
   suggestions: AiSuggestion[];
+  /** How many of them name an account. */
+  suggested: number;
   said: string;
   /** What the model could not answer, to be kept for the next morning. */
   unsure: UnsureLines;
@@ -139,16 +142,20 @@ export async function morningRun(input: MorningInput): Promise<MorningResult> {
   }
   const stillWaiting = new Set(waitingForAnswers().map((one) => one.transaction.id));
   for (const id of Object.keys(unsure)) if (!stillWaiting.has(id)) delete unsure[id];
-  const suggestions = allAiSuggestions();
+  // The hunches on lines left uncoded too, so the morning shows them.
+  const suggestions = keptAiAnswers();
+  // Counted as suggestions only where they name an account: a hunch is not one.
+  const suggested = suggestions.filter((one) => one.code !== "").length;
   return {
     added,
     items,
     suggestions,
+    suggested,
     unsure: { signature, ids: unsure },
     said: [
       `${added} new line${added === 1 ? "" : "s"} from the bank`,
       `${known} suggested from the list of known businesses`,
-      `${suggestions.length} suggestion${suggestions.length === 1 ? "" : "s"} waiting in all`,
+      `${suggested} suggestion${suggested === 1 ? "" : "s"} waiting in all`,
       input.ask === undefined ? "no AI asked" : `${asked} line${asked === 1 ? "" : "s"} asked of the AI`,
       ...said,
     ].join("; "),

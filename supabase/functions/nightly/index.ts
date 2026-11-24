@@ -143,7 +143,8 @@ async function runBook(book: string): Promise<string> {
   const said = result.said + (ownKey ? "" : key !== null && detectProvider(key.key) === "jev"
     ? "; a Jev key is not asked in the morning yet"
     : "; no key of the books' own, or AI is off for them");
-  const ran = { at, added: result.added, suggested: result.suggestions.length, said };
+  // Lines given an account; the list also keeps hunches on lines left uncoded.
+  const ran = { at, added: result.added, suggested: result.suggested, said };
   await rpc("nightly_put", {
     book,
     value: {

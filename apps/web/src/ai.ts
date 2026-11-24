@@ -10,6 +10,7 @@ import {
   accountForBusiness,
   askAbout,
   businessOf,
+  chargesNzGst,
   describeBusiness,
   briefing,
   directionCaution,
@@ -68,11 +69,20 @@ export function aiSuggestionFor(id: string): AiSuggestion | undefined {
  * What a model said about a line it would not code: "Possibly DeepSeek, an
  * AI service; the name is garbled". Kept apart from the suggestions, so
  * nothing is ever coded from it -- it is for the person reading the line.
- * Emptied by a reload; asking again brings it back.
+ * Kept beside the books with the suggestions (`keptAiAnswers`), so a reload
+ * or the morning's run does not lose it.
  */
-const hunches = new Map<string, { because: string; via?: string; payee?: string }>();
+type Hunch = { because: string; via?: string; payee?: string; nzGst?: "charges" | "none" };
+const hunches = new Map<string, Hunch>();
 
-export function aiHunchFor(id: string): { because: string; via?: string; payee?: string } | undefined {
+/** The parts of an answer a hunch keeps, beside what it said. */
+const hunchExtras = (one: Pick<AiSuggestion, "via" | "payee" | "nzGst">, via = one.via): Omit<Hunch, "because"> => ({
+  ...(via !== undefined ? { via } : {}),
+  ...(one.payee !== undefined ? { payee: one.payee } : {}),
+  ...(one.nzGst !== undefined ? { nzGst: one.nzGst } : {}),
+});
+
+export function aiHunchFor(id: string): Hunch | undefined {
   return found.has(id) ? undefined : hunches.get(id);
 }
 
@@ -93,9 +103,21 @@ export function aiSuggestionCount(): number {
   return found.size;
 }
 
-/** Every suggestion held, to keep beside the books between openings. */
+/** Every suggestion held: lines the model gave an account. */
 export function allAiSuggestions(): AiSuggestion[] {
   return [...found.values()];
+}
+
+/**
+ * What to keep beside the books between openings: every suggestion, and every
+ * hunch about a line left uncoded -- an answer with an empty code, which
+ * `restoreAiSuggestions` puts back as a hunch, never as a suggestion.
+ */
+export function keptAiAnswers(): AiSuggestion[] {
+  const uncoded: AiSuggestion[] = [...hunches]
+    .filter(([id]) => !found.has(id))
+    .map(([id, hunch]) => ({ id, code: "", confidence: 0, because: hunch.because, ...hunchExtras(hunch) }));
+  return [...found.values(), ...uncoded];
 }
 
 /**
@@ -117,6 +139,12 @@ export function restoreAiSuggestions(kept: readonly AiSuggestion[], replace = fa
     // Replacing: what the person asked their own AI app for wins over a
     // guess nobody asked for.
     if (!waiting.has(one.id) || (found.has(one.id) && !replace)) continue;
+    // An uncoded answer comes back as the hunch it was, never as a suggestion.
+    if (one.code.trim() === "") {
+      const hunch = hunchOf(one);
+      if (hunch !== null && !hunches.has(one.id)) hunches.set(one.id, { because: hunch, ...hunchExtras(one) });
+      continue;
+    }
     const label = labelForCode(splitAccountLabel(one.code).code || one.code, labels);
     if (label === null) continue;
     found.set(one.id, { ...one, code: label });
@@ -409,9 +437,11 @@ export function paidInForeignCurrency(transaction: Suggestion["transaction"]): b
  *
  * The same payee on the same account, most recent first: a Wise payment for
  * stock was coded without GST every time, and suggesting Cost of Goods Sold at
- * the account's 15% undid that. With no history, a line paid in another
- * currency is an overseas supplier, where NZ GST is charged only sometimes --
- * 0% until the receipt says otherwise. Null leaves it to the account.
+ * the account's 15% undid that. With no history, an overseas business known
+ * to charge NZ GST (overseas-gst.ts) is 15%: most businesses have not given
+ * it a GST number, which is what would make it charge none. Otherwise a line
+ * paid in another currency is an overseas supplier not known to charge NZ
+ * GST -- 0% until the receipt says otherwise. Null leaves it to the account.
  */
 export function rateForSuggestion(
   transaction: Suggestion["transaction"],
@@ -438,8 +468,14 @@ export function rateForSuggestion(
       return { rate: classificationToRate(before.classification), why: `as ${before.transaction.date}'s was` };
     }
   }
+  if (booksCountry().id === "nz") {
+    const business = businessOf(transaction, "nz");
+    if (business !== null && chargesNzGst(business.name)) {
+      return { rate: "15", why: `15%: ${business.name} charges NZ GST unless given a GST number. Check the receipt` };
+    }
+  }
   if (paidInForeignCurrency(transaction)) {
-    return { rate: "0", why: "paid overseas: 0% unless the receipt shows NZ GST" };
+    return { rate: "0", why: "0%: an overseas supplier not known to charge NZ GST. Check the receipt" };
   }
   return null;
 }
@@ -499,9 +535,8 @@ export async function askAboutLines(
   if (answer.error !== undefined) return { got: 0, said: answer.error, failed: true };
   // Where the answer came from matters a year later: a suggestion made on the
   // shared key was made on a model somebody else chose and paid for.
-  const kept = keepWhatIsUsable(answer.text ?? "", asked, codes, answer.demo === true ? "shared key" : undefined);
-  if (kept.got > 0) keeper?.(allAiSuggestions());
-  return kept;
+  // Kept beside the books by keepWhatIsUsable itself.
+  return keepWhatIsUsable(answer.text ?? "", asked, codes, answer.demo === true ? "shared key" : undefined);
 }
 
 const KIND_WORDS: Record<EntityKind, string> = {
@@ -622,6 +657,7 @@ export function keepWhatIsUsable(
   let got = 0;
   let invented = 0;
   let blank = 0;
+  let hunched = 0;
   for (const one of back) {
     // A blank is the model saying it does not know, which is worth nothing on
     // a queue of things to decide, and is not an invented account either.
@@ -632,11 +668,8 @@ export function keepWhatIsUsable(
       // on a code the chart does not have.
       const hunch = hunchOf(one);
       if (hunch !== null) {
-        hunches.set(one.id, {
-          because: hunch,
-          ...(via !== undefined ? { via } : {}),
-          ...(one.payee !== undefined ? { payee: one.payee } : {}),
-        });
+        hunches.set(one.id, { because: hunch, ...hunchExtras(one, via) });
+        hunched += 1;
       }
       continue;
     }
@@ -658,8 +691,13 @@ export function keepWhatIsUsable(
       ...(caution !== undefined ? { caution } : {}),
       ...(via !== undefined ? { via } : {}),
     });
+    // Coded now: a hunch from an earlier ask has been answered.
+    hunches.delete(one.id);
     got += 1;
   }
+  // Kept beside the books, whichever way the answer came -- asked here or
+  // pasted back -- so a reload does not lose it.
+  if (got > 0 || hunched > 0) keeper?.(keptAiAnswers());
   // Said, because silence read as a fault: twenty asked, three shown, and
   // nothing to say the other seventeen were the model declining to guess.
   const unsure =
