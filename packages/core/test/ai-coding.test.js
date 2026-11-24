@@ -194,8 +194,24 @@ test("a payee name comes back where the model gives a usable one, and only then"
   );
   // The prompt asks for it, and says when to leave it empty.
   const said = instructions({ ...briefing(model, chart, about), about: "" });
-  assert.match(said, /\{id, code, confidence, because, payee\}/);
+  assert.match(said, /\{id, code, confidence, because, payee, nzGst\}/);
   assert.match(said, /Never invent one/);
+});
+
+test("the model's view of NZ GST comes back only as charges or none, and is only a view", () => {
+  const out = parseSuggestions(
+    JSON.stringify([
+      { id: "t1", code: "485", confidence: 0.6, because: "x", nzGst: "charges" },
+      { id: "t2", code: "", confidence: 0, because: "Possibly DeepSeek", nzGst: " None " },
+      { id: "t3", code: "485", confidence: 0.6, because: "x", nzGst: "maybe" },
+      { id: "t4", code: "485", confidence: 0.6, because: "x", nzGst: 15 },
+      { id: "t5", code: "485", confidence: 0.6, because: "x" },
+    ]),
+    { asked: ["t1", "t2", "t3", "t4", "t5"], codes: ["485"] },
+  );
+  assert.deepEqual(out.map((one) => one.nzGst), ["charges", "none", undefined, undefined, undefined]);
+  const said = instructions({ ...briefing(model, chart, about), about: "" });
+  assert.match(said, /it does not set the rate/);
 });
 
 test("nothing about a transaction nobody asked about gets through", () => {

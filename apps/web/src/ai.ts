@@ -10,6 +10,7 @@ import {
   accountForBusiness,
   askAbout,
   businessOf,
+  chargesNzGst,
   describeBusiness,
   briefing,
   directionCaution,
@@ -71,9 +72,17 @@ export function aiSuggestionFor(id: string): AiSuggestion | undefined {
  * Kept beside the books with the suggestions (`keptAiAnswers`), so a reload
  * or the morning's run does not lose it.
  */
-const hunches = new Map<string, { because: string; via?: string; payee?: string }>();
+type Hunch = { because: string; via?: string; payee?: string; nzGst?: "charges" | "none" };
+const hunches = new Map<string, Hunch>();
 
-export function aiHunchFor(id: string): { because: string; via?: string; payee?: string } | undefined {
+/** The parts of an answer a hunch keeps, beside what it said. */
+const hunchExtras = (one: Pick<AiSuggestion, "via" | "payee" | "nzGst">, via = one.via): Omit<Hunch, "because"> => ({
+  ...(via !== undefined ? { via } : {}),
+  ...(one.payee !== undefined ? { payee: one.payee } : {}),
+  ...(one.nzGst !== undefined ? { nzGst: one.nzGst } : {}),
+});
+
+export function aiHunchFor(id: string): Hunch | undefined {
   return found.has(id) ? undefined : hunches.get(id);
 }
 
@@ -107,14 +116,7 @@ export function allAiSuggestions(): AiSuggestion[] {
 export function keptAiAnswers(): AiSuggestion[] {
   const uncoded: AiSuggestion[] = [...hunches]
     .filter(([id]) => !found.has(id))
-    .map(([id, hunch]) => ({
-      id,
-      code: "",
-      confidence: 0,
-      because: hunch.because,
-      ...(hunch.via !== undefined ? { via: hunch.via } : {}),
-      ...(hunch.payee !== undefined ? { payee: hunch.payee } : {}),
-    }));
+    .map(([id, hunch]) => ({ id, code: "", confidence: 0, because: hunch.because, ...hunchExtras(hunch) }));
   return [...found.values(), ...uncoded];
 }
 
@@ -140,13 +142,7 @@ export function restoreAiSuggestions(kept: readonly AiSuggestion[], replace = fa
     // An uncoded answer comes back as the hunch it was, never as a suggestion.
     if (one.code.trim() === "") {
       const hunch = hunchOf(one);
-      if (hunch !== null && !hunches.has(one.id)) {
-        hunches.set(one.id, {
-          because: hunch,
-          ...(one.via !== undefined ? { via: one.via } : {}),
-          ...(one.payee !== undefined ? { payee: one.payee } : {}),
-        });
-      }
+      if (hunch !== null && !hunches.has(one.id)) hunches.set(one.id, { because: hunch, ...hunchExtras(one) });
       continue;
     }
     const label = labelForCode(splitAccountLabel(one.code).code || one.code, labels);
@@ -441,9 +437,11 @@ export function paidInForeignCurrency(transaction: Suggestion["transaction"]): b
  *
  * The same payee on the same account, most recent first: a Wise payment for
  * stock was coded without GST every time, and suggesting Cost of Goods Sold at
- * the account's 15% undid that. With no history, a line paid in another
- * currency is an overseas supplier, where NZ GST is charged only sometimes --
- * 0% until the receipt says otherwise. Null leaves it to the account.
+ * the account's 15% undid that. With no history, an overseas business known
+ * to charge NZ GST (overseas-gst.ts) is 15%: most businesses have not given
+ * it a GST number, which is what would make it charge none. Otherwise a line
+ * paid in another currency is an overseas supplier not known to charge NZ
+ * GST -- 0% until the receipt says otherwise. Null leaves it to the account.
  */
 export function rateForSuggestion(
   transaction: Suggestion["transaction"],
@@ -470,8 +468,14 @@ export function rateForSuggestion(
       return { rate: classificationToRate(before.classification), why: `as ${before.transaction.date}'s was` };
     }
   }
+  if (booksCountry().id === "nz") {
+    const business = businessOf(transaction, "nz");
+    if (business !== null && chargesNzGst(business.name)) {
+      return { rate: "15", why: `15%: ${business.name} charges NZ GST unless given a GST number. Check the receipt` };
+    }
+  }
   if (paidInForeignCurrency(transaction)) {
-    return { rate: "0", why: "paid overseas: 0% unless the receipt shows NZ GST" };
+    return { rate: "0", why: "0%: an overseas supplier not known to charge NZ GST. Check the receipt" };
   }
   return null;
 }
@@ -664,11 +668,7 @@ export function keepWhatIsUsable(
       // on a code the chart does not have.
       const hunch = hunchOf(one);
       if (hunch !== null) {
-        hunches.set(one.id, {
-          because: hunch,
-          ...(via !== undefined ? { via } : {}),
-          ...(one.payee !== undefined ? { payee: one.payee } : {}),
-        });
+        hunches.set(one.id, { because: hunch, ...hunchExtras(one, via) });
         hunched += 1;
       }
       continue;

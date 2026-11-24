@@ -93,6 +93,12 @@ export interface AiSuggestion {
    * "To" where nothing else named the payee; never coded from.
    */
   payee?: string;
+  /**
+   * The model's view of whether an overseas supplier charges NZ GST, where it
+   * gave one. Shown beside the line; never sets the rate -- a guess about tax
+   * does not go into a return on its own.
+   */
+  nzGst?: "charges" | "none";
 }
 
 /**
@@ -265,7 +271,11 @@ export function instructions(books: BooksBriefing): string {
     "  buries it: \"Kea Coffee Roasters\" for \"KEACOFEERO 0800123456 NZD42\". Leave it",
     "  empty when the bank's text already says it plainly, or when you are not sure who",
     "  it is. Never invent one.",
-    "- Reply with JSON only: an array of {id, code, confidence, because, payee}.",
+    "- nzGst, only for a supplier outside New Zealand: \"charges\" if you know it charges",
+    "  NZ GST to a customer who has not given it a GST number, \"none\" if you know it does",
+    "  not, and empty otherwise or when unsure. It is shown to a person beside the receipt;",
+    "  it does not set the rate.",
+    "- Reply with JSON only: an array of {id, code, confidence, because, payee, nzGst}.",
     "  confidence is 0 to 1. because is one short sentence naming what in the",
     "  transaction led you there.",
     "",
@@ -442,6 +452,8 @@ export function parseSuggestions(
     const confidence = Number.isFinite(asNumber) && asNumber >= 0 && asNumber <= 1 ? asNumber : 0;
     const because = typeof one["because"] === "string" ? one["because"].trim() : "";
     const payee = plainPayee(one["payee"]);
+    const gstView = typeof one["nzGst"] === "string" ? one["nzGst"].trim().toLowerCase() : "";
+    const nzGst = gstView === "charges" || gstView === "none" ? gstView : null;
 
     answered.add(id);
     found.push({
@@ -453,6 +465,7 @@ export function parseSuggestions(
           ? `Suggested ${code}, which is not in this chart of accounts.`
           : because,
       ...(payee !== null ? { payee } : {}),
+      ...(nzGst !== null ? { nzGst } : {}),
     });
   }
   return found;

@@ -664,14 +664,26 @@ function renderLine(one: Suggestion, codes: readonly string[]): HTMLElement {
               (fromModel.confidence > 0 ? `, ${Math.round(fromModel.confidence * 100)}% sure` : "") +
               ` · ${fromModel.because}`) +
           (fromModel.caution === undefined ? "" : ` · ${fromModel.caution}`) +
-          (fromHistory === null || noSalesTax() ? "" : ` · GST ${fromHistory.why}`)
+          (fromHistory === null || noSalesTax() ? "" : ` · GST ${fromHistory.why}`) +
+          aiGstView(fromModel.nzGst, fromHistory)
         : hunch !== undefined
           ? // Said as not a suggestion: nothing is in the picker from it.
-            `AI left this uncoded${hunch.via === undefined ? "" : ` (${hunch.via})`} · ${hunch.because}`
+            `AI left this uncoded${hunch.via === undefined ? "" : ` (${hunch.via})`} · ${hunch.because}` +
+            aiGstView(hunch.nzGst, null)
         : noSalesTax()
           ? one.reason
           : `${taxTypeLabel(rateLabel(one.classification))} · ${one.reason}`;
   if (fromModel !== undefined || hunch !== undefined) reason.classList.add("code-reason-ai");
+
+  /**
+   * What the model thinks of an overseas supplier's NZ GST, beside the rate:
+   * read with the receipt, never used to set it. Left out where the person's
+   * own earlier coding of this payee set the rate -- that is the answer.
+   */
+  function aiGstView(view: "charges" | "none" | undefined, rate: { why: string } | null): string {
+    if (view === undefined || noSalesTax() || rate?.why.startsWith("as ") === true) return "";
+    return view === "charges" ? " · The AI thinks it charges NZ GST" : " · The AI thinks it charges no NZ GST";
+  }
 
   /**
    * What the row now says, once something on it has been changed by hand.
