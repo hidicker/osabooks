@@ -20,13 +20,14 @@ BASE="${WEBDISK_BASE:-https://nbparagliding.nz:2078}"
 DIST_APP=apps/web/dist-moved TARGET=app bash tools/deploy-webdisk.sh
 
 # The demo folder: every request forwarded, before any file in it is served.
-cat > /tmp/demo-forward.htaccess <<'EOF'
+# Streamed to the upload, not written to a file in /tmp first, where another
+# user on the machine could have put one in its place (Antigravity L10).
+curl -sS --fail -o /dev/null -u "${WEBDISK_DEMO_USER:?WEBDISK_DEMO_USER is not set}:$WEBDISK_PASSWORD" \
+  -T - "$BASE/.htaccess" <<'EOF'
 # The demo moved to https://demo.osabooks.app on 23 November 2026.
 RewriteEngine On
 RewriteRule ^(.*)$ https://demo.osabooks.app/$1 [R=301,L,QSA]
 EOF
-curl -sS --fail -o /dev/null -u "${WEBDISK_DEMO_USER:?WEBDISK_DEMO_USER is not set}:$WEBDISK_PASSWORD" \
-  -T /tmp/demo-forward.htaccess "$BASE/.htaccess"
 for tries in 1 2 3 4 5 6; do
   where=$(curl -sS -o /dev/null -w '%{redirect_url}' "https://nbparagliding.nz/osabooks_demo/?v=$RANDOM")
   case "$where" in https://demo.osabooks.app/*) echo "nbparagliding.nz/osabooks_demo forwards to $where"; exit 0;; esac
