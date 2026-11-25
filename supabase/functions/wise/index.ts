@@ -184,14 +184,14 @@ Deno.serve(async (request: Request) => {
       }
       const start = String(body.start ?? "");
       // In windows of a year: Wise accepts at most 469 days in one.
-      // Clamp start to a sensible floor and cap windows so a bad date cannot loop endlessly.
-      const FLOOR = Date.UTC(2011, 0, 1);
+      // Clamp start to the most recent 15 years so a bad date cannot loop endlessly or drop recent months.
       const MAX_WINDOWS = 15;
+      const stop = Date.now();
+      const FLOOR = stop - MAX_WINDOWS * 365 * 86_400_000;
       const transactions: unknown[] = [];
-      const parsed = Date.parse(start !== "" ? start : new Date(Date.now() - 365 * 86_400_000).toISOString());
+      const parsed = Date.parse(start !== "" ? start : new Date(stop - 365 * 86_400_000).toISOString());
       if (Number.isNaN(parsed)) return reply({ error: "invalid start date" }, 400);
       let at = Math.max(parsed, FLOOR);
-      const stop = Date.now();
       let closing: unknown = null;
       let windows = 0;
       while (at < stop && windows < MAX_WINDOWS) {

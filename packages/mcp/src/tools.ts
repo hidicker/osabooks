@@ -129,6 +129,9 @@ function belongs(books: Books, transaction: Transaction, code: string | null, en
 }
 
 function entitiesOfInvoice(books: Books, invoice: Invoice): readonly string[] {
+  if (invoice.entityId !== undefined && invoice.entityId !== "") {
+    return [invoice.entityId];
+  }
   const ids = new Set<string>();
   for (const line of invoice.lines ?? []) {
     const key = splitAccountLabel(line.accountCode).code || line.accountCode;

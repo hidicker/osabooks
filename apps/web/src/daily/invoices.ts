@@ -4,7 +4,7 @@ import { moduleOn } from "../modules.js";
 import { creditOnAccountSection, usedInPart } from "./credit-ui.js";
 import { attachmentsControl } from "./attachments-ui.js";
 import { openQuickEntry } from "./quick-entry.js";
-import { cardPaymentSaid, checkCardPayments, checkCardPaymentsButton, payLinkFor, stripeConnected } from "./stripe-ui.js";
+import { cardPaymentSaid, checkCardPayments, checkCardPaymentsButton, closePayLink, payLinkFor, stripeConnected } from "./stripe-ui.js";
 import { COMMON_CURRENCIES } from "./currencies-page.js";
 import { giveDocument, heldJobs, jobChoices } from "./jobs-page.js";
 import type { InvoiceMessage } from "../store.js";
@@ -1545,7 +1545,9 @@ export async function voidDocument(doc: Invoice, options: { ask: boolean; why?: 
   if (options.ask && !(await askOnPage(`Void ${doc.number}? It comes out of the books and stays listed, marked Voided. The change log can undo it.`))) {
     return false;
   }
+  await closePayLink(doc);
   const after: Invoice = { ...doc, status: "Voided" };
+  if (after.payLink !== undefined && after.payLink.paidAt === undefined) delete after.payLink;
   const before = state.ledger.invoices ?? [];
   state.ledger = { ...state.ledger, invoices: before.map((i) => (documentKey(i) === documentKey(doc) ? after : i)) };
   state.persistent = await savePart(state.ledger, "invoices");
