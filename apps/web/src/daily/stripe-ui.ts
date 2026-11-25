@@ -123,6 +123,14 @@ export async function payLinkFor(invoice: Invoice): Promise<void> {
   }
 }
 
+/** Close an unpaid Stripe payment link on an invoice (e.g. when voiding). */
+export async function closePayLink(invoice: Invoice): Promise<void> {
+  const link = invoice.payLink;
+  if (link === undefined || link.paidAt !== undefined || !stripePossible()) return;
+  const book = openCloudBookId();
+  await callFunction("stripe", { action: "close", book, id: link.id }).catch(() => undefined);
+}
+
 /**
  * Ask Stripe which links have been paid, and say so on their invoices.
  * Each time Invoices is opened, at most once a minute; at once when asked.
@@ -132,7 +140,9 @@ export async function checkCardPayments(force = false): Promise<number> {
   // Recording what Stripe says is a change to the books: not for somebody who may only read them.
   if (!stripePossible() || booksReadOnly() || (!force && checked.book === book && Date.now() - checked.at < 60_000)) return 0;
   checked = { book, at: Date.now() };
-  const open = (state.ledger.invoices ?? []).filter((i) => i.payLink !== undefined && i.payLink.paidAt === undefined);
+  const open = (state.ledger.invoices ?? []).filter(
+    (i) => i.payLink !== undefined && i.payLink.paidAt === undefined && i.status !== "Voided",
+  );
   if (open.length === 0) return 0;
   const connected = await stripeStatus();
   if (connected === null || !connected.configured) return 0;
