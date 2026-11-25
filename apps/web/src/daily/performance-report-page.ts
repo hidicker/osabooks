@@ -248,7 +248,7 @@ export function renderPerformancePage(): void {
       previousInputs: inputsFor(entity, year - 1),
     });
     const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-    window.open(url, "_blank");
+    window.open(url, "_blank", "noopener,noreferrer");
     setTimeout(() => URL.revokeObjectURL(url), 60_000);
   });
   status.append(open);

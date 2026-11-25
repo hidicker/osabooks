@@ -52,7 +52,7 @@ function said(value: unknown, where: string, max = 300): string {
 }
 
 /** An account as these books name it, from a full name or the code alone. */
-function account(books: Books, value: unknown, where: string): string {
+function account(books: Books, context: ToolContext, value: unknown, where: string): string {
   if (typeof value !== "string" || value.trim() === "") {
     throw new ToolError(`${where}: give an account from list_accounts.`);
   }
@@ -67,6 +67,12 @@ function account(books: Books, value: unknown, where: string): string {
     exact ?? (byName.length === 1 ? byName[0] : undefined) ?? labelForCode(splitAccountLabel(wanted).code || wanted, books.labels);
   if (found === undefined || found === null) {
     throw new ToolError(`${where}: these books have no account "${wanted}". Use one from list_accounts.`);
+  }
+  if (context.allowed !== undefined) {
+    const owner = books.entities.accounts[splitAccountLabel(found).code];
+    if (owner !== undefined && !context.allowed.has(owner)) {
+      throw new ToolError(`${where}: account "${found}" belongs to an entity this server may not access.`);
+    }
   }
   return found;
 }
@@ -164,7 +170,7 @@ export const SUGGEST_TOOLS: Tool[] = [
         const now = books.engine?.codeOf(t) ?? null;
         if (now !== null) throw new ToolError(`${where}: line ${t.id} is already coded to ${now}. Only uncoded lines take a suggested code.`);
         if (books.split.has(t.id)) throw new ToolError(`${where}: line ${t.id} is split already.`);
-        items.push({ kind: "coding", transaction: t.id, code: account(books, given["account"], where), because: said(given["because"], where) });
+        items.push({ kind: "coding", transaction: t.id, code: account(books, context, given["account"], where), because: said(given["because"], where) });
       }
       return keep(context, items);
     },
@@ -208,7 +214,7 @@ export const SUGGEST_TOOLS: Tool[] = [
         const note = text(part, "note");
         return {
           amount: cents(part["amount"], `parts[${i}]`),
-          code: account(books, part["account"], `parts[${i}]`),
+          code: account(books, context, part["account"], `parts[${i}]`),
           ...(note !== undefined ? { note: note.slice(0, 200) } : {}),
         };
       });
@@ -274,7 +280,7 @@ export const SUGGEST_TOOLS: Tool[] = [
         if (amount <= 0) throw new ToolError(`${where}: the amount must be more than nothing.`);
         const description = text(given, "description");
         return {
-          code: account(books, given["account"], where),
+          code: account(books, context, given["account"], where),
           debit: hasDebit ? amount : 0,
           credit: hasCredit ? amount : 0,
           ...(description !== undefined ? { description: description.slice(0, 200) } : {}),
@@ -324,7 +330,7 @@ export const SUGGEST_TOOLS: Tool[] = [
     inputSchema: { type: "object", properties: { entity: { type: "string" } }, additionalProperties: false },
     run(args, context) {
       const books = context.shelf.get();
-      scope(books, context, args);
+      const entity = scope(books, context, args);
       let held: unknown = undefined;
       try {
         const textHeld = context.shelf.sandbox.readSuggested();
@@ -332,9 +338,23 @@ export const SUGGEST_TOOLS: Tool[] = [
       } catch {
         held = undefined;
       }
-      const waiting = suggestionsWaiting(readSuggestedFile(held), books.suggestionsDone).filter(
-        (one) => one.item.kind !== "show",
-      );
+      const allowedSet = entity !== null ? new Set([entity]) : context.allowed;
+      const waiting = suggestionsWaiting(readSuggestedFile(held), books.suggestionsDone).filter(({ item }) => {
+        if (item.kind === "show") return false;
+        if (allowedSet === undefined) return true;
+        if (item.kind === "coding" || item.kind === "split") {
+          const t = books.transactions.find((x) => x.id === item.transaction);
+          if (t === undefined) return false;
+          return entitiesOfLine(books, t, books.engine?.codeOf(t) ?? null).some((e) => allowedSet.has(e));
+        }
+        if (item.kind === "journal") {
+          return item.lines.every((l) => {
+            const owner = books.entities.accounts[splitAccountLabel(l.code).code];
+            return owner === undefined || allowedSet.has(owner);
+          });
+        }
+        return false;
+      });
       return {
         waiting: waiting.length,
         suggestions: waiting.slice(0, context.maxRows).map(({ set, item }) => {

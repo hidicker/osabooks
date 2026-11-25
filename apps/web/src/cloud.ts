@@ -247,16 +247,27 @@ export async function sessionFromUrl(): Promise<boolean> {
   const refreshToken = params.get("refresh_token");
   if (accessToken === null || refreshToken === null) return false;
 
-  const claims = claimsOf(accessToken);
-  remember({
-    userId: claims.sub ?? "",
-    email: claims.email ?? "",
-    accessToken,
-    refreshToken,
-    expiresAt: Math.floor(Date.now() / 1000) + Number(params.get("expires_in") ?? 3600),
-  });
   history.replaceState(null, "", location.pathname + location.search);
-  return true;
+  // Refuse to silently replace an active session from a URL fragment (login CSRF).
+  if (session !== null || recall() !== null) return false;
+  try {
+    const check = await fetch(`${CLOUD.url}/auth/v1/user`, {
+      headers: { apikey: CLOUD.publishableKey, Authorization: `Bearer ${accessToken}` },
+    });
+    if (!check.ok) return false;
+    const user = (await check.json().catch(() => null)) as { id?: string; email?: string } | null;
+    if (typeof user?.id !== "string" || user.id === "") return false;
+    remember({
+      userId: user.id,
+      email: typeof user.email === "string" ? user.email : (claimsOf(accessToken).email ?? ""),
+      accessToken,
+      refreshToken,
+      expiresAt: Math.floor(Date.now() / 1000) + Number(params.get("expires_in") ?? 3600),
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 let authError: string | null = null;

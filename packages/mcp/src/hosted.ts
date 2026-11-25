@@ -32,6 +32,8 @@ export interface HostedAnswer {
   suggested: unknown;
 }
 
+const MAX_BATCH = 20;
+
 export function answerHosted(request: HostedRequest): HostedAnswer {
   const source = new PartsSource(request.parts, request.name);
   const context = {
@@ -40,13 +42,26 @@ export function answerHosted(request: HostedRequest): HostedAnswer {
     maxRows: 200,
     suggest: request.suggest,
     client: request.client,
+    clientLocked: true,
   };
-  const messages = Array.isArray(request.body) ? request.body : [request.body];
-  const replies = messages
-    .map((message) => handle(message as Message, context))
-    .filter((reply) => reply !== undefined);
+  if (Array.isArray(request.body)) {
+    if (request.body.length > MAX_BATCH) {
+      return {
+        reply: { jsonrpc: "2.0", id: null, error: { code: -32600, message: `Too many requests in one batch (maximum ${MAX_BATCH}).` } },
+        suggested: undefined,
+      };
+    }
+    const replies = request.body
+      .map((message) => handle(message as Message, context))
+      .filter((reply) => reply !== undefined);
+    return {
+      reply: replies.length > 0 ? replies : undefined,
+      suggested: source.written === undefined ? undefined : JSON.parse(source.written),
+    };
+  }
+  const reply = handle(request.body as Message, context);
   return {
-    reply: Array.isArray(request.body) ? (replies.length > 0 ? replies : undefined) : replies[0],
+    reply,
     suggested: source.written === undefined ? undefined : JSON.parse(source.written),
   };
 }

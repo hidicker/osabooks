@@ -54,7 +54,11 @@ jobs:
             echo "The SUPABASE_ACCESS_TOKEN secret is not set." >&2
             exit 1
           fi
-          if [ "$CHOSEN" = "all" ]; then names="akahu wise gemini gemini-demo nightly signup-alert mcp reminders stripe invite"; else names="$CHOSEN"; fi
+          case "$CHOSEN" in
+            all) names="akahu wise gemini gemini-demo nightly signup-alert mcp reminders stripe invite" ;;
+            akahu|wise|gemini|gemini-demo|nightly|signup-alert|mcp|reminders|stripe|invite) names="$CHOSEN" ;;
+            *) echo "Unknown function: $CHOSEN" >&2; exit 1 ;;
+          esac
           for name in $names; do
             echo "Deploying $name"
             # Called with no Supabase sign-in, each checking its caller itself: the morning run,
@@ -63,5 +67,5 @@ jobs:
             # turn them all away (gemini-demo was missing here, and would have been).
             flags=""
             case "$name" in nightly|signup-alert|mcp|reminders|gemini-demo) flags="--no-verify-jwt" ;; esac
-            npx --yes supabase functions deploy "$name" $flags --use-api --project-ref "$PROJECT_REF" --yes
+            npx --yes supabase@3.4.0 functions deploy "$name" $flags --use-api --project-ref "$PROJECT_REF" --yes
           done
