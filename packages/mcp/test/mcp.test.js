@@ -84,7 +84,7 @@ test("the server lists its tools, and every one is read-only by name", () => {
   const names = answer.result.tools.map((t) => t.name);
   assert.deepEqual(names, [
     "list_entities", "search_transactions", "get_unreconciled_transactions",
-    "get_coding_progress", "check_daily_balances", "list_accounts",
+    "get_coding_progress", "check_daily_balances", "search_invoices", "list_accounts",
   ]);
   for (const name of names) assert.doesNotMatch(name, /^(set|write|post|delete|update|create)_/);
 });
@@ -309,4 +309,63 @@ test("a folder holding several sets of books still starts, and says why it canno
   assert.equal(hello.result.serverInfo.name, "osabooks");
   assert.equal(answer.result.isError, true);
   assert.match(answer.result.content[0].text, /holds 2 sets of books.*Change the books folder/);
+});
+
+test("search_invoices finds invoices by contact, number or line description and hides voided by default", () => {
+  const { folder } = books();
+  writeFileSync(
+    join(folder, "invoices.json"),
+    JSON.stringify({
+      version: 1,
+      data: [
+        {
+          number: "INV-0148",
+          kind: "sales",
+          contact: "James Martyn",
+          reference: "Course",
+          issued: "2026-05-15",
+          due: "2026-05-22",
+          total: 85800,
+          tax: 11191,
+          status: "Paid",
+          lines: [
+            { description: "PG2 paragliding course", accountCode: "200RE", taxType: "15% GST on Income", net: 74609, tax: 11191, gross: 85800 },
+          ],
+        },
+        {
+          number: "INV-0149",
+          kind: "sales",
+          contact: "James Martyn",
+          reference: "Mistake",
+          issued: "2026-05-16",
+          due: "2026-05-23",
+          total: 10000,
+          tax: 1304,
+          status: "Voided",
+          lines: [
+            { description: "Duplicate", accountCode: "200RE", taxType: "15% GST on Income", net: 8696, tax: 1304, gross: 10000 },
+          ],
+        },
+      ],
+    }),
+  );
+  const ctx = context(folder);
+  const byName = call(ctx, "search_invoices", { entity: "rental", query: "James Martyn" });
+  assert.equal(byName.total, 1, "voided invoice hidden by default");
+  assert.equal(byName.rows[0].number, "INV-0148");
+  assert.equal(byName.rows[0].total, "858.00");
+  assert.equal(byName.rows[0].text.contact, "James Martyn");
+  assert.equal(byName.rows[0].lines[0].text.description, "PG2 paragliding course");
+
+  const byDesc = call(ctx, "search_invoices", { entity: "rental", query: "paragliding" });
+  assert.equal(byDesc.total, 1);
+
+  const byNum = call(ctx, "search_invoices", { entity: "rental", number: "148" });
+  assert.equal(byNum.total, 1);
+
+  const withVoided = call(ctx, "search_invoices", { entity: "rental", query: "James", includeVoided: true });
+  assert.equal(withVoided.total, 2);
+
+  const wrongEntity = call(ctx, "search_invoices", { entity: "personal", query: "James" });
+  assert.equal(wrongEntity.total, 0);
 });

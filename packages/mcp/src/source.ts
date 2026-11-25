@@ -13,6 +13,7 @@ export const BOOK_FILES = [
   "entities.json",
   "chart.json",
   "rules.json",
+  "invoices.json",
   "ledger.json",
 ] as const;
 
@@ -36,6 +37,7 @@ const PART_OF: Record<BookFile, string> = {
   "entities.json": "entities",
   "chart.json": "chart",
   "rules.json": "rules",
+  "invoices.json": "invoices",
   "ledger.json": "",
 };
 
