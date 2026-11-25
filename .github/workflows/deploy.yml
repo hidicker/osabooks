@@ -83,4 +83,6 @@ jobs:
         if: inputs.target != 'old'
         # Pages, demo books, the old addresses, the extension, and the AI
         # connector refusing a request with no sign-in. Reads only.
-        run: node tools/after-deploy.mjs ${{ inputs.target }}
+        env:
+          TARGET: ${{ inputs.target }}
+        run: node tools/after-deploy.mjs "$TARGET"

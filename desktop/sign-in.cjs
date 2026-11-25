@@ -75,6 +75,8 @@ function openSignInWindow(parent, url, onReturn) {
       partition: `sign-in-${require("node:crypto").randomUUID()}`,
     },
   });
+  signIn.webContents.session.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  signIn.webContents.session.setPermissionCheckHandler(() => false);
   signIn.on("page-title-updated", (event) => event.preventDefault());
   let back = false;
   const watch = (event, to) => {

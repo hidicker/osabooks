@@ -22,8 +22,9 @@ import { context } from "esbuild";
 import { createServer } from "node:http";
 import { execFileSync } from "node:child_process";
 import { homedir, tmpdir } from "node:os";
-import { createHash } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import {
+  chmodSync,
   copyFileSync,
   createReadStream,
   existsSync,
@@ -273,9 +274,22 @@ function send(response, status, body, type = "application/json; charset=utf-8") 
   response.end(typeof body === "string" ? body : JSON.stringify(body));
 }
 
-async function readBody(request) {
+const MAX_BODY_BYTES = 50 * 1024 * 1024;
+
+/** A request body larger than this server accepts: answered 413. */
+class PayloadTooLarge extends Error {}
+
+async function readBody(request, maxBytes = MAX_BODY_BYTES) {
   const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
+  let total = 0;
+  for await (const chunk of request) {
+    total += chunk.length;
+    if (total > maxBytes) {
+      request.destroy();
+      throw new PayloadTooLarge("the request body is too large");
+    }
+    chunks.push(chunk);
+  }
   return Buffer.concat(chunks).toString("utf8");
 }
 
@@ -392,8 +406,9 @@ export function secretFile(root, name) {
   const old = join(root, name);
   if (!existsSync(file) && existsSync(old)) {
     try {
-      mkdirSync(folder, { recursive: true });
+      mkdirSync(folder, { recursive: true, mode: 0o700 });
       copyFileSync(old, file);
+      try { chmodSync(file, 0o600); } catch { /* Windows NTFS ignores POSIX mode */ }
       rmSync(old, { force: true });
     } catch {
       // Left where it was: read from there this time, moved next time.
@@ -401,6 +416,32 @@ export function secretFile(root, name) {
     }
   }
   return file;
+}
+
+/** Optional OS-backed secret sealer (Electron safeStorage DPAPI / Keychain) set by desktop/main.cjs. */
+let activeSecretBox = null;
+
+function readSecretJson(file) {
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    if (parsed && typeof parsed === "object" && parsed.v === 1 && typeof parsed.sealed === "string") {
+      if (!activeSecretBox) return {};
+      const inner = JSON.parse(activeSecretBox.open(parsed.sealed));
+      return inner && typeof inner === "object" ? inner : {};
+    }
+    return parsed && typeof parsed === "object" ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function writeSecretJson(file, store) {
+  mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
+  const raw = JSON.stringify(store, null, 1);
+  const out = activeSecretBox ? JSON.stringify({ v: 1, sealed: activeSecretBox.seal(raw) }) : raw;
+  const temporary = `${file}.writing`;
+  writeFileSync(temporary, out, { mode: 0o600 });
+  renameSync(temporary, file);
 }
 
 /**
@@ -414,11 +455,7 @@ export function secretFile(root, name) {
  * set of books finds no connection, which is the truth.
  */
 function readStore(root) {
-  try {
-    return JSON.parse(readFileSync(feedFile(root), "utf8"));
-  } catch {
-    return {};
-  }
+  return readSecretJson(feedFile(root));
 }
 
 function readFeed(root, ledger) {
@@ -426,11 +463,7 @@ function readFeed(root, ledger) {
 }
 
 function writeStore(root, store) {
-  const file = feedFile(root);
-  mkdirSync(dirname(file), { recursive: true });
-  const temporary = `${file}.writing`;
-  writeFileSync(temporary, JSON.stringify(store, null, 1), { mode: 0o600 });
-  renameSync(temporary, file);
+  writeSecretJson(feedFile(root), store);
 }
 
 function writeFeed(root, ledger, feed) {
@@ -458,19 +491,11 @@ function aiFile(root) {
 }
 
 function readAiStore(root) {
-  try {
-    return JSON.parse(readFileSync(aiFile(root), "utf8"));
-  } catch {
-    return {};
-  }
+  return readSecretJson(aiFile(root));
 }
 
 function writeAiStore(root, store) {
-  const file = aiFile(root);
-  mkdirSync(dirname(file), { recursive: true });
-  const temporary = `${file}.writing`;
-  writeFileSync(temporary, JSON.stringify(store, null, 1), { mode: 0o600 });
-  renameSync(temporary, file);
+  writeSecretJson(aiFile(root), store);
 }
 
 function readAi(root, ledger) {
@@ -573,12 +598,7 @@ function wiseFile(root) {
 }
 
 function readWiseStore(root) {
-  try {
-    const parsed = JSON.parse(readFileSync(wiseFile(root), "utf8"));
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
+  return readSecretJson(wiseFile(root));
 }
 
 function readWise(root, ledger) {
@@ -589,11 +609,7 @@ function writeWise(root, ledger, value) {
   const store = readWiseStore(root);
   if (value === null) delete store[ledger];
   else store[ledger] = value;
-  const file = wiseFile(root);
-  mkdirSync(dirname(file), { recursive: true });
-  const temporary = `${file}.writing`;
-  writeFileSync(temporary, JSON.stringify(store, null, 1), { mode: 0o600 });
-  renameSync(temporary, file);
+  writeSecretJson(wiseFile(root), store);
 }
 
 /**
@@ -607,12 +623,7 @@ function simpleFinFile(root) {
 }
 
 function readSimpleFinStore(root) {
-  try {
-    const parsed = JSON.parse(readFileSync(simpleFinFile(root), "utf8"));
-    return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
-    return {};
-  }
+  return readSecretJson(simpleFinFile(root));
 }
 
 function readSimpleFin(root, ledger) {
@@ -623,11 +634,7 @@ function writeSimpleFin(root, ledger, value) {
   const store = readSimpleFinStore(root);
   if (value === null) delete store[ledger];
   else store[ledger] = value;
-  const file = simpleFinFile(root);
-  mkdirSync(dirname(file), { recursive: true });
-  const temporary = `${file}.writing`;
-  writeFileSync(temporary, JSON.stringify(store, null, 1), { mode: 0o600 });
-  renameSync(temporary, file);
+  writeSecretJson(simpleFinFile(root), store);
 }
 
 /** Ask the Bridge for its account set, with the Access URL's name and password. */
@@ -685,7 +692,13 @@ function madeAt(folder) {
   }
 }
 
-export function startServer({ port, ledgerRoot, ledgerId }) {
+function tokenMatches(given, expected) {
+  if (typeof given !== "string" || given.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(given, "utf8"), Buffer.from(expected, "utf8"));
+}
+
+export function startServer({ port, ledgerRoot, ledgerId, apiToken = null, secretBox = null }) {
+  if (secretBox !== null) activeSecretBox = secretBox;
   const folderOf = (id) => join(ledgerRoot, id);
   let current = ledgerId;
 
@@ -757,6 +770,10 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
       // computer is the same site to a browser.
       const fetchSite = request.headers["sec-fetch-site"];
       if (fetchSite === "cross-site" || fetchSite === "same-site") {
+        send(response, 403, { error: "that request did not come from this app" });
+        return;
+      }
+      if (apiToken !== null && !tokenMatches(request.headers["x-osabooks-token"], apiToken)) {
         send(response, 403, { error: "that request did not come from this app" });
         return;
       }
@@ -1925,7 +1942,8 @@ export function startServer({ port, ledgerRoot, ledgerId }) {
 
       send(response, 404, { error: "no such endpoint" });
     } catch (error) {
-      send(response, error instanceof BadRequest ? 400 : 500, { error: error.message });
+      const code = error instanceof PayloadTooLarge ? 413 : error instanceof BadRequest ? 400 : 500;
+      send(response, code, { error: error.message });
     }
   });
 

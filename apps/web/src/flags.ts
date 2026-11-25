@@ -88,6 +88,9 @@ export function flagIcon(country: string, name: string): SVGSVGElement {
   svg.setAttribute("class", "country-flag");
   svg.setAttribute("role", "img");
   svg.setAttribute("aria-label", name);
-  svg.innerHTML = `<title>${name}</title>${FLAGS[country] ?? GLOBE}`;
+  svg.innerHTML = FLAGS[country] ?? GLOBE;
+  const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
+  title.textContent = name;
+  svg.prepend(title);
   return svg;
 }

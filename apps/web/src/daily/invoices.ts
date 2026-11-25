@@ -1753,7 +1753,7 @@ function editInvoiceCell(invoice: Invoice): HTMLTableCellElement {
                 }),
               };
         window.location.href =
-          `mailto:${message.to}?subject=${encodeURIComponent(message.subject)}` +
+          `mailto:${encodeURIComponent(message.to.trim())}?subject=${encodeURIComponent(message.subject)}` +
           `&body=${encodeURIComponent(message.body)}`;
       });
     }

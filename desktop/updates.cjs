@@ -7,16 +7,33 @@
 // person chooses to restart. Nothing happens offline, or in an edition with no
 // releases named, or run from a checkout.
 
-const { app, dialog } = require("electron");
+const { app, dialog, shell } = require("electron");
+const { existsSync, readFileSync } = require("node:fs");
+const { join } = require("node:path");
 
 const FIRST_LOOK_MS = 15 * 1000;
 const EVERY_MS = 6 * 60 * 60 * 1000;
 
+/** True when this packaged build carries a Authenticode publisherName to verify updates against. */
+function isSignedBuild() {
+  try {
+    const cfg = join(process.resourcesPath, "app-update.yml");
+    if (!existsSync(cfg)) return false;
+    return /^\s*publisherName\s*:/m.test(readFileSync(cfg, "utf8"));
+  } catch {
+    return false;
+  }
+}
+
 function startUpdates(edition, mainWindow) {
   if (!app.isPackaged || !edition.updates) return { checkNow: null };
   const { autoUpdater } = require("electron-updater");
-  autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  const signed = isSignedBuild();
+  // Never silently download and execute unsigned installers (deep audit H1).
+  // Once OSABOOKS_PUBLISHER_NAME is configured at build time, app-update.yml
+  // includes publisherName and signed auto-updates turn back on automatically.
+  autoUpdater.autoDownload = signed;
+  autoUpdater.autoInstallOnAppQuit = signed;
   // A pre-release is for trying out, not for everyone's books.
   autoUpdater.allowPrerelease = false;
 
@@ -54,6 +71,25 @@ function startUpdates(edition, mainWindow) {
   });
 
   autoUpdater.on("update-available", (info) => {
+    if (!signed) {
+      if (!asked) return;
+      asked = false;
+      const releases = `https://github.com/${edition.updates.owner}/${edition.updates.repo}/releases/latest`;
+      void dialog
+        .showMessageBox(mainWindow() ?? undefined, {
+          type: "info",
+          title: `${edition.name} update`,
+          message: `${edition.name} ${info.version} is available.`,
+          detail: "Automatic download is off until this edition is code-signed. Open the releases page to download it manually.",
+          buttons: ["Open releases page", "Later"],
+          defaultId: 0,
+          cancelId: 1,
+        })
+        .then(({ response }) => {
+          if (response === 0) void shell.openExternal(releases);
+        });
+      return;
+    }
     if (!asked) return;
     asked = false;
     void dialog.showMessageBox(mainWindow() ?? undefined, {

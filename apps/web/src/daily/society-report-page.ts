@@ -79,7 +79,7 @@ function labelled(label: string, control: HTMLElement): HTMLLabelElement {
 
 function openReport(html: string): void {
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-  window.open(url, "_blank");
+  window.open(url, "_blank", "noopener,noreferrer");
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 

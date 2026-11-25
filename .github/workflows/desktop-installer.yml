@@ -56,6 +56,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag }}
         run: |
+          if ! [[ "$TAG" =~ ^v[0-9][0-9A-Za-z._-]*$ ]]; then
+            echo "Invalid release tag: $TAG" >&2
+            exit 1
+          fi
           # latest.yml is what installed copies read to find a newer version;
           # the blockmap lets them download only what changed.
           gh release create "$TAG" desktop/release/OsaBooks-Setup.exe \

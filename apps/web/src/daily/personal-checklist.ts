@@ -249,7 +249,7 @@ function donationsCoded(owner: string, from: string, to: string): number {
     .filter((t) => t.date >= from && t.date <= to)
     .filter((t) => {
       const code = overrides[t.id]?.code ?? "";
-      return [...codes].some((c) => new RegExp(`\\b${c}\\b`).test(code));
+      return [...codes].some((c) => new RegExp(`\\b${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(code));
     })
     .reduce((s, t) => s - t.amount, 0);
 }

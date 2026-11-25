@@ -99,7 +99,7 @@ export function handle(message: Message, context: ToolContext): unknown {
       const books = booksName(context);
       const asked = String(message.params?.["protocolVersion"] ?? "");
       const client = (message.params?.["clientInfo"] as { name?: unknown } | undefined)?.name;
-      if (typeof client === "string") context.client = client.slice(0, 60);
+      if (context.clientLocked !== true && typeof client === "string") context.client = client.slice(0, 60);
       return reply({
         protocolVersion: SUPPORTED.includes(asked) ? asked : (SUPPORTED[0] as string),
         capabilities: { tools: {} },

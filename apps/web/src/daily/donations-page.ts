@@ -78,7 +78,7 @@ function openReceipt(entity: Entity, receipt: DonationReceipt, options: { copy?:
     ...(replaced !== undefined ? { replacedNumber: replaced } : {}),
   });
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-  window.open(url, "_blank");
+  window.open(url, "_blank", "noopener,noreferrer");
   // Left for a minute: the tab reads it after it opens.
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
@@ -373,7 +373,7 @@ function openStatement(entity: Entity, donor: string, year: number, receipts: re
   if (entity.nonprofit === undefined) return;
   const html = givingStatementHtml({ name: entity.name, address: entity.address }, entity.nonprofit, donor, year, receipts, taxYearOf);
   const url = URL.createObjectURL(new Blob([html], { type: "text/html" }));
-  window.open(url, "_blank");
+  window.open(url, "_blank", "noopener,noreferrer");
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 

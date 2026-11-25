@@ -20,6 +20,8 @@ export interface ToolContext {
   suggest?: boolean;
   /** The client's name for itself, from initialize: who a suggestion came from. */
   client?: string;
+  /** True when the host (hosted OAuth) verified client identity; initialize cannot overwrite it. */
+  clientLocked?: boolean;
   /** Now, as an ISO time; a test gives a fixed one. */
   now?: () => string;
 }
@@ -377,7 +379,14 @@ export const TOOLS: Tool[] = [
     run(args, context) {
       const books = context.shelf.get();
       const only = text(args, "bank_account");
-      const sections = books.dailyBalances.filter((s) => only === undefined || s.account === only);
+      const sections = books.dailyBalances.filter((s) => {
+        if (only !== undefined && s.account !== only) return false;
+        if (context.allowed !== undefined) {
+          const owners = s.account !== undefined ? books.entities.banks[s.account] : undefined;
+          if (owners === undefined || !owners.some((e) => context.allowed?.has(e))) return false;
+        }
+        return true;
+      });
       const checks = checkDailyBalances(sections, books.transactions);
       return {
         checked: checks.length,

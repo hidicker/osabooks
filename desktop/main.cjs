@@ -13,7 +13,8 @@
 // server staged beside this file; installed, the server is in the program's
 // resources.
 
-const { app, BrowserWindow, Menu, dialog, shell } = require("electron");
+const { app, BrowserWindow, Menu, dialog, safeStorage, session, shell } = require("electron");
+const { randomBytes } = require("node:crypto");
 const { existsSync, mkdirSync } = require("node:fs");
 const { join } = require("node:path");
 const { pathToFileURL } = require("node:url");
@@ -52,10 +53,26 @@ async function startOwnServer() {
   // allows them): none for OsaBooks, the filing service for a Pro edition.
   process.env["OSABOOKS_CONNECT"] = (edition.connect ?? []).join(" ");
   const { startServer } = await import(pathToFileURL(join(folder, "server.js")).href);
-  running = await startServer({ port: PORT, ledgerRoot: books, ledgerId: "my-books" });
+  const apiToken = randomBytes(32).toString("hex");
+  // Attach the per-launch loopback token to all requests from the app window
+  // so other local processes/users cannot call 127.0.0.1:<port>/api/* (deep audit M14).
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: [`${ORIGIN}/*`] }, (details, callback) => {
+    details.requestHeaders["x-osabooks-token"] = apiToken;
+    callback({ requestHeaders: details.requestHeaders });
+  });
+  // Encrypt local bank/AI key files using OS credential protection (DPAPI / Keychain) (deep audit M15).
+  const secretBox = safeStorage.isEncryptionAvailable()
+    ? {
+        seal: (plain) => safeStorage.encryptString(plain).toString("base64"),
+        open: (cipher) => safeStorage.decryptString(Buffer.from(cipher, "base64")),
+      }
+    : undefined;
+  running = await startServer({ port: PORT, ledgerRoot: books, ledgerId: "my-books", apiToken, secretBox });
 }
 
 function openWindow() {
+  session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
+  session.defaultSession.setPermissionCheckHandler(() => false);
   window = new BrowserWindow({
     width: 1280,
     height: 860,
@@ -94,12 +111,14 @@ function openWindow() {
     if (/^https?:\/\//.test(url)) void shell.openExternal(url);
     return { action: "deny" };
   });
-  window.webContents.on("will-navigate", (event, url) => {
+  const guardNav = (event, url) => {
     if (!isApp(url)) {
       event.preventDefault();
       if (/^https?:\/\//.test(url)) void shell.openExternal(url);
     }
-  });
+  };
+  window.webContents.on("will-navigate", guardNav);
+  window.webContents.on("will-redirect", guardNav);
   window.on("closed", () => {
     window = null;
   });

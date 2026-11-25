@@ -128,6 +128,7 @@ export function openPayslips(slips: readonly Payslip[], fileName: string): void 
   box.className = "ask-on-page payslip-view";
   const frame = document.createElement("iframe");
   frame.className = "payslip-frame";
+  frame.setAttribute("sandbox", "allow-same-origin allow-modals");
   frame.title = slips.length === 1 ? `Payslip for ${slips[0]?.employee ?? ""}` : `${slips.length} payslips`;
   frame.srcdoc = html;
   const actions = document.createElement("div");
