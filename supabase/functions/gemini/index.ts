@@ -240,6 +240,9 @@ Deno.serve(async (request: Request) => {
       if (demo && SHARED_KEY === "") {
         return reply({ error: "no key set for these books" }, 400);
       }
+      if (prompt.length > (demo ? 30_000 : 600_000)) {
+        return reply({ error: "that is too big to ask in one go" }, 400);
+      }
 
       // Counted first. A cap checked afterwards is one that spends the money
       // and then discovers it was not allowed to.
@@ -304,6 +307,12 @@ Deno.serve(async (request: Request) => {
       const demo = theirs === null;
       if (demo && SHARED_KEY === "") {
         return reply({ error: "no key set for these books" }, 400);
+      }
+      if (demo) {
+        const serialized = JSON.stringify({ contents, tools });
+        if (serialized.length > 60_000 || serialized.includes('"inlineData"')) {
+          return reply({ error: "that conversation is too big for the shared key" }, 400);
+        }
       }
 
       // One turn counts as one, against the same allowance the coding uses.

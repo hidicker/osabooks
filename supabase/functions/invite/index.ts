@@ -74,7 +74,10 @@ async function caller(jwt: string): Promise<{ id: string; email: string }> {
 /** Past this many in a day, the site's owner hears about it, once. */
 const ALERT_AFTER = 10;
 
+const SAFE_EMAIL = /^[^\s\r\n\u0085\u2028\u2029,<>]+@[^\s\r\n\u0085\u2028\u2029,<>]+$/;
+
 async function send(to: string, subject: string, text: string, html: string): Promise<void> {
+  if (!SAFE_EMAIL.test(to)) throw new Error("invalid recipient address");
   const client = new SMTPClient({
     connection: {
       hostname: SMTP_HOST,
@@ -114,6 +117,7 @@ Deno.serve(async (request: Request) => {
   const email = String(body.email ?? "").trim();
   const role = String(body.role ?? "bookkeeper");
   if (book === "" || email === "") return reply({ error: "which books, and whom?" }, 400);
+  if (!SAFE_EMAIL.test(email)) return reply({ error: "That does not look like an email address." }, 400);
 
   // The invitation first, as the caller: the database decides whether they may.
   const made = await asCaller(jwt, "invite_to_book", { book, who: email, as_role: role });
