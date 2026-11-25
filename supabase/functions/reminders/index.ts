@@ -27,9 +27,15 @@ const SMTP_USER = Deno.env.get("SMTP_USER") ?? "";
 const SMTP_PASSWORD = Deno.env.get("SMTP_PASSWORD") ?? "";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 const FROM = Deno.env.get("REMINDERS_FROM") ?? SMTP_USER;
+/** Where a warning goes when one account sends many reminders in a day. */
+const ALERT_EMAIL = Deno.env.get("ALERT_EMAIL") ?? "";
 
 /** The most one set of books sends in a morning, so a mistake cannot flood anybody. */
 const PER_BOOK = 50;
+/** Past this many reminders in 24 hours across an account's books, tell the site's owner once. */
+const ALERT_AFTER = 10;
+/** How many sets of books run in parallel each morning (code review 7.2). */
+const BATCH = 5;
 /** How many runs the log keeps. */
 const LOG_LENGTH = 60;
 
@@ -103,6 +109,27 @@ async function sendBySmtp(client: SMTPClient, email: Email): Promise<void> {
   });
 }
 
+async function sendAlert(client: SMTPClient | null, subject: string, text: string): Promise<void> {
+  if (ALERT_EMAIL === "") return;
+  if (client === null) {
+    const response = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { authorization: `Bearer ${RESEND_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({ from: `OsaBooks <${FROM}>`, to: [ALERT_EMAIL], subject: oneLine(subject), text }),
+    });
+    if (!response.ok) throw new Error(`Resend alert said ${response.status}`);
+    return;
+  }
+  await client.send({ from: `OsaBooks <${FROM}>`, to: ALERT_EMAIL, subject: oneLine(subject), content: text });
+}
+
+const CAP_WHY: Record<string, string> = {
+  "too-new": "new books wait 24 hours before sending reminders",
+  "address-limit": "already sent three reminders to this address in the last 24 hours",
+  "books-limit": `more than ${PER_BOOK} in 24 hours; sent tomorrow`,
+  "account-limit": "account daily limit of 100 reminder emails reached; sent tomorrow",
+};
+
 interface Held {
   sent?: Record<string, number>;
   log?: { at: string; to: string; customer: string; invoices: string[]; failed?: string }[];
@@ -121,18 +148,52 @@ async function runBook(book: string): Promise<string> {
   const client = useResend
     ? null
     : new SMTPClient({ connection: { hostname: SMTP_HOST, port: 465, tls: true, auth: { username: SMTP_USER, password: SMTP_PASSWORD } } });
+
+  // Reserve quota in the database before sending (code review 7.1): enforces
+  // 24h cooling-off for new books, per-address, per-book, and per-account caps.
+  const allowed: Email[] = [];
+  const capSkipped: { customer: string; why: string }[] = [];
+  let alertInfo: { owner: string; books: string; to: string } | null = null;
+  for (const email of result.emails.slice(0, PER_BOOK)) {
+    const take = await rpc<{ ok: boolean; why?: string; books?: string; owner_id?: string; owner_email?: string; sent_today?: number }>(
+      "reminder_email_take",
+      { book, who: email.to },
+    );
+    if (!take.ok) {
+      capSkipped.push({ customer: email.customer, why: CAP_WHY[take.why ?? ""] ?? "daily reminder limit reached" });
+      continue;
+    }
+    allowed.push(email);
+    if (take.sent_today === ALERT_AFTER + 1) {
+      alertInfo = { owner: take.owner_email || take.owner_id || "unknown", books: take.books ?? book, to: email.to };
+    }
+  }
+
   // Each email recorded as soon as it has gone, so a run that stops part way
   // never leaves an email sent and unrecorded to go again tomorrow.
   const done = await (async () => {
     try {
-      return await sendReminders(
-        result.emails.slice(0, PER_BOOK),
+      const res = await sendReminders(
+        allowed,
         { sent, log: [...(held.log ?? [])] },
         (email: Email) => (client === null ? sendByResend(email) : sendBySmtp(client, email)),
         async (now: { sent: Record<string, number>; log: NonNullable<Held["log"]> }) => {
           await rpc("reminders_put", { book, value: { ...held, sent: now.sent, log: now.log.slice(0, LOG_LENGTH) } });
         },
       );
+      if (alertInfo !== null && ALERT_EMAIL !== "") {
+        await sendAlert(
+          client,
+          `OsaBooks: ${alertInfo.owner} has sent ${ALERT_AFTER + 1} payment reminders today`,
+          [
+            `${alertInfo.owner} has now sent ${ALERT_AFTER + 1} payment reminder emails in the last 24 hours.`,
+            `Latest: to ${alertInfo.to}, for the books "${alertInfo.books}".`,
+            "",
+            "One account may send at most 100 a day across all its books.",
+          ].join("\n"),
+        ).catch((error) => console.error("reminder alert:", (error as Error).message));
+      }
+      return res;
     } finally {
       await client?.close();
     }
@@ -142,6 +203,7 @@ async function runBook(book: string): Promise<string> {
   Object.assign(sent, done.sent);
   const skipped = [
     ...result.skipped,
+    ...capSkipped,
     ...result.emails.slice(PER_BOOK).map((e: Email) => ({ customer: e.customer, why: `more than ${PER_BOOK} in one morning; sent tomorrow` })),
   ];
   await rpc("reminders_put", {
@@ -174,18 +236,23 @@ Deno.serve(async (request: Request) => {
     }
   }
 
-  // Each set of books in a call of its own, as the morning run does.
+  // Each set of books in a call of its own, in small batches so many books
+  // never open hundreds of simultaneous mail connections (code review 7.2).
   const books = await rpc<{ book_id: string }[]>("reminders_books", {});
   const self = `${SUPABASE_URL}/functions/v1/reminders`;
-  const calls = Promise.allSettled(
-    books.map((one) =>
-      fetch(self, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-nightly-key": NIGHTLY_KEY },
-        body: JSON.stringify({ book: one.book_id }),
-      }).then(async (response) => console.log(await response.text())),
-    ),
-  );
+  const calls = (async () => {
+    for (let i = 0; i < books.length; i += BATCH) {
+      await Promise.allSettled(
+        books.slice(i, i + BATCH).map((one) =>
+          fetch(self, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-nightly-key": NIGHTLY_KEY },
+            body: JSON.stringify({ book: one.book_id }),
+          }).then(async (response) => console.log(await response.text())),
+        ),
+      );
+    }
+  })();
   // @ts-ignore EdgeRuntime is Supabase's: keep working after the reply.
   if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(calls);
   else await calls;

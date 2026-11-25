@@ -211,19 +211,24 @@ Deno.serve(async (request: Request) => {
     }
   }
 
-  // The morning itself: each set of books in a call of its own, so one slow
-  // bank or one long AI answer cannot run another set out of time.
+  // The morning itself: each set of books in a call of its own, in batches of
+  // 5 so many books do not flood the database or bank APIs at once (review 7.2).
   const books = await rpc<{ book_id: string }[]>("nightly_books", {});
   const self = `${SUPABASE_URL}/functions/v1/nightly`;
-  const calls = Promise.allSettled(
-    books.map((one) =>
-      fetch(self, {
-        method: "POST",
-        headers: { "content-type": "application/json", "x-nightly-key": NIGHTLY_KEY },
-        body: JSON.stringify({ book: one.book_id }),
-      }).then(async (response) => console.log(await response.text())),
-    ),
-  );
+  const BATCH = 5;
+  const calls = (async () => {
+    for (let i = 0; i < books.length; i += BATCH) {
+      await Promise.allSettled(
+        books.slice(i, i + BATCH).map((one) =>
+          fetch(self, {
+            method: "POST",
+            headers: { "content-type": "application/json", "x-nightly-key": NIGHTLY_KEY },
+            body: JSON.stringify({ book: one.book_id }),
+          }).then(async (response) => console.log(await response.text())),
+        ),
+      );
+    }
+  })();
   // @ts-ignore EdgeRuntime is Supabase's: keep working after the reply.
   if (typeof EdgeRuntime !== "undefined") EdgeRuntime.waitUntil(calls);
   else await calls;
