@@ -4,6 +4,7 @@ import type {
   BalanceSection,
   CodingEngine,
   EntityModel,
+  Invoice,
   LockDates,
   Overrides,
   RuleSet,
@@ -21,6 +22,7 @@ import type { BookFile, BookSource } from "./source.js";
 export interface Books {
   name: string;
   transactions: Transaction[];
+  invoices: Invoice[];
   entities: EntityModel;
   chart: Account[];
   engine: CodingEngine | null;
@@ -65,6 +67,7 @@ export class BookShelf {
   private read(): Books {
     const meta = (this.part("ledger.json") ?? {}) as { name?: string };
     const transactions = asArray<Transaction>(this.part("transactions.json"));
+    const invoices = asArray<Invoice>(this.part("invoices.json"));
     const decisions = (this.part("decisions.json") ?? {}) as Record<string, unknown>;
     const entities = (this.part("entities.json") ?? { entities: [], accounts: {}, banks: {} }) as EntityModel;
     const chart = asArray<Account>(this.part("chart.json"));
@@ -80,6 +83,7 @@ export class BookShelf {
     return {
       name: meta.name ?? "OsaBooks",
       transactions,
+      invoices,
       entities,
       chart,
       engine,

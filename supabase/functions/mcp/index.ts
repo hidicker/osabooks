@@ -32,7 +32,7 @@ const CORS: Record<string, string> = {
 };
 
 /** The parts the tools read, and the one they add to. */
-const PARTS = ["transactions", "decisions", "entities", "chart", "rules", "suggested"];
+const PARTS = ["transactions", "decisions", "entities", "chart", "rules", "invoices", "suggested"];
 
 /** Roles that may suggest; a read-only member only reads. */
 const SUGGESTERS = new Set(["owner", "bookkeeper", "accountant"]);
