@@ -1760,8 +1760,12 @@ export async function copyToCloudBook(
 ): Promise<{ ok: true } | { ok: false; why: string }> {
   const held = await loadCloudParts(bookId);
   if (held === null) return { ok: false, why: "The set on the server could not be read." };
+  // Save "decisions" (which carries lockDates) after transactions and invoices
+  // so books that already have a lock date can be copied online without the
+  // Stage 2 lock trigger rejecting the initial invoices insert.
+  const orderedParts = [...FOLDER_PARTS.filter((p) => p !== "decisions"), ...FOLDER_PARTS.filter((p) => p === "decisions")];
   const writes: [string, unknown][] = [
-    ...FOLDER_PARTS.map((part): [string, unknown] => [part, partValue(ledger, part)]),
+    ...orderedParts.map((part): [string, unknown] => [part, partValue(ledger, part)]),
     ["rules", extra.rules ?? {}],
     ["rulesarchive", extra.rulesarchive],
     ["events", extra.events],

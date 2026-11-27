@@ -155,17 +155,18 @@ async function twoFactorNeeded(book: string, person: string): Promise<boolean> {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CONSENT_MAX_AGE_MS = 90 * 86_400_000;
 
-async function approvedWithCode(person: string, clientId: unknown): Promise<boolean> {
-  if (typeof clientId !== "string" || !UUID_RE.test(clientId)) return false;
+async function approvedWithCode(person: string, clientId: unknown): Promise<"ok" | "expired" | "missing"> {
+  if (typeof clientId !== "string" || !UUID_RE.test(clientId)) return "missing";
   const response = await service(
     `/rest/v1/connector_consents?select=client_id,made_at&user_id=eq.${person}&client_id=eq.${clientId}`,
   );
-  if (!response.ok) return false;
+  if (!response.ok) return "missing";
   const rows = (await response.json().catch(() => [])) as { made_at?: string }[];
   const madeAt = rows[0]?.made_at;
-  if (typeof madeAt !== "string") return false;
+  if (typeof madeAt !== "string") return "missing";
   const when = Date.parse(madeAt);
-  return Number.isFinite(when) && Date.now() - when <= CONSENT_MAX_AGE_MS;
+  if (!Number.isFinite(when)) return "missing";
+  return Date.now() - when <= CONSENT_MAX_AGE_MS ? "ok" : "expired";
 }
 
 async function booksNamed(book: string): Promise<string | null> {
@@ -252,15 +253,15 @@ Deno.serve(async (request) => {
   // An app's own token never carries aal2 (Supabase's way), so the approval
   // made with the code is what counts for it.
   const claims0 = claimsOf(token);
-  if (
-    (await twoFactorNeeded(book, person)) &&
-    claims0["aal"] !== "aal2" &&
-    !(await approvedWithCode(person, claims0["client_id"]))
-  ) {
-    return json(
-      rpcError(firstId, -32001, "These books need two-factor sign-in, and this connection was not made with the code from your authenticator app."),
-      403,
-    );
+  if ((await twoFactorNeeded(book, person)) && claims0["aal"] !== "aal2") {
+    const consent = await approvedWithCode(person, claims0["client_id"]);
+    if (consent !== "ok") {
+      const msg =
+        consent === "expired"
+          ? "Your two-factor approval for this AI app expired after 90 days. Reconnect this app in OsaBooks to approve it again."
+          : "These books need two-factor sign-in, and this connection was not made with the code from your authenticator app.";
+      return json(rpcError(firstId, -32001, msg), 403);
+    }
   }
 
   try {

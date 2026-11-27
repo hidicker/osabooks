@@ -135,7 +135,7 @@ async function draw(screen: HTMLElement, id: string): Promise<void> {
   card.append(el("p", "Allowed, it can, for any set of books you give it the connector address of:"));
   const can = el("ul");
   for (const line of [
-    "read the books: transactions, accounts, coding and entities;",
+    "read the books: transactions, invoices, accounts, coding and entities;",
     "suggest codes, splits and journals, which wait in OsaBooks until you use or decline each one.",
   ]) {
     can.append(el("li", line));

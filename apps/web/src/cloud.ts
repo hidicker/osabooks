@@ -248,8 +248,10 @@ export async function sessionFromUrl(): Promise<boolean> {
   if (accessToken === null || refreshToken === null) return false;
 
   history.replaceState(null, "", location.pathname + location.search);
-  // Refuse to silently replace an active session from a URL fragment (login CSRF).
-  if (session !== null || recall() !== null) return false;
+  // Refuse to silently replace an active (unexpired) session from a URL fragment (login CSRF),
+  // while still allowing a fresh sign-in/reset link when any stored session has already expired.
+  const existing = session ?? recall();
+  if (existing !== null && existing.expiresAt > Math.floor(Date.now() / 1000)) return false;
   try {
     const check = await fetch(`${CLOUD.url}/auth/v1/user`, {
       headers: { apikey: CLOUD.publishableKey, Authorization: `Bearer ${accessToken}` },
