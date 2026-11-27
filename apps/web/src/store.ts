@@ -5,6 +5,7 @@ import type {
   UsPayroll,
   Item,
   BankLayout,
+  StockAdjustment,
   StockCount,
   TimeEntry,
   BankReconciliation,
@@ -294,6 +295,8 @@ export interface StoredLedger {
   timeEntries?: TimeEntry[];
   /** Stock counted, and the journal each put the inventory account to. */
   stockCounts?: StockCount[];
+  /** Single-item stock adjustments (opening stock, damage, shrinkage, write-off). */
+  stockAdjustments?: StockAdjustment[];
   /** United States sales tax rates, each owed in its own liability account. */
   salesTaxRates?: SalesTaxRate[];
   /** Bank file layouts pointed out by hand, by the file's headings, with the account their lines go on. */
@@ -996,6 +999,7 @@ function decisionsOf(ledger: StoredLedger): Record<string, unknown> {
     ...(ledger.auPayroll && (ledger.auPayroll.employees.length > 0 || ledger.auPayroll.payRuns.length > 0) ? { auPayroll: ledger.auPayroll } : {}),
     ...(ledger.usPayroll && (ledger.usPayroll.employees.length > 0 || ledger.usPayroll.payRuns.length > 0) ? { usPayroll: ledger.usPayroll } : {}),
     ...(ledger.stockCounts && ledger.stockCounts.length > 0 ? { stockCounts: ledger.stockCounts } : {}),
+    ...(ledger.stockAdjustments && ledger.stockAdjustments.length > 0 ? { stockAdjustments: ledger.stockAdjustments } : {}),
     ...(ledger.salesTaxRates && ledger.salesTaxRates.length > 0 ? { salesTaxRates: ledger.salesTaxRates } : {}),
     ...(ledger.bankLayouts && Object.keys(ledger.bankLayouts).length > 0 ? { bankLayouts: ledger.bankLayouts } : {}),
     ...(ledger.classes && (ledger.classes.names.length > 0 || Object.keys(ledger.classes.assigned).length > 0) ? { classes: ledger.classes } : {}),

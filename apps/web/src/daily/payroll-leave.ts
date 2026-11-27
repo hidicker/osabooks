@@ -1,4 +1,5 @@
 import { note } from "../ui.js";
+import { renderLeaveRequestsSection } from "./payroll-portal-ui.js";
 import { NZ_REGIONS, formatAmount, leaveBalance, ordinaryWeeklyPayOf, workingDaysBetween, localToday } from "@nzosa/core";
 import type { Cents, IsoDate, LeaveKind, LeaveSettings, LeaveTaken } from "@nzosa/core";
 import type { PayrollData } from "../store.js";
@@ -52,6 +53,8 @@ export function renderLeave(
     container.append(note("No employees yet. Add them on the Employees tab."));
     return;
   }
+
+  renderLeaveRequestsSection(container, payroll, commit);
 
   const pick = document.createElement("label");
   const date = document.createElement("input");

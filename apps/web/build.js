@@ -119,10 +119,22 @@ const options = {
   logLevel: "info",
 };
 
+const portalOptions = {
+  entryPoints: [join(root, "src/portal/portal.ts")],
+  bundle: true,
+  format: "esm",
+  target: ["es2022"],
+  outfile: join(outdir, "portal", "portal.js"),
+  sourcemap: serve,
+  minify: !serve,
+  logLevel: "info",
+};
+
 if (serve) {
   // esbuild only rebuilds now; serving is ours, because the ledger folder needs
   // an API in front of it and esbuild's server has no room for one.
   const ctx = await watch(options);
+  void watch(portalOptions);
 
   // Where the books live. A folder per ledger, so switching to the demo and
   // back is a different folder rather than a different browser.
@@ -181,5 +193,5 @@ ${message}
   if (process.argv.includes("--open")) openBrowser(url);
   void running;
 } else {
-  await build(options);
+  await Promise.all([build(options), build(portalOptions)]);
 }

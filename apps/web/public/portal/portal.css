@@ -1,0 +1,54 @@
+/* Employee Payroll Portal — built on ../styles.css tokens for light & dark themes. */
+body.portal-page { background: var(--bg); color: var(--text); margin: 0; }
+.portal-main { max-width: 960px; margin: 0 auto; padding: 24px 16px 56px; }
+.portal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.portal-brand h1 { margin: 0 0 4px; font-size: 1.5rem; }
+.portal-brand p { margin: 0; }
+.portal-head-actions { display: flex; gap: 10px; align-items: center; }
+.portal-back { color: var(--accent); text-decoration: none; font-size: 0.92rem; }
+.portal-back:hover { text-decoration: underline; }
+
+.portal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+}
+.portal-card h2 { margin: 0 0 10px; font-size: 1.15rem; }
+.portal-card h3 { margin: 0 0 8px; font-size: 1rem; }
+
+.portal-auth-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.portal-form { display: flex; flex-direction: column; gap: 10px; max-width: 420px; }
+.portal-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; }
+.portal-form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+
+.portal-tabs { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+.portal-tab { background: transparent; border: 1px solid var(--border); border-radius: 6px; padding: 6px 14px; cursor: pointer; color: var(--text); }
+.portal-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+
+.portal-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.portal-stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.portal-stat-label { font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+.portal-stat-value { font-size: 1.25rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.portal-table-wrap { overflow-x: auto; }
+.portal-table { width: 100%; border-collapse: collapse; }
+.portal-table th, .portal-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+.portal-table th { font-size: 0.82rem; color: var(--muted); font-weight: 600; }
+.portal-table td.num, .portal-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+.portal-badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; text-transform: capitalize; }
+.portal-badge.pending { background: rgba(217, 119, 6, 0.15); color: #b45309; }
+.portal-badge.approved { background: rgba(22, 163, 74, 0.15); color: #15803d; }
+.portal-badge.declined { background: rgba(220, 38, 38, 0.15); color: #b91c1c; }
+.portal-badge.cancelled { background: rgba(100, 116, 139, 0.15); color: var(--muted); }
+
+.portal-invite-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 8px 0; border-bottom: 1px solid var(--border); }
+.portal-invite-row:last-child { border-bottom: none; }
+
+.portal-employer-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 14px; }
+.portal-details-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.portal-detail-item { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.portal-detail-label { font-size: 0.8rem; color: var(--muted); }
+.portal-detail-value { font-size: 0.98rem; font-weight: 500; margin-top: 2px; }

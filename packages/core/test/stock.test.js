@@ -77,3 +77,64 @@ test("each product's movements, with what is on hand and its worth after each", 
   // Low: at or below the reorder point, furthest below first; none set, never low.
   assert.deepEqual(lowStock(items, onHand).map((x) => [x.item.id, x.onHand, x.reorderAt]), [["cups", 8, 10], ["beans", 5, 5]]);
 });
+
+test("explicit tracked toggle, SKU lookup, single-item adjustments, per-item accounts, and gross margin", async () => {
+  const {
+    averageUnitCost,
+    findItem,
+    formatStockMovementsCsv,
+    formatStockValuationCsv,
+    grossMarginByItem,
+    isTrackedItem,
+    trackStock,
+  } = await import("../dist/index.js");
+
+  const items = [
+    { id: "w1", code: "WGT-01", name: "Widget", kind: "product", tracked: true, unitCost: 1_000, inventoryAccountCode: "630A", cogsAccountCode: "310A", reorderAt: 3 },
+    { id: "u1", code: "UNT-01", name: "Untracked widget", kind: "product", tracked: false, unitCost: 500 },
+    { id: "s1", code: "SRV-01", name: "Consulting", kind: "service", price: 15_000 },
+  ];
+  assert.equal(isTrackedItem(items[0]), true);
+  assert.equal(isTrackedItem(items[1]), false);
+  assert.equal(isTrackedItem(items[2]), false);
+  assert.equal(findItem(items, "wgt-01")?.id, "w1");
+
+  const adjustments = [
+    { id: "a1", date: "2026-04-01", itemId: "w1", quantityDelta: 10, unitCost: 1_200, reason: "opening", note: "Opening balance" },
+    { id: "a2", date: "2026-04-15", itemId: "w1", quantityDelta: -2, reason: "damage", note: "Broken box" },
+  ];
+  const docs = [
+    { number: "INV-10", kind: "sales", issued: "2026-04-10", credit: false, lines: [{ itemCode: "WGT-01", quantity: 4, net: 10_000, description: "Widget" }] },
+  ];
+  const { onHand, costs, history } = trackStock(items, docs, [], adjustments);
+
+  // 10 opening @ 12.00 = 120.00; 4 sold @ 12.00 = 48.00 (left 6 @ 72.00); 2 damaged @ 12.00 = 24.00 (left 4 @ 48.00).
+  assert.deepEqual(onHand.get("w1"), { quantity: 4, value: 4_800 });
+  assert.equal(averageUnitCost(onHand.get("w1"), 1_000), 1_200);
+  assert.equal(onHand.has("u1"), false);
+
+  const saleCost = costs.find((c) => c.number === "INV-10");
+  assert.equal(saleCost?.cost, 4_800);
+  assert.equal(saleCost?.inventoryAccountCode, "630A");
+  assert.equal(saleCost?.cogsAccountCode, "310A");
+
+  const dmgCost = costs.find((c) => c.transactionId === "stock-adj:a2");
+  assert.equal(dmgCost?.cost, 2_400);
+
+  const gm = grossMarginByItem(
+    [{ number: "INV-10", kind: "sales", status: "Sent", issued: "2026-04-10", contact: "Acme", total: 11_500, tax: 1_500, lines: [{ itemCode: "WGT-01", quantity: 4, net: 10_000, tax: 1_500, gross: 11_500, accountCode: "200", taxType: "GST", description: "Widget" }] }],
+    items,
+    history,
+    { from: "2026-04-01", to: "2026-04-30" },
+  );
+  assert.equal(gm.rows.length, 1);
+  assert.equal(gm.rows[0].salesNet, 10_000);
+  assert.equal(gm.rows[0].cogs, 4_800);
+  assert.equal(gm.rows[0].grossProfit, 5_200);
+  assert.equal(gm.rows[0].marginPercent, 52);
+
+  const valCsv = formatStockValuationCsv(items, onHand, "2026-04-30");
+  assert.ok(valCsv.includes("WGT-01") && valCsv.includes("48.00"));
+  const movCsv = formatStockMovementsCsv(items, history);
+  assert.ok(movCsv.includes("Opening") && movCsv.includes("Adjusted") && movCsv.includes("Damaged stock"));
+});

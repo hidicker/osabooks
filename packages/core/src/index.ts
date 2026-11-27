@@ -524,8 +524,8 @@ export { isMyobAccounts, isMyobJournal, parseMyobAccounts, parseMyobBooks, parse
 export type { MyobAccounts } from "./myob.js";
 export { fillWording, STANDARD_WORDING, unknownBlanks, WORDING_BLANKS, wordingFor } from "./email-wording.js";
 export type { Wording, WordingKind } from "./email-wording.js";
-export { salesBy } from "./sales-by.js";
-export type { SalesBy, SalesRow } from "./sales-by.js";
+export { salesBy, grossMarginByItem } from "./sales-by.js";
+export type { SalesBy, SalesRow, GrossMarginReport, GrossMarginRow } from "./sales-by.js";
 export { paidTo } from "./paid-to.js";
 export type { PaidTo } from "./paid-to.js";
 export * from "./quick-entry.js";
