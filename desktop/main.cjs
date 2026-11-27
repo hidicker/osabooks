@@ -71,8 +71,11 @@ async function startOwnServer() {
 }
 
 function openWindow() {
-  session.defaultSession.setPermissionRequestHandler((_wc, _permission, callback) => callback(false));
-  session.defaultSession.setPermissionCheckHandler(() => false);
+  // Deny browser permissions (camera, mic, geolocation, notifications) while
+  // keeping clipboard write working for in-app Copy buttons.
+  const allowPermission = (permission) => permission === "clipboard-sanitized-write";
+  session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(allowPermission(permission)));
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowPermission(permission));
   window = new BrowserWindow({
     width: 1280,
     height: 860,

@@ -435,7 +435,19 @@ function readSecretJson(file) {
   }
 }
 
+function isSealedFile(file) {
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    return Boolean(parsed && typeof parsed === "object" && parsed.v === 1 && typeof parsed.sealed === "string");
+  } catch {
+    return false;
+  }
+}
+
 function writeSecretJson(file, store) {
+  if (!activeSecretBox && isSealedFile(file)) {
+    throw new Error("This key file is protected by the OsaBooks desktop app and cannot be overwritten outside it.");
+  }
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   const raw = JSON.stringify(store, null, 1);
   const out = activeSecretBox ? JSON.stringify({ v: 1, sealed: activeSecretBox.seal(raw) }) : raw;
