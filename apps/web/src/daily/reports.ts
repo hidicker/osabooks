@@ -4,7 +4,7 @@ import { renderDashboard } from "./dashboard-report.js";
 import { renderXeroCheck } from "./xero-check-report.js";
 import { comparing, drawPeriodControls, earlierRange, periodFileName, periodHeading, reportRange } from "./report-period.js";
 import { depreciationStillToPost } from "@nzosa/core";
-import { bestAccountMatch, cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell, localToday, documentKey, documentNumberOf } from "@nzosa/core";
+import { bestAccountMatch, cashForecast, changeShare, dateLooksWrong, daysSalesOutstanding, grossMarginByItem, gstReturnFingerprint, isCreditNote, isPosted, formatChartOfAccounts, formatFixedAssets, periodSaid, salesBy, spreadsheetCell, localToday, documentKey, documentNumberOf } from "@nzosa/core";
 import type { IsoDate, OpeningBalances, OwingDocument, XeroHistoryEntry } from "@nzosa/core";
 import { manualJournalHistory } from "@nzosa/core";
 import { computeOurReturns } from "../variance.js";
@@ -38,6 +38,7 @@ import {
   manualJournalGstAccount,
   ledgerFromStart,
   invoicesInPlay,
+  stockTracked,
   entityView,
   booksGstAccount,
   gstBasis,
@@ -5942,6 +5943,77 @@ function renderSalesBy(body: HTMLElement, year: number, by: "customer" | "item")
   tbody.append(total);
   table.append(tbody);
   body.append(table);
+
+  if (by === "item") {
+    const tracked = stockTracked();
+    if (tracked !== null) {
+      const period = reportRange(year);
+      const chosen = state.entityFilter;
+      const invoices = invoicesInPlay().filter((i) => chosen === "" || i.entityId === undefined || i.entityId === chosen);
+      const gm = grossMarginByItem(invoices, state.ledger.items ?? [], tracked.history, period);
+      if (gm.rows.some((r) => r.cogs !== 0)) {
+        const gmHead = document.createElement("h3");
+        gmHead.textContent = `Gross margin by item, ${periodHeading(year)}`;
+        gmHead.style.marginTop = "20px";
+        body.append(gmHead);
+        const gmTable = document.createElement("table");
+        gmTable.className = "report-table";
+        gmTable.innerHTML =
+          '<thead><tr><th>SKU</th><th>Product or service</th><th style="text-align:right">Qty</th>' +
+          '<th style="text-align:right">Sales (net)</th><th style="text-align:right">COGS</th>' +
+          '<th style="text-align:right">Gross profit</th><th style="text-align:right">Margin</th></tr></thead>';
+        const gmBody = document.createElement("tbody");
+        for (const r of gm.rows) {
+          const tr = document.createElement("tr");
+          tr.append(
+            nameCell(r.code),
+            nameCell(r.name),
+            amountCell(r.quantity === 0 ? "" : String(Math.round(r.quantity * 100) / 100)),
+            amountCell(booksMoney(r.salesNet)),
+            amountCell(booksMoney(r.cogs)),
+            amountCell(booksMoney(r.grossProfit)),
+            amountCell(r.marginPercent === null ? "" : `${r.marginPercent}%`),
+          );
+          gmBody.append(tr);
+        }
+        const gmTotal = document.createElement("tr");
+        gmTotal.className = "report-total";
+        gmTotal.append(
+          nameCell(""),
+          nameCell("Total"),
+          amountCell(""),
+          amountCell(booksMoney(gm.salesNet)),
+          amountCell(booksMoney(gm.cogs)),
+          amountCell(booksMoney(gm.grossProfit)),
+          amountCell(gm.marginPercent === null ? "" : `${gm.marginPercent}%`),
+        );
+        gmBody.append(gmTotal);
+        gmTable.append(gmBody);
+        body.append(gmTable);
+
+        const csvBtn = document.createElement("button");
+        csvBtn.type = "button";
+        csvBtn.className = "small";
+        csvBtn.style.marginTop = "8px";
+        csvBtn.textContent = "Download gross margin (CSV)";
+        csvBtn.addEventListener("click", () => {
+          const head = ["SKU", "Product or service", "Quantity", "Sales net", "COGS", "Gross profit", "Margin %"];
+          const rows = gm.rows.map((r) => [
+            r.code,
+            r.name,
+            String(r.quantity),
+            formatAmount(r.salesNet),
+            formatAmount(r.cogs),
+            formatAmount(r.grossProfit),
+            r.marginPercent === null ? "" : String(r.marginPercent),
+          ]);
+          const csv = [head, ...rows].map((row) => row.map(spreadsheetCell).join(",")).join("\r\n") + "\r\n";
+          download(csv, `gross-margin-by-item-${periodFileName(year)}.csv`, "text/csv");
+        });
+        body.append(csvBtn);
+      }
+    }
+  }
 }
 
 /** The twelve months of a financial year, from its first: April to March in New Zealand. */

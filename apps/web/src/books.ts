@@ -83,6 +83,7 @@ import {
   documentsInPlay,
   isPosted,
   isCreditNote as isCreditDocument,
+  isTrackedItem,
   trackStock,
   outsidePurchases,
   outsideSales,
@@ -2508,7 +2509,7 @@ export function stockAccounts(): { inventory?: { code: string; name: string }; c
 /** Each stocked product's invoices and bills, as the stock tracking reads them. */
 export function stockTracked(): ReturnType<typeof trackStock> | null {
   const items = state.ledger.items ?? [];
-  if (!items.some((i) => i.kind === "product" && i.unitCost !== undefined)) return null;
+  if (!items.some((i) => isTrackedItem(i))) return null;
   const documents = invoicesInPlay()
     .filter(isPosted)
     .map((i) => ({
@@ -2523,30 +2524,42 @@ export function stockTracked(): ReturnType<typeof trackStock> | null {
         description: l.description,
       })),
     }));
-  return trackStock(items, documents, state.ledger.stockCounts ?? []);
+  return trackStock(items, documents, state.ledger.stockCounts ?? [], state.ledger.stockAdjustments ?? []);
 }
 
 /**
- * The cost of stocked products sold, from inventory to cost of goods sold, on
- * each invoice's date. Derived each time, as depreciation is.
+ * The cost of stocked products sold (and single-item stock adjustments), from
+ * inventory to cost of goods sold, on each document's date. Derived each time,
+ * as depreciation is.
  */
 function stockCostJournals(): PostedJournal[] {
   const tracked = stockTracked();
   const { inventory, cost } = stockAccounts();
-  if (tracked === null || inventory === undefined || cost === undefined) return [];
-  return tracked.costs.map((c) => ({
-    transactionId: c.transactionId,
-    // Stock leaves on a sale: the cost goes with that sale's job and class.
-    document: documentKey("sales", c.number),
-    date: c.date as IsoDate,
-    narration: `Cost of stock sold on ${c.number}`,
-    lines: [
-      { accountCode: cost.code, accountName: cost.name, amount: c.cost, taxType: "NONE", description: `Stock sold, ${c.number}` },
-      { accountCode: inventory.code, accountName: inventory.name, amount: -c.cost, taxType: "NONE", description: `Stock sold, ${c.number}` },
-    ],
-    source: "adjustment",
-    taxBasis: "both",
-  }));
+  if (tracked === null) return [];
+  const nameOf = (code: string, fallback: string): string =>
+    state.chart.find((a) => a.code.trim() === code)?.name ?? fallback;
+  const out: PostedJournal[] = [];
+  for (const c of tracked.costs) {
+    const invCode = c.inventoryAccountCode ?? inventory?.code;
+    const cogsCode = c.cogsAccountCode ?? cost?.code;
+    if (!invCode || !cogsCode) continue;
+    const invName = nameOf(invCode, inventory?.name ?? "Inventory");
+    const cogsName = nameOf(cogsCode, cost?.name ?? "Cost of Goods Sold");
+    const desc = c.narration ?? `Stock sold, ${c.number}`;
+    out.push({
+      transactionId: c.transactionId,
+      ...(c.number !== "" ? { document: documentKey("sales", c.number) } : {}),
+      date: c.date as IsoDate,
+      narration: c.narration ?? `Cost of stock sold on ${c.number}`,
+      lines: [
+        { accountCode: cogsCode, accountName: cogsName, amount: c.cost, taxType: "NONE", description: desc },
+        { accountCode: invCode, accountName: invName, amount: -c.cost, taxType: "NONE", description: desc },
+      ],
+      source: "adjustment",
+      taxBasis: "both",
+    });
+  }
+  return out;
 }
 
 /**

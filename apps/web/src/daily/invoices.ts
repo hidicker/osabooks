@@ -22,6 +22,7 @@ import {
   proposalOpen,
   proposalState,
   stockAccounts,
+  stockTracked,
 } from "../books.js";
 import { combobox } from "../combobox.js";
 import { renderRecurring } from "./recurring.js";
@@ -44,6 +45,7 @@ import {
   emailForContact,
   findContact,
   findItem,
+  isTrackedItem,
   isPosted,
   isEstimate,
   linesWithoutAccount,
@@ -831,10 +833,12 @@ export function renderInvoiceEditor(): void {
   const accounts = knownCodes(state.rules, state.ledger.overrides ?? {}, state.chart);
   const lineAccounts = new Map<HTMLElement, Combobox>();
 
-  // Products kept in stock, whose lines carry a quantity.
-  const stockedItems: Item[] = (state.ledger.items ?? []).filter(
-    (i) => i.kind === "product" && i.unitCost !== undefined && i.active !== false,
-  );
+  // Active products & services, and which of them are tracked in stock.
+  const activeItems: Item[] = (state.ledger.items ?? []).filter((i) => i.active !== false);
+  const stockedItems: Item[] = activeItems.filter((i) => isTrackedItem(i));
+  const stockWarn = document.createElement("p");
+  stockWarn.className = "variance-note warn";
+  stockWarn.hidden = true;
 
   function readLines(): InvoiceLine[] {
     return [...lineHost.querySelectorAll<HTMLElement>(".invoice-line")].map((row) => {
@@ -880,6 +884,36 @@ export function renderInvoiceEditor(): void {
         : noSalesTax()
           ? `Total ${formatAmount(total)}`
           : sayTax(`Total ${formatAmount(total)} · GST ${formatAmount(tax)} · excluding GST ${formatAmount(total - tax)}`);
+
+    // Non-blocking warning when a sales invoice sells more tracked stock than is currently on hand.
+    if (!asBill && !isCreditNote(draft) && stockedItems.length > 0) {
+      const tracked = stockTracked();
+      const warnings: string[] = [];
+      if (tracked !== null) {
+        const qtyByItem = new Map<string, number>();
+        for (const l of lines) {
+          if (!l.itemCode) continue;
+          const item = stockedItems.find((i) => i.id === l.itemCode || i.name === l.itemCode || i.code === l.itemCode);
+          if (!item) continue;
+          qtyByItem.set(item.id, (qtyByItem.get(item.id) ?? 0) + (l.quantity ?? 1));
+        }
+        for (const [id, wanted] of qtyByItem) {
+          const item = stockedItems.find((i) => i.id === id);
+          const avail = tracked.onHand.get(id)?.quantity ?? 0;
+          if (item && wanted > avail) {
+            warnings.push(`${item.name}: selling ${wanted}, only ${Math.round(avail * 100) / 100} on hand`);
+          }
+        }
+      }
+      if (warnings.length > 0) {
+        stockWarn.textContent = `Low stock warning: ${warnings.join("; ")}.`;
+        stockWarn.hidden = false;
+      } else {
+        stockWarn.hidden = true;
+      }
+    } else {
+      stockWarn.hidden = true;
+    }
   }
 
   function addLine(line: InvoiceLine): void {
@@ -888,15 +922,14 @@ export function renderInvoiceEditor(): void {
 
     const description = text(line.description, "What it is for");
     description.className = "line-description";
-    // The products and services on record, offered as the line is written;
-    // on a bill, the products kept in stock.
-    if ((!asBill || stockedItems.length > 0) && (state.ledger.items ?? []).length > 0) {
+    // The products and services on record, offered as the line is written.
+    if (activeItems.length > 0) {
       const list = document.createElement("datalist");
       list.id = "invoice-items";
-      for (const one of asBill ? stockedItems : (state.ledger.items ?? [])) {
-        if (one.active === false) continue;
+      for (const one of activeItems) {
         const option = document.createElement("option");
         option.value = one.name;
+        if (one.code) option.label = `${one.code} — ${one.name}`;
         list.append(option);
       }
       description.setAttribute("list", list.id);
@@ -968,7 +1001,9 @@ export function renderInvoiceEditor(): void {
       qty.hidden = false;
       qty.value = String(quantity);
     };
-    const already = stockedItems.find((i) => i.id === line.itemCode || i.name === line.itemCode);
+    const already = activeItems.find(
+      (i) => i.id === line.itemCode || i.name === line.itemCode || (i.code !== undefined && i.code === line.itemCode),
+    );
     if (already !== undefined) stockedLine(already, line.quantity ?? 1);
     // The unit a quantity is multiplied by: the price on an invoice, which is
     // what the customer pays; on a bill the cost, which is before GST, with the
@@ -980,7 +1015,7 @@ export function renderInvoiceEditor(): void {
           : Math.round(item.unitCost * (1 + (isTaxable(tax.value) ? gstPercent() : 0) / 100))
         : item.price;
     qty.addEventListener("input", () => {
-      const item = stockedItems.find((i) => i.id === row.dataset["item"]);
+      const item = activeItems.find((i) => i.id === row.dataset["item"]);
       const unit = item === undefined ? undefined : unitOf(item);
       const n = Number(qty.value.replace(",", "."));
       if (unit !== undefined && Number.isFinite(n) && n > 0) gross.value = ((Math.round(unit * n)) / 100).toFixed(2);
@@ -992,19 +1027,24 @@ export function renderInvoiceEditor(): void {
     tax.hidden = usTax ? chosenRate() === null : noSalesTax();
     row.append(description, qty, account.element, tax, gross, drop);
     lineHost.append(row);
-    // A name that is an item's fills in what is still empty: its account, its
-    // price, and the words the line should say.
+    // A name or SKU that is an item's fills in what is still empty: its account,
+    // its price/cost, quantity, and the words the line should say.
     description.addEventListener("change", () => {
       const found = findItem(state.ledger.items ?? [], description.value);
-      const stocked = found === undefined ? undefined : stockedItems.find((i) => i.id === found.id);
-      if (found === undefined || stocked !== undefined || row.dataset["item"] !== undefined) {
-        stockedLine(stocked, 1);
+      if (found === undefined) {
+        if (row.dataset["item"] !== undefined) stockedLine(undefined, 1);
+        return;
       }
-      if (found === undefined) return;
-      // A stocked product bought goes into the inventory account.
-      const into = asBill ? (stocked !== undefined ? stockAccounts().inventory?.code : undefined) : found.accountCode;
-      if (asBill && stocked !== undefined && stocked.unitCost !== undefined && parseMoney(gross.value) === 0) {
-        gross.value = ((unitOf(stocked) ?? 0) / 100).toFixed(2);
+      stockedLine(found, Number(qty.value.replace(",", ".")) || 1);
+      const tracked = isTrackedItem(found);
+      // Tracked products bought go into Inventory; untracked items use their purchase account.
+      const into = asBill
+        ? tracked
+          ? (found.inventoryAccountCode ?? stockAccounts().inventory?.code)
+          : found.purchaseAccountCode
+        : found.accountCode;
+      if (asBill && found.unitCost !== undefined && parseMoney(gross.value) === 0) {
+        gross.value = ((unitOf(found) ?? 0) / 100).toFixed(2);
         gross.dispatchEvent(new Event("input", { bubbles: true }));
       }
       if (into !== undefined && account.value === "") account.choose(accountLabelFor(into));
@@ -1037,7 +1077,7 @@ export function renderInvoiceEditor(): void {
     });
     refreshTotals();
   });
-  box.append(addRow, totals);
+  box.append(addRow, totals, stockWarn);
 
   // --- the message at the foot ---------------------------------------------
   // Terms, a thank you, bank details for this customer: kept on the invoice,

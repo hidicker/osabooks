@@ -7,6 +7,7 @@ import { itemsEditor } from "./payroll-items.js";
 import type { DeductionNotice, PayDeduction, PayItem } from "@nzosa/core";
 import { noticesEditor } from "./payroll-notices.js";
 import { renderLeave } from "./payroll-leave.js";
+import { renderPortalAccessSection } from "./payroll-portal-ui.js";
 import { emailPayslip, employerName, openPayslips, payslipsFor } from "./payslips-ui.js";
 import { openPaymentFile } from "./payment-file-ui.js";
 import { payrollAccounts, reclassify, record, yearsChangedBy, yearsSaid } from "../books.js";
@@ -931,6 +932,7 @@ function renderEmployeesTable(container: HTMLElement): void {
   table.append(tbody);
   tableWrap.append(table);
   container.append(tableWrap);
+  renderPortalAccessSection(container, payroll);
 }
 
 /** Rows open for extras, by employee. */
