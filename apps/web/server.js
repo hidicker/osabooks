@@ -444,9 +444,27 @@ function isSealedFile(file) {
   }
 }
 
+/** Whether a sealed file can be opened with the sealer this program has. */
+function canOpenSealed(file) {
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8"));
+    activeSecretBox.open(parsed.sealed);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function writeSecretJson(file, store) {
   if (!activeSecretBox && isSealedFile(file)) {
     throw new Error("This key file is protected by the OsaBooks desktop app and cannot be overwritten outside it.");
+  }
+  // Sealed by this program but not openable now (another Windows profile,
+  // or the computer's keys changed): it reads as empty, so writing over it
+  // would lose every key in it for good. Kept aside instead, unchanged, so it
+  // can still be opened where it was made.
+  if (activeSecretBox && isSealedFile(file) && !canOpenSealed(file)) {
+    renameSync(file, `${file}.unreadable-${new Date().toISOString().replace(/[:.]/g, "-")}`);
   }
   mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   const raw = JSON.stringify(store, null, 1);
