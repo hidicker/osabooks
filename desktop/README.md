@@ -56,6 +56,33 @@ part of it. Each release carries `latest.yml` (what installed copies read) and
 the installer's `.blockmap` (so they download only what changed); a draft or a
 pre-release is never offered. An edition with no `updates` is updated by hand.
 
+It installs an update by itself only once it is proved to be the publisher's,
+because anyone who could publish a release could publish a matching
+`latest.yml`:
+
+- **Code-signed** (`OSABOOKS_PUBLISHER_NAME` set when built): the updater
+  checks the installer's signature itself.
+- **Our own update key** (`updateKey` in `edition.json`, no certificate
+  needed): it downloads, then installs only if the release's
+  `<installer>.sig` checks out against that key (`update-signature.cjs`). The
+  signature covers the file's SHA-512, its name and its version, so it cannot
+  be moved onto another file or an older release.
+- **Neither**: it says, once per version, that a newer one is out, with a link
+  to the releases page, and installs nothing.
+
+The key is made once, and each release is signed with it before it is
+published. The private key stays off GitHub and backed up; lose it and
+installed copies stop updating by themselves (they still say a newer version
+is out).
+
+```
+node desktop/sign-update.mjs keygen <private key file>      # prints the public key for edition.json
+node desktop/sign-update.mjs sign desktop/release <private key file>
+```
+
+Upload the `.sig` it writes with the installer, `latest.yml` and the
+`.blockmap`.
+
 To try an update end to end without publishing anything, build two installers
 pointed at a folder on this computer, install the older and let it find the
 newer:
